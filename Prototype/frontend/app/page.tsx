@@ -2,6 +2,7 @@
 import Image from "next/image";
 
 import React, { useState } from "react";
+import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
 
 /**
@@ -21,11 +22,17 @@ import { useRouter } from "next/navigation";
  *  - Set NEXT_PUBLIC_API_BASE_URL to your Nest server (e.g. http://localhost:3001).
  */
 
+type AuthFormFields = {
+  email: string;
+  password: string;
+  confirm: string;
+};
+
 export default function AuthPage() {
   const [mode, setMode] = useState<"signin" | "signup">("signin");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
+  const {register, handleSubmit, formState:{errors}, setValue, watch} = useForm<AuthFormFields>({ mode: "onBlur" })
+  const password = watch("password");
+  const confirm = watch("confirm");
   const [role, setRole] = useState<"TRADER" | "ADMIN" | "">(""); // optional per backend
   const [showPw, setShowPw] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -42,21 +49,16 @@ export default function AuthPage() {
 
   const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL?  process.env.NEXT_PUBLIC_API_BASE_URL : "http://localhost:3001";
 
-  function validate() {
-    if (!email.trim()) return "Email is required.";
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return "Enter a valid email.";
-    if (!password) return "Password is required.";
-    if (password.length < 6) return "Password must be at least 6 characters."; // matches DTO
+  function validate(data: AuthFormFields) {
     if (mode === "signup") {
-      if (confirm !== password) return "Passwords do not match.";
+      if (data.confirm !== data.password) return "Passwords do not match.";
     }
     return null;
   }
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function onSubmit(data: AuthFormFields) {
     setMessage(null);
-    const err = validate();
+    const err = validate(data);
     if (err) {
       setMessage({ type: "error", text: err });
       return;
@@ -64,7 +66,7 @@ export default function AuthPage() {
     setIsLoading(true);
     try {
       const url = mode === "signin" ? "/auth/login" : "/auth/signup";
-      const body: any = { email: email.trim(), password };
+      const body: any = { email: data.email, password: data.password };
       if (mode === "signup" && role) body.role = role; // optional; backend falls back to TRADER
 
       const res = await fetch(`${API_BASE}${url}`, {
@@ -73,15 +75,15 @@ export default function AuthPage() {
         body: JSON.stringify(body),
       });
 
-      const data = await res.json().catch(() => ({}));
+      const result = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        const serverMsg = (data && (data.message || data.error)) || "Something went wrong.";
+        const serverMsg = (result && (result.message || result.error)) || "Something went wrong.";
         throw new Error(Array.isArray(serverMsg) ? serverMsg.join(" \u2022 ") : serverMsg);
       }
 
       if (mode === "signin") {
-        const token = data?.access_token;
+        const token = result?.access_token;
         if (typeof token === "string" && token.length > 0) {
           // Store token (quick start). For production, prefer an httpOnly cookie via Next route handler.
           localStorage.setItem("access_token", token);
@@ -91,8 +93,8 @@ export default function AuthPage() {
       } else {
         setMessage({ type: "success", text: "Account created. You can sign in now." });
         setMode("signin");
-        setPassword("");
-        setConfirm("");
+        setValue("password", "");
+        setValue("confirm", "");
       }
     } catch (e: any) {
       setMessage({ type: "error", text: e?.message || "Request failed." });
@@ -102,29 +104,26 @@ export default function AuthPage() {
   }
 
   return (
-    <main className="min-h-svh w-full bg-gradient-to-b from-neutral-50 to-neutral-100 flex items-center justify-center p-4">
-      <div className="relative w-full max-w-md">
-        {/* Background shape */}
-        <div className="absolute -inset-1 rounded-3xl bg-gradient-to-tr from-black/10 to-black/0 blur-2xl" aria-hidden />
-
+    <main className="min-h-svh w-full bg-[#111418] flex items-center justify-center overflow-hidden">
+      <div className="flex min-h-140">
         {/* Card */}
-        <section className="relative rounded-3xl bg-white/70 backdrop-blur-xl shadow-[0_6px_40px_rgba(0,0,0,0.07)] ring-1 ring-black/5 overflow-hidden">
+        <section className="w-100 relative rounded-bl-3xl rounded-tl-3xl bg-[#1C1F24] shadow-lg ring-1 ring-[#2D3139] overflow-hidden">
           {/* Header */}
           <header className="px-6 pt-6 pb-2">
-            <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">{mode === "signin" ? "Welcome back" : "Create your account"}</h1>
-            <p className="mt-1 text-sm text-neutral-600">
+            <h1 className="text-2xl font-semibold tracking-tight text-[#E4E6EB]">{mode === "signin" ? "Welcome back" : "Create your account"}</h1>
+            <p className="mt-1 text-sm text-[#9BA1A6]">
               {mode === "signin" ? "Sign in to continue." : "It takes less than a minute."}
             </p>
           </header>
 
           {/* Mode switch */}
           <div className="px-6 pt-2">
-            <div className="inline-flex rounded-full bg-neutral-100 p-1">
+            <div className="inline-flex rounded-full bg-[#1C1F24] p-1">
               <button
                 onClick={() => setMode("signin")}
                 aria-pressed={mode === "signin"}
-                className={`px-4 py-1.5 text-sm rounded-full transition-all ${
-                  mode === "signin" ? "bg-white shadow text-neutral-900" : "text-neutral-500 hover:text-neutral-800"
+                className={`cursor-pointer px-4 py-1.5 text-sm rounded-full transition-all ${
+                  mode === "signin" ? "bg-[#2D3139] shadow text-[#E4E6EB]" : "text-[#9BA1A6] hover:text-[#E4E6EB]"
                 }`}
               >
                 Sign in
@@ -132,8 +131,8 @@ export default function AuthPage() {
               <button
                 onClick={() => setMode("signup")}
                 aria-pressed={mode === "signup"}
-                className={`px-4 py-1.5 text-sm rounded-full transition-all ${
-                  mode === "signup" ? "bg-white shadow text-neutral-900" : "text-neutral-500 hover:text-neutral-800"
+                className={`cursor-pointer px-4 py-1.5 text-sm rounded-full transition-all ${
+                  mode === "signup" ? "bg-[#2D3139] shadow text-[#E4E6EB]" : "text-[#9BA1A6] hover:text-[#E4E6EB]"
                 }`}
               >
                 Sign up
@@ -142,18 +141,24 @@ export default function AuthPage() {
           </div>
 
           {/* Form */}
-          <form onSubmit={onSubmit} className="px-6 pt-4 pb-6 space-y-4">
+          <form onSubmit={handleSubmit(onSubmit)} className="px-6 pt-4 pb-6 space-y-4">
             <Field label="Email" htmlFor="email">
               <input
                 id="email"
                 type="email"
                 autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="field-input text-neutral-900 placeholder:text-neutral-400 caret-neutral-900"
+                {...register('email',{
+                  required: 'email is required',
+                  pattern: {
+                    value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                    message: "Please enter a valid email address."
+                  }
+                })}
+                className="field-input bg-[#1C1F24] text-[#E4E6EB] placeholder:text-[#9BA1A6] caret-[#E4E6EB] border-[#2D3139]"
                 placeholder="you@example.com"
               />
             </Field>
+            {errors.email && <span className="text-red-500 mb-[10px] block">{errors.email.message}</span>}
 
             <Field label="Password" htmlFor="password">
               <div className="relative">
@@ -161,16 +166,21 @@ export default function AuthPage() {
                   id="password"
                   type={showPw ? "text" : "password"}
                   autoComplete={mode === "signin" ? "current-password" : "new-password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="field-input text-neutral-900 placeholder:text-neutral-400 caret-neutral-900"
-                  placeholder={mode === "signin" ? "Your password" : "6+ characters"}
+                  {...register("password",{
+                    required: 'passsword is required',
+                    minLength:{
+                      value: 8,
+                      message: 'password should be atleast 8 characters long'
+                    } 
+                  })}
+                  className="field-input bg-[#1C1F24] text-[#E4E6EB] placeholder:text-[#9BA1A6] caret-[#E4E6EB] border-[#2D3139]"
+                  placeholder={mode === "signin" ? "Your password" : "atleast 8 characters"}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPw((s) => !s)}
                   aria-label={showPw ? "Hide password" : "Show password"}
-                  className="absolute inset-y-0 right-0 px-3 text-neutral-500 hover:text-neutral-800"
+                  className="absolute inset-y-0 right-0 px-3 text-[#9BA1A6] hover:text-[#E4E6EB]"
                 >
                   {showPw ? 
                     (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 3l18 18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><path d="M10.58 10.58a3 3 0 004.24 4.24" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><path d="M9.88 5.08A10.4 10.4 0 0121 12s-2.5 4.5-9 4.5c-.73 0-1.43-.06-2.08-.17M6.12 8.01A10.5 10.5 0 003 12s2.5 4.5 9 4.5c.36 0 .71-.01 1.05-.04" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>)
@@ -179,6 +189,7 @@ export default function AuthPage() {
                 </button>
               </div>
             </Field>
+            {errors.password && <span className="text-red-500 mb-[10px] block">{errors.password.message}</span>}
 
             {mode === "signup" && (
               <Field label="Role (optional)" htmlFor="role">
@@ -196,13 +207,15 @@ export default function AuthPage() {
                   id="confirm"
                   type={showPw ? "text" : "password"}
                   autoComplete="new-password"
-                  value={confirm}
-                  onChange={(e) => setConfirm(e.target.value)}
-                  className="field-input text-neutral-900 placeholder:text-neutral-400 caret-neutral-900"
+                  {...register("confirm",{
+                    validate: (value) => value == watch('password') || 'Both passwords should be same'
+                  })}
+                  className="field-input bg-[#1C1F24] text-[#E4E6EB] placeholder:text-[#9BA1A6] caret-[#E4E6EB] border-[#2D3139]"
                   placeholder="Repeat password"
                 />
               </Field>
             )}
+            {errors.confirm && <span className="text-red-500 mb-[10px] block">{errors.confirm.message}</span>}
 
             {/* Alert */}
             {message && (
@@ -210,8 +223,8 @@ export default function AuthPage() {
                 role={message.type === "error" ? "alert" : "status"}
                 className={`text-sm rounded-xl px-3 py-2 border ${
                   message.type === "error"
-                    ? "bg-rose-50/80 text-rose-700 border-rose-200"
-                    : "bg-emerald-50/80 text-emerald-700 border-emerald-200"
+                    ? "bg-[#2D3139] text-red-400 border-red-900/50"
+                    : "bg-[#2D3139] text-green-400 border-green-900/50"
                 }`}
               >
                 {message.text}
@@ -222,7 +235,7 @@ export default function AuthPage() {
             <button
               type="submit"
               disabled={isLoading}
-              className="group relative w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-neutral-900 text-white py-3 text-sm font-medium tracking-tight shadow-sm ring-1 ring-black/5 disabled:opacity-60 disabled:cursor-not-allowed"
+              className="group relative w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-[#39FF14] text-black cursor-pointer py-3 text-sm font-medium tracking-tight shadow-sm ring-1 ring-[#1C1F24] hover:bg-[#2ecc40] disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <span className="absolute inset-0 rounded-2xl bg-gradient-to-r from-white/10 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity" />
               {isLoading ? (
@@ -250,28 +263,28 @@ export default function AuthPage() {
               <button
                 type="button"
                 onClick={browseAsGuest}
-                className="w-full rounded-2xl bg-white ring-1 ring-black/10 text-neutral-900 py-2.5 text-sm hover:bg-neutral-50 shadow-sm transition"
+                className="cursor-pointer w-full rounded-2xl bg-[#ff1744] ring-1 ring-[#d50000] text-white py-2.5 text-sm hover:bg-[#d50000] shadow-sm transition "
               >
                 Browse stocks as guest
               </button>
-              <p className="mt-1 text-center text-xs text-neutral-500">
+              <p className="mt-1 text-center text-xs text-[#9BA1A6]">
                 You can view prices but must sign in to save to watchlist.
               </p>
             </div>
 
             {/* Footer switch */}
-            <p className="text-center text-sm text-neutral-600 pt-1">
+            <p className="text-center text-sm text-[#9BA1A6] pt-1">
               {mode === "signin" ? (
                 <>
-                  Don’t have an account?{' '}
-                  <button type="button" onClick={() => setMode("signup")} className="underline underline-offset-4 decoration-neutral-300 hover:decoration-neutral-900 hover:text-neutral-900">
+                  Don't have an account?{' '}
+                  <button type="button" onClick={() => setMode("signup")} className="cursor-pointer underline underline-offset-4 decoration-[#2D3139] hover:decoration-[#E4E6EB] hover:text-[#E4E6EB]">
                     Sign up
                   </button>
                 </>
               ) : (
                 <>
                   Already have an account?{' '}
-                  <button type="button" onClick={() => setMode("signin")} className="underline underline-offset-4 decoration-neutral-300 hover:decoration-neutral-900 hover:text-neutral-900">
+                  <button type="button" onClick={() => setMode("signin")} className="underline underline-offset-4 decoration-[#2D3139] hover:decoration-[#E4E6EB] hover:text-[#E4E6EB]">
                     Sign in
                   </button>
                 </>
@@ -279,18 +292,19 @@ export default function AuthPage() {
             </p>
           </form>
         </section>
-
-        {/* Small print */}
-        <p className="mt-4 text-center text-xs text-neutral-500">
-          By continuing, you agree to our <a className="underline hover:text-neutral-800" href="#">Terms</a> and <a className="underline hover:text-neutral-800" href="#">Privacy Policy</a>.
-        </p>
+        
+        {/* Tag Line */}
+        <div className="bg-[url('/6256878.jpg')] px-15 flex flex-col justify-center  bg-cover bg-center w-160 rounded-tr-3xl rounded-br-3xl">
+          <h1 className="text-[30px] text-white font-bold mt-4 mb-8 drop-shadow-xl">Trade Up</h1>
+          <p className="text-[25px] text-white font-semibold mt-4 mb-8 drop-shadow-xl">Your gateway to smarter trading.</p>
+        </div>
       </div>
 
       {/* Inline styles for inputs to keep this file self‑contained */}
       <style>{`
-        .field-input { width: 100%; appearance: none; background: white; border-radius: 1rem; padding: 0.75rem 0.875rem; border: 1px solid rgba(0,0,0,0.06); outline: none; box-shadow: 0 0 0 0 rgba(0,0,0,0); transition: box-shadow .2s, border-color .2s; }
-        .field-input::placeholder { color: #9ca3af; }
-        .field-input:focus { border-color: rgba(0,0,0,0.12); box-shadow: 0 0 0 6px rgba(0,0,0,0.04); }
+        .field-input { width: 100%; appearance: none; background: #1C1F24; border-radius: 1rem; padding: 0.75rem 0.875rem; border: 1px solid #2D3139; outline: none; box-shadow: 0 0 0 0 rgba(0,0,0,0); transition: box-shadow .2s, border-color .2s; }
+        .field-input::placeholder { color: #9BA1A6; }
+        .field-input:focus { border-color: #E4E6EB; box-shadow: 0 0 0 6px rgba(45,49,57,0.4); }
       `}</style>
     </main>
   );
@@ -298,8 +312,8 @@ export default function AuthPage() {
 
 function Field({ label, htmlFor, children }: { label: string; htmlFor: string; children: React.ReactNode }) {
   return (
-    <label htmlFor={htmlFor} className="block space-y-1.5">
-      <span className="text-sm font-medium text-neutral-800">{label}</span>
+    <label htmlFor={htmlFor} className="block mb-3">
+      <span className="text-sm font-medium text-[#E4E6EB]">{label}</span>
       {children}
     </label>
   );
@@ -322,7 +336,7 @@ function RoleChip({ value, current, onPick }: { value: "TRADER" | "ADMIN"; curre
       onClick={() => onPick(value)}
       aria-pressed={active}
       className={`px-3 py-1.5 rounded-xl text-xs border transition ${
-        active ? "bg-neutral-900 text-white border-neutral-900" : "bg-white border-neutral-200 text-neutral-700 hover:border-neutral-400"
+        active ? "bg-[#2D3139] text-[#E4E6EB] border-[#2D3139]" : "bg-[#1C1F24] border-[#2D3139] text-[#9BA1A6] hover:border-[#E4E6EB]"
       }`}
     >
       {value}
