@@ -14,8 +14,8 @@ export default function charts() {
     const [candleData, setCandleData] = useState<any[]>([]);
     const [currentCandle, setCurrentCandle] = useState<any>(null);
     const [stock, setStock] = useState<string>('HBL');
-
-    // 1 minute in milliseconds
+    const [historicalData, setHistoricalData] = useState<any[]>([]);
+    const [isLoadingHistory, setIsLoadingHistory] = useState<boolean>(false);
     const CANDLE_INTERVAL = 1 * 60 * 1000;
 
     const getCandleStartTime = (timestamp: number) => {
@@ -68,7 +68,7 @@ export default function charts() {
                 autoScale: true,
             },
             crosshair: {
-                mode: 0, // Normal crosshair mode
+                mode: 0, 
                 vertLine: {
                     color: '#2D3139',
                     width: 1,
@@ -93,7 +93,6 @@ export default function charts() {
         chartRef.current = chart;
         candlestickSeriesRef.current = candlestickSeries;
 
-        // Handle resize
         const resizeObserver = new ResizeObserver(entries => {
             if (chartRef.current && chartContainerRef.current) {
                 chartRef.current.applyOptions({
@@ -115,8 +114,7 @@ export default function charts() {
     useEffect(() => {
         initializeChart();
         
-        if (stock) { // Only connect if stock is selected
-            // Load previous candles from localStorage when stock changes
+        if (stock) { 
             try {
                 const storedCandles = localStorage.getItem(`candles_${stock}`);
                 if (storedCandles) {
@@ -140,7 +138,6 @@ export default function charts() {
             socket.on("tickUpdate", (data) => {
                 setTickData(data);
                 
-                // Process tick data inline to avoid closure issues
                 const tick = data.tick;
                 if (!tick) return;
                 
@@ -149,12 +146,9 @@ export default function charts() {
                 const candleTimeInSeconds = candleStartTime / 1000;
                 
                 setCurrentCandle((prev: any) => {
-                    // Check if we need to start a new candle
                     if (!prev || prev.time !== candleTimeInSeconds) {
-                        // Save the previous candle if it exists
                         if (prev) {
                             setCandleData(oldData => {
-                                // Check if this candle already exists in the data
                                 const exists = oldData.some(candle => candle.time === prev.time);
                                 if (exists) {
                                     console.log('Candle already exists, skipping duplicate');
@@ -162,7 +156,6 @@ export default function charts() {
                                 }
                                 
                                 const updated = [...oldData, prev];
-                                // Save to localStorage
                                 try {
                                     localStorage.setItem(`candles_${stock}`, JSON.stringify(updated));
                                     console.log(`Saved candle at time ${prev.time}. Total: ${updated.length}`);
@@ -173,7 +166,6 @@ export default function charts() {
                             });
                         }
                         
-                        // Return new candle
                         return {
                             time: candleTimeInSeconds,
                             open: tick.o,
@@ -182,7 +174,6 @@ export default function charts() {
                             close: tick.c,
                         };
                     } else {
-                        // Update current candle
                         return {
                             ...prev,
                             high: Math.max(prev.high, tick.h),
@@ -202,7 +193,6 @@ export default function charts() {
         }
     }, [stock]);
 
-    // Update chart with all data (completed candles + current candle)
     useEffect(() => {
         if (candlestickSeriesRef.current) {
             const allData = currentCandle 
@@ -210,14 +200,12 @@ export default function charts() {
                 : candleData;
             
             if (allData.length > 0) {
-                // Sort data by time to ensure ascending order
                 const sortedData = [...allData].sort((a, b) => a.time - b.time);
                 
-                // Remove duplicates by keeping the last occurrence of each timestamp
                 const uniqueData = sortedData.reduce((acc: any[], candle) => {
                     const existingIndex = acc.findIndex(c => c.time === candle.time);
                     if (existingIndex >= 0) {
-                        acc[existingIndex] = candle; // Replace with newer data
+                        acc[existingIndex] = candle; 
                     } else {
                         acc.push(candle);
                     }
@@ -233,54 +221,50 @@ export default function charts() {
         <div className="min-h-screen bg-[#111418]">
             <TopBar/>
             <div className="mx-auto max-w-7xl">
-                <div className="mb-6 flex items-center">
-                    <div><h1 className="text-3xl font-bold text-[#E4E6EB]">Live Trading Charts</h1>
-                    <p className="text-[#9BA1A6] mt-2">Real-time 1-minute candlestick chart for {stock || 'No Stock Selected'}</p>
-                    </div>
-                    <div className="ml-10 flex items-center gap-4">
-                        <select 
-                            value={stock} 
-                            onChange={(e)=>setStock(e.target.value)} 
-                            name="Stock" 
-                            id="Stock"
-                            className="bg-[#1C1F24] text-[#E4E6EB] border border-[#2D3139] rounded-lg px-3 py-2 focus:border-[#E4E6EB] focus:outline-none"
-                        >
-                            <option value="HBL">HBL</option>
-                            <option value="UBL">UBL</option>
-                            <option value="MCB">MCB</option>
-                            <option value="HUBC">HUBC</option>
-                            <option value="FFC">FFC</option>
-                        </select>
-                        <button
-                            onClick={clearCandleHistory}
-                            className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-                        >
-                            Clear History
-                        </button>
-                    </div>
-                </div>
-                
-                <Card className="overflow-hidden bg-[#1C1F24] border-[#2D3139]">
-                    <CardContent className="p-6">
-                        <div className="mb-4">
-                            <h2 className="text-xl font-semibold text-[#E4E6EB] mb-2">{stock || 'No Stock Selected'} - 1M Chart</h2>
-                            <div className="flex items-center gap-4 text-sm text-[#9BA1A6]">
-                                <span>Completed Candles: {candleData.length}</span>
-                                <span>•</span>
-                                <span>Status: {stock ? (tickData ? "Connected" : "Waiting for connection...") : "Please select a stock"}</span>
+                <div className="grid gap-6 lg:grid-cols-3">
+                    <Card className="overflow-hidden bg-[#1C1F24] border-[#2D3139] lg:col-span-2 p-0">
+                        <CardContent className="p-3">
+                            <div className="mb-2">
+                                <h2 className="text-xl font-semibold text-[#E4E6EB] mb-2">{stock || 'No Stock Selected'} - 1M Chart</h2>
+                                <div className="flex items-center gap-4 text-sm text-[#9BA1A6]">
+                                    <span>Historical: {historicalData.length}</span>
+                                    <span>•</span>
+                                    <span>Live Candles: {candleData.length}</span>
+                                    <span>•</span>
+                                    <span>Status: {stock ? (tickData ? "Connected" : (isLoadingHistory ? "Loading history..." : "Waiting for connection...")) : "Please select a stock"}</span>
+                                </div>
                             </div>
-                        </div>
-                        
-                        <div 
-                            ref={chartContainerRef} 
-                            className="w-full h-[500px] bg-[#1C1F24] rounded-lg border border-[#2D3139]"
-                        />
-                    </CardContent>
-                </Card>
+                            
+                            <div 
+                                ref={chartContainerRef} 
+                                className="w-full h-[500px] bg-[#1C1F24] rounded-lg border border-[#2D3139]"
+                            />
+                        </CardContent>
+                    </Card>
 
-                <div className="mt-6 grid gap-4 md:grid-cols-2">
                     <Card className="bg-[#1C1F24] border-[#2D3139]">
                         <CardContent className="p-6">
+                            <div className="mb-4 flex items-center gap-4">
+                                <select 
+                                    value={stock} 
+                                    onChange={(e)=>setStock(e.target.value)} 
+                                    name="Stock" 
+                                    id="Stock"
+                                    className="bg-[#1C1F24] text-[#E4E6EB] border border-[#2D3139] rounded-lg px-3 py-2 focus:border-[#E4E6EB] focus:outline-none"
+                                >
+                                    <option value="HBL">HBL</option>
+                                    <option value="UBL">UBL</option>
+                                    <option value="MCB">MCB</option>
+                                    <option value="HUBC">HUBC</option>
+                                    <option value="FFC">FFC</option>
+                                </select>
+                                <button
+                                    onClick={clearCandleHistory}
+                                    className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                                >
+                                    Clear History
+                                </button>
+                            </div>
                             <h3 className="text-lg font-medium text-[#E4E6EB] mb-3">Current Candle</h3>
                             <div className="space-y-2">
                                 {currentCandle ? (
@@ -298,23 +282,6 @@ export default function charts() {
                                     </div>
                                 ) : (
                                     <p className="text-[#9BA1A6]">No active candle</p>
-                                )}
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card className="bg-[#1C1F24] border-[#2D3139]">
-                        <CardContent className="p-6">
-                            <h3 className="text-lg font-medium text-[#E4E6EB] mb-3">Latest Tick Data</h3>
-                            <div className="space-y-2">
-                                {tickData ? (
-                                    <div className="font-mono text-xs bg-[#2D3139] p-3 rounded-md max-h-32 overflow-y-auto">
-                                        <pre className="text-[#9BA1A6] whitespace-pre-wrap">
-                                            {JSON.stringify(tickData, null, 2)}
-                                        </pre>
-                                    </div>
-                                ) : (
-                                    <p className="text-[#9BA1A6]">Waiting for data...</p>
                                 )}
                             </div>
                         </CardContent>

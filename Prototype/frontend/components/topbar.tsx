@@ -4,13 +4,14 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import CloseIcon from '@mui/icons-material/Close';
-
+import { useRouter } from "next/navigation";
 
 export default function topBar() {
 
     const [hidden, setHidden] = useState<string>('none');
     const [url, setUrl] = useState<any>(null);
     const [img, setimg] = useState<any>(null);
+    const router = useRouter();
 
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -43,7 +44,14 @@ export default function topBar() {
                 </Avatar>
                 <Label className="my-5 ">John Doe</Label>
                 <div className="flex justify-around w-[100%]">
-                    <button className="bg-[#22c55e] w-20 h-7 rounded cursor-pointer" onClick={() => { setimg(url); setHidden('none') }}>Sign Out</button>
+                    <button className="bg-[#ef4444] w-20 h-7 rounded cursor-pointer" onClick={() => {
+                        if (typeof window !== "undefined") {
+                            localStorage.removeItem("access_token");
+                        }
+                        setimg(url);
+                        setHidden('none');
+                        router.push("/");
+                    }}>Sign Out</button>
                     <button className="cursor-pointer" ><a href="/settings">Settings</a></button>
                 </div>
             </div>

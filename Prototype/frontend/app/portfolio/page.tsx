@@ -1,11 +1,36 @@
 'use client'
 import { useState, useEffect } from 'react';
 import TopBar from '@/components/topbar';
+import { useRouter } from 'next/navigation';
 
 export default function portfolio() {
 
+    const router = useRouter();
     const [total, setTotal] = useState<number>(0);
+    const [loading, setLoading] = useState(true);
 
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const token = localStorage.getItem('access_token');
+            if (!token) {
+                setTimeout(() => {
+                    router.push('/');
+                }, 150);
+            } else {
+                setTimeout(() => {
+                    setLoading(false);;
+                }, 150);
+            }
+        }
+    }, []);
+
+    if (loading) {
+        return (
+            <div className='min-h-screen bg-[#111418] flex items-center justify-center'>
+                <span className='text-white text-xl'>Loading...</span>
+            </div>
+        );
+    }
 
     return (
         <div className='min-h-screen bg-[#111418]'>
