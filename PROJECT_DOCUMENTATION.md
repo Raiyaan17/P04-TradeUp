@@ -1581,13 +1581,20 @@ socket.emit("subscribeSymbol", "HBL");
   "type": "tickUpdate",
   "symbol": "HBL",
   "tick": {
-    "c": 123.45,
-    "o": 120.00,
-    "h": 125.00,
-    "l": 119.00,
-    "v": 1000000,
-    "chg": 3.45,
-    "chgP": 2.88
+    "market": "REG",
+    "st": "SUS",
+    "price": 291.99,
+    "change": 1.01,
+    "changePercent": 0.00347,
+    "volume": 979007,
+    "trades": 1386,
+    "value": 284856921.58,
+    "high": 294,
+    "low": 289.02,
+    "bid": 0,
+    "ask": 0,
+    "bidVol": 0,
+    "askVol": 0
   },
   "timestamp": 1234567890123
 }
@@ -1687,13 +1694,20 @@ GET https://psxterminal.com/api/ticks/REG/HBL
   "success": true,
   "data": {
     "symbol": "HBL",
-    "c": 123.45,
-    "o": 120.00,
-    "h": 125.00,
-    "l": 119.00,
-    "v": 1000000,
-    "chg": 3.45,
-    "chgP": 2.88
+    "market": "REG",
+    "st": "SUS",
+    "price": 291.99,
+    "change": 1.01,
+    "changePercent": 0.00347,
+    "volume": 979007,
+    "trades": 1386,
+    "value": 284856921.58,
+    "high": 294,
+    "low": 289.02,
+    "bid": 0,
+    "ask": 0,
+    "bidVol": 0,
+    "askVol": 0,
   }
 }
 ```
@@ -1721,11 +1735,20 @@ GET https://psxterminal.com/api/ticks/REG/HBL
   "type": "tickUpdate",
   "symbol": "HBL",
   "tick": {
-    "c": 123.45,
-    "o": 120.00,
-    "h": 125.00,
-    "l": 119.00,
-    "v": 1000000
+    "market": "REG",
+    "st": "SUS",
+    "price": 291.99,
+    "change": 1.01,
+    "changePercent": 0.00347,
+    "volume": 979007,
+    "trades": 1386,
+    "value": 284856921.58,
+    "high": 294,
+    "low": 289.02,
+    "bid": 0,
+    "ask": 0,
+    "bidVol": 0,
+    "askVol": 0,
   },
   "timestamp": 1234567890123
 }
