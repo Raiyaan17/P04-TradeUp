@@ -14,7 +14,7 @@
   TRADER
   ADMIN
  }
- enum Side {
+ enum TransactionType {
   BUY
   SELL
 }
@@ -27,12 +27,11 @@
   role         Role            @default(TRADER)
   createdAt    DateTime        @default(now())
 
-  balance  BigInt    @default(100000)
-
   // Relations
-  watchlist     WatchlistItem[]
-  holdings      Holding[]
-  txns          Txn[]
+  balance      Decimal   @default(1000000)  // Starting balance
+  portfolio    Portfolio[]
+  transactions Transaction[]
+  watchlist    WatchlistItem[]
  }
 
  model Stock {
@@ -42,8 +41,8 @@
   marketType String          @default("REG")
   createdAt  DateTime        @default(now())
   watchers   WatchlistItem[]
-  holdings   Holding[]
-  txns       Txn[]
+  portfolio  Portfolio[]
+  transactions Transaction[]
  }
 
  model WatchlistItem {
@@ -58,40 +57,30 @@
  }
 
 // PORTFOLIO: one row per user+stock with whole-share quantity
-model Holding {
-  id        Int     @id @default(autoincrement())
-  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+model Portfolio {
+  id        Int      @id @default(autoincrement())
   userId    Int
-  stock     Stock   @relation(fields: [stockId], references: [id], onDelete: Cascade)
   stockId   Int
-
-  // Whole shares only
-  shares    Int
-
+  quantity  Int
+  avgPrice  Decimal
+  user      User     @relation(fields: [userId], references: [id])
+  stock     Stock    @relation(fields: [stockId], references: [id])
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 
   @@unique([userId, stockId])
-  @@index([userId])
-  @@index([stockId])
 }
 
 // LEDGER: append-only transaction history (execution price is per-share)
-//
-model Txn {
-  id           Int      @id @default(autoincrement())
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId       Int
-  stock        Stock    @relation(fields: [stockId], references: [id], onDelete: Cascade)
-  stockId      Int
-
-  side         Side
-  shares       Int            // whole shares (positive)
-  priceCents   BigInt         // execution price per share (cents)
-  amountCents  BigInt         // optional: shares * priceCents (store for fast queries)
-
-  createdAt    DateTime @default(now())
-
-  @@index([userId, createdAt])
-  @@index([stockId, createdAt])
+model Transaction {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  stockId     Int
+  type        TransactionType  // BUY or SELL
+  quantity    Int
+  price       Decimal
+  total       Decimal
+  user        User     @relation(fields: [userId], references: [id])
+  stock       Stock    @relation(fields: [stockId], references: [id])
+  createdAt   DateTime @default(now())
 }
+

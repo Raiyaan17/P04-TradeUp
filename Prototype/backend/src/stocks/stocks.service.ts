@@ -1,10 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import axios from 'axios';
 import { FEATURED_SYMBOLS, PSX_API_BASE } from '../common/constants';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class StocksService {
   private readonly base = PSX_API_BASE;
+
+  constructor(private readonly prisma: PrismaService) {}
 
   getFeaturedSymbols() {
     return FEATURED_SYMBOLS as readonly string[];
@@ -23,5 +26,19 @@ export class StocksService {
       symbols.map(async (s) => ({ symbol: s, tick: await this.getTick(s) })),
     );
     return results;
+  }
+
+  async findOrCreateStock(symbol: string) {
+    let stock = await this.prisma.stock.findUnique({
+      where: { symbol },
+    });
+
+    if (!stock) {
+      stock = await this.prisma.stock.create({
+        data: { symbol },
+      });
+    }
+
+    return stock;
   }
 }
