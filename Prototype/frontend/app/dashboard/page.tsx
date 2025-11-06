@@ -1,6 +1,7 @@
 "use client";
 import React from "react";
 import { useRouter } from "next/navigation";
+import TopBar from '@/components/topbar';
 
 /**
  * Dashboard — PSX stocks list + Watchlist (add/remove)
@@ -243,71 +244,46 @@ React.useEffect(() => {
 
   // ---------- UI ----------
   return (
-    <main className="min-h-svh w-full bg-gradient-to-b from-neutral-50 to-neutral-100 p-4">
-      <div className="mx-auto max-w-5xl">
-        <header className="mb-4 flex items-center justify-between">
+    <main className="min-h-screen w-full bg-[#111418]">
+      <TopBar/>
+      <div className="mx-auto max-w-7xl">
+        <header className="mb-6 flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">
-              TradeUp Dashboard
-            </h1>
-            <p className="text-sm text-neutral-600">Featured PSX stocks</p>
+            <h1 className="text-3xl font-semibold text-white mb-2">Dashboard</h1>
+            <p className="text-base text-[#9BA1A6]">Featured PSX stocks</p>
           </div>
           <div className="flex items-center gap-3">
             {lastUpdated && (
-              <span className="text-xs text-neutral-500">Updated {timeAgo(lastUpdated)}</span>
+              <span className="text-xs text-[#9BA1A6]">Updated {timeAgo(lastUpdated)}</span>
             )}
-
             <button
               type="button"
               onClick={() => {
                 setLoading(true);
                 fetchFeatured();
-                fetchWatchlist(); // keep watchlist fresh too
+                fetchWatchlist();
               }}
-              className="rounded-2xl bg-white px-3 py-1.5 text-sm text-neutral-900 ring-1 ring-black/10 shadow-sm hover:bg-neutral-50 hover:shadow-md active:shadow transition"
+              className="rounded-lg bg-[#22c55e] px-4 py-2 text-sm text-white font-medium shadow hover:bg-[#16a34a] transition"
             >
               Refresh
             </button>
-
-            {authed ? (
-              <button
-                type="button"
-                onClick={signOut}
-                className="rounded-2xl px-3 py-1.5 text-sm text-white bg-neutral-900 shadow hover:bg-neutral-800 transition"
-              >
-                Sign out
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => router.push("/")}
-                className="rounded-2xl px-3 py-1.5 text-sm text-neutral-900 bg-white ring-1 ring-black/10 hover:bg-neutral-50 shadow-sm transition"
-              >
-                Sign in
-              </button>
-            )}
           </div>
         </header>
 
-        {/* ---------------- Watchlist (above Featured) ---------------- */}
+        {/* Watchlist Section */}
         {tokenRef.current && (
-          <section className="relative rounded-3xl bg-white/70 backdrop-blur-xl shadow-[0_6px_40px_rgba(0,0,0,0.07)] ring-1 ring-black/5 overflow-hidden mb-4">
-            <div className="p-4 border-b border-black/5 flex items-center justify-between">
-              <h2 className="text-base font-semibold tracking-tight text-neutral-900">
-                Your Watchlist
-              </h2>
+          <section className="mb-6 bg-[#181B20] rounded-3xl text-white shadow flex flex-col gap-2 p-7">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-semibold">Your Watchlist</h2>
               {watchlistRows.length === 0 && (
-                <span className="text-xs text-neutral-500">
-                  No stocks yet — add from the Featured list.
-                </span>
+                <span className="text-sm text-[#9BA1A6]">No stocks yet — add from the Featured list.</span>
               )}
             </div>
-
             {watchlistRows.length > 0 && (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="text-left text-neutral-500 border-b border-black/5">
+                    <tr className="text-left text-white border-b border-[#23262A]">
                       <th className="px-4 py-3">Symbol</th>
                       <th className="px-4 py-3">Name</th>
                       <th className="px-4 py-3">Market</th>
@@ -329,18 +305,18 @@ React.useEffect(() => {
                       const isRemoving = removing.has(s);
 
                       return (
-                        <tr key={s} className="border-b border-black/5">
-                          <td className="px-4 py-3 font-medium text-neutral-900">{row?.symbol ?? "—"}</td>
-                          <td className="px-4 py-3 text-neutral-700">{row?.name ?? "—"}</td>
-                          <td className="px-4 py-3 text-neutral-700">{row?.marketType ?? "REG"}</td>
-                          <td className="px-4 py-3 tabular-nums text-neutral-900 font-medium">{fmt(price)}</td>
-                          <td className={`px-4 py-3 tabular-nums ${neutral ? "text-neutral-700" : up ? "text-emerald-600" : "text-rose-600"}`}>
+                        <tr key={s} className="border-b border-[#23262A]">
+                          <td className="px-4 py-3 font-medium text-white">{row?.symbol ?? "—"}</td>
+                          <td className="px-4 py-3 text-[#E4E6EB]">{row?.name ?? "—"}</td>
+                          <td className="px-4 py-3 text-[#E4E6EB]">{row?.marketType ?? "REG"}</td>
+                          <td className="px-4 py-3 tabular-nums text-white font-medium">{fmt(price)}</td>
+                          <td className={`px-4 py-3 tabular-nums ${neutral ? "text-[#E4E6EB]" : up ? "text-emerald-400" : "text-rose-400"}`}>
                             {fmtSigned(chg)}
                           </td>
-                          <td className={`px-4 py-3 tabular-nums ${neutral ? "text-neutral-700" : up ? "text-emerald-600" : "text-rose-600"}`}>
+                          <td className={`px-4 py-3 tabular-nums ${neutral ? "text-[#E4E6EB]" : up ? "text-emerald-400" : "text-rose-400"}`}>
                             {isFinite(pct) ? `${pct.toFixed(2)}%` : "—"}
                           </td>
-                          <td className="px-4 py-3 tabular-nums text-neutral-900">{fmtInt(vol)}</td>
+                          <td className="px-4 py-3 tabular-nums text-white">{fmtInt(vol)}</td>
                           <td className="px-4 py-3">
                             <button
                               onClick={() => removeSymbol(s)}
@@ -366,23 +342,20 @@ React.useEffect(() => {
           </section>
         )}
 
-        {/* ---------------- Featured Stocks ---------------- */}
-        <section className="relative rounded-3xl bg-white/70 backdrop-blur-xl shadow-[0_6px_40px_rgba(0,0,0,0.07)] ring-1 ring-black/5 overflow-hidden">
-          <div className="p-4 border-b border-black/5 flex items-center justify-between">
-            <h2 className="text-base font-semibold tracking-tight text-neutral-900">
-              Featured Stocks
-            </h2>
+        {/* Featured Stocks Section */}
+        <section className="bg-[#181B20] rounded-3xl text-white shadow flex flex-col gap-2 p-7">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-2xl font-semibold">Featured Stocks</h2>
             {error && (
-              <span className="text-xs text-rose-700 bg-rose-50/80 border border-rose-200 rounded-xl px-2 py-1">
+              <span className="text-sm text-[#ef4444] bg-[#181B20] border border-[#ef4444] rounded-xl px-2 py-1">
                 {error}
               </span>
             )}
           </div>
-
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-neutral-500 border-b border-black/5">
+                <tr className="text-left text-white border-b border-[#23262A]">
                   <th className="px-4 py-3">Symbol</th>
                   <th className="px-4 py-3">Name</th>
                   <th className="px-4 py-3">Market</th>
@@ -409,18 +382,18 @@ React.useEffect(() => {
                     const canSave = !!tokenRef.current && !isSaved && !isSaving;
 
                     return (
-                      <tr key={s} className="border-b border-black/5">
-                        <td className="px-4 py-3 font-medium text-neutral-900">{row?.symbol ?? "—"}</td>
-                        <td className="px-4 py-3 text-neutral-700">{row?.name ?? "—"}</td>
-                        <td className="px-4 py-3 text-neutral-700">{row?.marketType ?? "REG"}</td>
-                        <td className="px-4 py-3 tabular-nums text-neutral-900 font-medium">{fmt(price)}</td>
-                        <td className={`px-4 py-3 tabular-nums ${neutral ? "text-neutral-700" : up ? "text-emerald-600" : "text-rose-600"}`}>
+                      <tr key={s} className="border-b border-[#23262A]">
+                        <td className="px-4 py-3 font-medium text-white">{row?.symbol ?? "—"}</td>
+                        <td className="px-4 py-3 text-[#E4E6EB]">{row?.name ?? "—"}</td>
+                        <td className="px-4 py-3 text-[#E4E6EB]">{row?.marketType ?? "REG"}</td>
+                        <td className="px-4 py-3 tabular-nums text-white font-medium">{fmt(price)}</td>
+                        <td className={`px-4 py-3 tabular-nums ${neutral ? "text-[#E4E6EB]" : up ? "text-emerald-400" : "text-rose-400"}`}>
                           {fmtSigned(chg)}
                         </td>
-                        <td className={`px-4 py-3 tabular-nums ${neutral ? "text-neutral-700" : up ? "text-emerald-600" : "text-rose-600"}`}>
+                        <td className={`px-4 py-3 tabular-nums ${neutral ? "text-[#E4E6EB]" : up ? "text-emerald-400" : "text-rose-400"}`}>
                           {isFinite(pct) ? `${pct.toFixed(2)}%` : "—"}
                         </td>
-                        <td className="px-4 py-3 tabular-nums text-neutral-900">{fmtInt(vol)}</td>
+                        <td className="px-4 py-3 tabular-nums text-white">{fmtInt(vol)}</td>
                         <td className="px-4 py-3">
                           {isSaved ? (
                             <span className="inline-flex items-center gap-1 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-1 text-xs">
@@ -451,15 +424,10 @@ React.useEffect(() => {
           </div>
         </section>
 
-        <p className="mt-4 text-center text-xs text-neutral-500">
+        <p className="mt-4 text-center text-xs text-[#9BA1A6]">
           Early read-only view for prices. Live ticks can replace polling next.
         </p>
       </div>
-
-      {/* Inline utility styles to match the Auth page */}
-      <style>{`
-        .tabular-nums { font-variant-numeric: tabular-nums; }
-      `}</style>
     </main>
   );
 }
@@ -528,7 +496,6 @@ function timeAgo(d: Date) {
   return `${h}h ago`;
 }
 
-/* ---------------- Tiny inline icons ---------------- */
 function Plus16() {
   return (
     <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true">
