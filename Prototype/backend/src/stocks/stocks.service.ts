@@ -28,6 +28,30 @@ export class StocksService {
     return results;
   }
 
+  async getKlines(
+    symbol: string,
+    timeframe: string = '1m',
+    options?: { start?: number; end?: number; limit?: number },
+  ) {
+    const url = `${this.base}/api/klines/${encodeURIComponent(symbol)}/${timeframe}`;
+    const params: any = {};
+
+    if (options?.start) params.start = options.start;
+    if (options?.end) params.end = options.end;
+    if (options?.limit) params.limit = options.limit;
+
+    try {
+      const { data } = await axios.get(url, { params, timeout: 10000 });
+      if (data?.success && Array.isArray(data.data)) {
+        return data.data;
+      }
+      return [];
+    } catch (error) {
+      console.error('Failed to fetch klines:', error);
+      return [];
+    }
+  }
+
   async findOrCreateStock(symbol: string) {
     let stock = await this.prisma.stock.findUnique({
       where: { symbol },

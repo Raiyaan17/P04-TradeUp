@@ -16,14 +16,15 @@
 8. [Backend Architecture](#backend-architecture)
 9. [Frontend Architecture](#frontend-architecture)
 10. [API Documentation](#api-documentation)
-11. [WebSocket Real-Time Updates](#websocket-real-time-updates)
-12. [PSX API Integration](#psx-api-integration)
-13. [Authentication & Security](#authentication--security)
-14. [Setup Instructions](#setup-instructions)
-15. [Running the Application](#running-the-application)
-16. [Environment Variables](#environment-variables)
-17. [Future Development (Phase 2)](#future-development-phase-2)
-18. [Troubleshooting](#troubleshooting)
+11. [Postman Testing Guide for Buy & Sell Services](#postman-testing-guide-for-buy--sell-services)
+12. [WebSocket Real-Time Updates](#websocket-real-time-updates)
+13. [PSX API Integration](#psx-api-integration)
+14. [Authentication & Security](#authentication--security)
+15. [Setup Instructions](#setup-instructions)
+16. [Running the Application](#running-the-application)
+17. [Environment Variables](#environment-variables)
+18. [Future Development (Phase 2)](#future-development-phase-2)
+19. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -1508,6 +1509,259 @@ Authorization: Bearer <access_token>
   "ok": true
 }
 ```
+
+### Trading Endpoints
+
+#### 8. Buy Stock
+**Endpoint**: `POST /trades/buy`
+
+**Authentication**: Required (Bearer token)
+
+**Headers**:
+```
+Authorization: Bearer <access_token>
+```
+
+**Request Body**:
+```json
+{
+  "symbol": "AAPL",
+  "quantity": 10
+}
+```
+
+**Validation Rules**:
+- `symbol`: Must be a non-empty string (e.g., "AAPL", "GOOGL", "MSFT")
+- `quantity`: Must be an integer ≥ 1
+
+**Response** (200 OK):
+```json
+{
+  "success": true,
+  "trade": {
+    "id": 1,
+    "userId": 1,
+    "symbol": "AAPL",
+    "quantity": 10,
+    "price": 150.25,
+    "type": "BUY",
+    "createdAt": "2025-11-06T10:30:00.000Z"
+  }
+}
+```
+
+**Errors**:
+- `400 Bad Request`: Invalid input (empty symbol, invalid quantity)
+- `401 Unauthorized`: Missing or invalid token
+
+#### 9. Sell Stock
+**Endpoint**: `POST /trades/sell`
+
+**Authentication**: Required (Bearer token)
+
+**Headers**:
+```
+Authorization: Bearer <access_token>
+```
+
+**Request Body**:
+```json
+{
+  "symbol": "AAPL",
+  "quantity": 5
+}
+```
+
+**Validation Rules**:
+- `symbol`: Must be a non-empty string
+- `quantity`: Must be an integer ≥ 1
+- User must own the stock being sold
+
+**Response** (200 OK):
+```json
+{
+  "success": true,
+  "trade": {
+    "id": 2,
+    "userId": 1,
+    "symbol": "AAPL",
+    "quantity": 5,
+    "price": 151.00,
+    "type": "SELL",
+    "createdAt": "2025-11-06T10:35:00.000Z"
+  }
+}
+```
+
+**Errors**:
+- `400 Bad Request`: Invalid input
+- `401 Unauthorized`: Missing or invalid token
+- `400 Bad Request`: Insufficient stock quantity
+
+---
+
+## Postman Testing Guide for Buy & Sell Services
+
+### Base Configuration
+
+- **Base URL**: `http://localhost:3001`
+- **Authentication**: JWT Bearer Token required
+
+### Step 1: Create an Account (Optional if you already have one)
+
+**Endpoint**: `POST /auth/signup`
+
+**Request Body** (JSON):
+```json
+{
+  "email": "test@example.com",
+  "password": "yourpassword",
+  "role": "TRADER"
+}
+```
+
+**Note**: Role is optional, defaults to "TRADER"
+
+### Step 2: Login to Get JWT Token
+
+**Endpoint**: `POST /auth/login`
+
+**Request Body** (JSON):
+```json
+{
+  "email": "test@example.com",
+  "password": "yourpassword"
+}
+```
+
+**Expected Response**:
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+**Important**: Copy the `access_token` value - you'll need it for buy/sell requests!
+
+### Step 3: Set Authorization Header
+
+For both buy and sell requests, you need to add the JWT token:
+
+1. Go to the **Authorization** tab in Postman
+2. Select **Type**: Bearer Token
+3. Paste your `access_token` in the **Token** field
+
+### Step 4: Test Buy Stock
+
+**Endpoint**: `POST /trades/buy`
+
+**Headers**:
+- Authorization: Bearer <your_access_token>
+
+**Request Body** (JSON):
+```json
+{
+  "symbol": "AAPL",
+  "quantity": 10
+}
+```
+
+**Validation Rules**:
+- `symbol`: Must be a non-empty string (e.g., "AAPL", "GOOGL", "MSFT")
+- `quantity`: Must be an integer ≥ 1
+
+**Example Response** (success):
+```json
+{
+  "success": true,
+  "trade": {
+    "id": 1,
+    "userId": 1,
+    "symbol": "AAPL",
+    "quantity": 10,
+    "price": 150.25,
+    "type": "BUY",
+    "createdAt": "2025-11-06T10:30:00.000Z"
+  }
+}
+```
+
+### Step 5: Test Sell Stock
+
+**Endpoint**: `POST /trades/sell`
+
+**Headers**:
+- Authorization: Bearer <your_access_token>
+
+**Request Body** (JSON):
+```json
+{
+  "symbol": "AAPL",
+  "quantity": 5
+}
+```
+
+**Validation Rules**:
+- `symbol`: Must be a non-empty string
+- `quantity`: Must be an integer ≥ 1
+- You must own the stock you're trying to sell!
+
+**Example Response** (success):
+```json
+{
+  "success": true,
+  "trade": {
+    "id": 2,
+    "userId": 1,
+    "symbol": "AAPL",
+    "quantity": 5,
+    "price": 151.00,
+    "type": "SELL",
+    "createdAt": "2025-11-06T10:35:00.000Z"
+  }
+}
+```
+
+### Common Error Responses
+
+**401 Unauthorized (Missing/Invalid Token)**:
+```json
+{
+  "statusCode": 401,
+  "message": "Unauthorized"
+}
+```
+
+**400 Bad Request (Invalid Input)**:
+```json
+{
+  "statusCode": 400,
+  "message": [
+    "symbol should not be empty",
+    "quantity must be a positive number"
+  ],
+  "error": "Bad Request"
+}
+```
+
+### Quick Testing Tips
+
+1. **Save requests**: Create a Postman Collection for your API
+2. **Use Environment Variables**: Store the `access_token` as `{{token}}` for reuse
+3. **Test different stocks**: AAPL, GOOGL, MSFT, TSLA, etc.
+4. **Test edge cases**:
+   - Try `quantity = 0` (should fail)
+   - Try empty symbol (should fail)
+   - Try selling more than you own (should fail)
+   - Try invalid stock symbols
+
+### Postman Collection Variables Setup
+
+To make testing easier, set these variables:
+- `baseUrl`: `http://localhost:3001`
+- `token`: <paste your JWT token here>
+
+Then use: `{{baseUrl}}/trades/buy` with `{{token}}` in Authorization
 
 ---
 

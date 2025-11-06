@@ -55,7 +55,7 @@ export class MarketGateway implements OnModuleInit {
         const msg = JSON.parse(String(data));
         if (msg?.type === 'tickUpdate' && msg?.symbol) {
           // emit only to clients subscribed to this symbol
-          console.log(msg)
+          console.log(msg);
           this.server.to(`symbol:${msg.symbol}`).emit('tickUpdate', msg);
         }
       } catch {}
