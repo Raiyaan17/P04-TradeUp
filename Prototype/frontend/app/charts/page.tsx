@@ -5,6 +5,18 @@ import { createChart, IChartApi, ISeriesApi, UTCTimestamp } from 'lightweight-ch
 import { Card, CardContent } from "@/components/ui/card";
 import TopBar from "@/components/topbar"
 
+interface TickOHLC {
+    o: number;
+    h: number;
+    l: number;
+    c: number;
+}
+
+interface TickData {
+    tick: TickOHLC;
+    timestamp: number;
+}
+
 interface CandleData {
     time: number;
     open: number;
@@ -30,7 +42,7 @@ interface MarketStatus {
 }
 
 export default function Charts() {
-    const [tickData, setTickData] = useState<any>(null);
+    const [tickData, setTickData] = useState<TickData | null>(null);
     const chartContainerRef = useRef<HTMLDivElement>(null);
     const chartRef = useRef<IChartApi | null>(null);
     const candlestickSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);

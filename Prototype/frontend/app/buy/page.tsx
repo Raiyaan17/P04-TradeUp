@@ -2,11 +2,16 @@
 import React, { useState, useEffect } from "react";
 import TopBar from '@/components/topbar';
 
+interface Tick {
+  price: number;
+  change: number;
+}
+
 interface StockData {
   symbol: string;
   name?: string;
   marketType?: string;
-  tick: any; // or create a proper tick interface
+  tick?: Tick;
 }
 
 export default function BuyPage() {
@@ -255,12 +260,12 @@ export default function BuyPage() {
   );
 }
 
-function getPrice(tick: any): number {
+function getPrice(tick: Tick | null | undefined): number {
   if (!tick) return 0;
   return tick.price || 0;
 }
 
-function getChange(tick: any): { change: number; changePercent: number } {
+function getChange(tick: Tick | null | undefined): { change: number; changePercent: number } {
   if (!tick) return { change: 0, changePercent: 0 };
   const change = tick.change || 0;
   const changePercent = (change / (tick.price - change)) * 100;

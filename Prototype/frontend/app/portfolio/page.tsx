@@ -41,8 +41,8 @@ export default function Portfolio() {
       const data = await response.json();
       setBalance(data.balance);
       setPortfolio(data.portfolio);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError((err as Error).message);
     } finally {
       setLoading(false);
     }
@@ -84,8 +84,8 @@ export default function Portfolio() {
       alert('Stock sold successfully!');
       setLoading(true);
       fetchPortfolio();
-    } catch (err: any) {
-      alert(`Error selling stock: ${err.message}`);
+    } catch (err: unknown) {
+      alert(`Error selling stock: ${(err as Error).message}`);
     }
   };
 

@@ -7,7 +7,7 @@ import { useForm } from "react-hook-form";
 import { useRouter } from 'next/navigation';
 import { getUserProfile, User, updateUserName, updateUserEmail, updateUserPassword } from "@/lib/userService";
 
-export default function settings() {
+export default function Settings() {
 
     type AuthFormFields = {
         name: string;
@@ -17,9 +17,9 @@ export default function settings() {
     };
 
     const { register, handleSubmit, setValue, formState: { errors } } = useForm<AuthFormFields>();
-    const [image, setImage] = useState<any>(null);
+    const [image, setImage] = useState<File | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const [user,setUser] = useState<User|any>(null);
+    const [user,setUser] = useState<User | null>(null);
     const handleButtonClick = () => {
         if (fileInputRef.current) {
             fileInputRef.current.click();
@@ -56,14 +56,14 @@ export default function settings() {
             setValue('email', updatedProfile.email || '');
             setValue('password', '');
             setValue('confirm', '');
-            
-        } catch (error: any) {
+
+        } catch (error: unknown) {
             console.error('Failed to update profile:', error);
         }
     }
 
-    const handleFileChange = (event: any) => {
-        const file = event.target.files[0];
+    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
         if (file) {
             setImage(file);
         }

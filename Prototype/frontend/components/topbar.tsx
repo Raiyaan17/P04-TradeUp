@@ -7,11 +7,11 @@ import CloseIcon from '@mui/icons-material/Close';
 import { useRouter } from "next/navigation";
 import { getUserProfile, User } from "@/lib/userService";
 
-export default function topBar() {
+export default function TopBar() {
 
     const [hidden, setHidden] = useState<string>('none');
-    const [url, setUrl] = useState<any>(null);
-    const [img, setimg] = useState<any>(null);
+    const [url, setUrl] = useState<string | null>(null);
+    const [img, setimg] = useState<string | null>(null);
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const router = useRouter();

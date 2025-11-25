@@ -1,7 +1,7 @@
 type RoleChipProps = {
     value: "TRADER" | "ADMIN";
     current: string;
-    onPick: (v: any) => void;
+    onPick: (v: "TRADER" | "ADMIN" | "") => void;
   };
   
   export function RoleChip({ value, current, onPick }: RoleChipProps) {

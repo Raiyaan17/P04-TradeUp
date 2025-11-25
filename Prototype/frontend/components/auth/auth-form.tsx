@@ -52,7 +52,7 @@ export function AuthForm() {
     setIsLoading(true);
     try {
       const url = mode === "signin" ? "/auth/login" : "/auth/signup";
-      const body: any = { email: data.email, password: data.password };
+      const body: { email: string; password: string; role?: string } = { email: data.email, password: data.password };
       if (mode === "signup" && role) body.role = role;
 
       const res = await fetch(`${API_BASE}${url}`, {
@@ -88,8 +88,8 @@ export function AuthForm() {
         setValue("password", "");
         setValue("confirm", "");
       }
-    } catch (e: any) {
-      setMessage({ type: "error", text: e?.message || "Request failed." });
+    } catch (e: unknown) {
+      setMessage({ type: "error", text: (e as Error)?.message || "Request failed." });
     } finally {
       setIsLoading(false);
     }
@@ -340,7 +340,7 @@ export function AuthForm() {
         <p className="text-center text-sm text-gray-400 pt-1">
           {mode === "signin" ? (
             <>
-              Don't have an account?{" "}
+              Don&apos;t have an account?{" "}
               <button
                 type="button"
                 onClick={() => setMode("signup")}

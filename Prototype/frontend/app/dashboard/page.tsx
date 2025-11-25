@@ -19,19 +19,60 @@ import TopBar from '@/components/topbar';
  *  - DELETE /watchlist/:symbol             -> 200/204
  */
 
+interface Tick {
+  c?: number;
+  price?: number;
+  p?: number;
+  chg?: number;
+  change?: number;
+  chgPct?: number;
+  changePct?: number;
+  pct?: number;
+  pc?: number;
+  prev?: number;
+  previous?: number;
+  prevClose?: number;
+  v?: number;
+  volume?: number;
+}
+
+interface StockData {
+  symbol: string;
+  name?: string | null;
+  marketType?: string;
+  tick?: Tick | null;
+}
+
+interface ApiStockResponse {
+  stock?: StockData;
+  tick?: Tick;
+  currentTick?: Tick;
+  symbol?: string;
+  name?: string | null;
+  marketType?: string;
+}
+
+interface WatchlistResponse {
+  symbols?: string[];
+}
+
+interface WatchlistItem {
+  symbol: string;
+}
+
 export default function DashboardPage() {
   const API_BASE =
     process.env.NEXT_PUBLIC_API_BASE_URL
       ? process.env.NEXT_PUBLIC_API_BASE_URL
       : "http://localhost:3001";
 
-  const [featured, setFeatured] = React.useState<any[]>([]);
+  const [featured, setFeatured] = React.useState<StockData[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = React.useState<Date | null>(null);
 
   const [watchlist, setWatchlist] = React.useState<Set<string>>(new Set());
-  const [watchlistRows, setWatchlistRows] = React.useState<any[]>([]);
+  const [watchlistRows, setWatchlistRows] = React.useState<StockData[]>([]);
   const [saving, setSaving] = React.useState<Set<string>>(new Set());
   const [removing, setRemoving] = React.useState<Set<string>>(new Set());
 
@@ -63,16 +104,16 @@ export default function DashboardPage() {
 
 
   // ---------- Tiny API helpers ----------
-  async function apiGet(path: string) {
+  async function apiGet(path: string): Promise<unknown> {
     const res = await fetch(`${API_BASE}${path}`, {
       cache: "no-store",
       headers: tokenRef.current ? { Authorization: `Bearer ${tokenRef.current}` } : {},
     });
     const json = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(json?.message || json?.error || "Request failed");
+    if (!res.ok) throw new Error((json as { message?: string; error?: string })?.message || (json as { message?: string; error?: string })?.error || "Request failed");
     return json;
   }
-  async function apiPost(path: string, body: any) {
+  async function apiPost(path: string, body: Record<string, unknown>): Promise<unknown> {
     const res = await fetch(`${API_BASE}${path}`, {
       method: "POST",
       headers: {
@@ -82,22 +123,22 @@ export default function DashboardPage() {
       body: JSON.stringify(body),
     });
     const json = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(json?.message || json?.error || "Request failed");
+    if (!res.ok) throw new Error((json as { message?: string; error?: string })?.message || (json as { message?: string; error?: string })?.error || "Request failed");
     return json;
   }
-  async function apiDelete(path: string) {
+  async function apiDelete(path: string): Promise<unknown> {
     const res = await fetch(`${API_BASE}${path}`, {
       method: "DELETE",
       headers: tokenRef.current ? { Authorization: `Bearer ${tokenRef.current}` } : {},
     });
     // Some APIs return no JSON on 204; be tolerant:
-    let json: any = {};
+    let json: Record<string, unknown> = {};
     try { json = await res.json(); } catch {}
-    if (!res.ok) throw new Error(json?.message || json?.error || "Request failed");
+    if (!res.ok) throw new Error(json?.message as string || json?.error as string || "Request failed");
     return json;
   }
   // Normalize any /stocks/:symbol shape into the featured-row shape
-function normalizeStock(json: any, fallbackSymbol?: string) {
+function normalizeStock(json: ApiStockResponse, fallbackSymbol?: string): StockData {
   const stock = json?.stock ?? json ?? {};
   return {
     symbol: stock.symbol ?? fallbackSymbol ?? "—",
@@ -113,10 +154,10 @@ function normalizeStock(json: any, fallbackSymbol?: string) {
     setError(null);
     try {
       const json = await apiGet("/stocks/featured");
-      setFeatured(Array.isArray(json) ? json : []);
+      setFeatured(Array.isArray(json) ? json as StockData[] : []);
       setLastUpdated(new Date());
-    } catch (e: any) {
-      setError(e?.message || "Failed to load stocks");
+    } catch (e: unknown) {
+      setError((e as Error)?.message || "Failed to load stocks");
     } finally {
       setLoading(false);
     }
@@ -131,8 +172,8 @@ function normalizeStock(json: any, fallbackSymbol?: string) {
   try {
     const json = await apiGet("/watchlist");
     let symbols: string[] = [];
-    if (Array.isArray(json)) symbols = json.map((x: any) => x?.symbol).filter(Boolean);
-    else if (Array.isArray(json?.symbols)) symbols = json.symbols.filter((s: any) => typeof s === "string");
+    if (Array.isArray(json)) symbols = (json as WatchlistItem[]).map((x) => x?.symbol).filter(Boolean);
+    else if (Array.isArray((json as WatchlistResponse)?.symbols)) symbols = ((json as WatchlistResponse).symbols || []).filter((s) => typeof s === "string");
 
     setWatchlist(new Set(symbols));
 
@@ -141,7 +182,7 @@ function normalizeStock(json: any, fallbackSymbol?: string) {
       symbols.map(async (sym) => {
         try {
           const raw = await apiGet(`/stocks/${encodeURIComponent(sym)}`);
-          return normalizeStock(raw, sym);
+          return normalizeStock(raw as ApiStockResponse, sym);
         } catch {
           // still keep a minimal row if detail fetch fails
           return { symbol: sym, name: null, marketType: "REG", tick: null };
@@ -210,8 +251,8 @@ React.useEffect(() => {
     next.add(symbol);
     setWatchlist(next);
     setWatchlistRows((prev) => [normalized, ...prev]);
-  } catch (e: any) {
-    alert(e?.message || "Could not save to watchlist.");
+  } catch (e: unknown) {
+    alert((e as Error)?.message || "Could not save to watchlist.");
   } finally {
     const s2 = new Set(nextSaving);
     s2.delete(symbol);
@@ -233,8 +274,8 @@ React.useEffect(() => {
       next.delete(symbol);
       setWatchlist(next);
       setWatchlistRows((prev) => prev.filter((r) => r?.symbol !== symbol));
-    } catch (e: any) {
-      alert(e?.message || "Could not remove from watchlist.");
+    } catch (e: unknown) {
+      alert((e as Error)?.message || "Could not remove from watchlist.");
     } finally {
       const r2 = new Set(nextRemoving);
       r2.delete(symbol);
@@ -449,20 +490,17 @@ function SkeletonRows({ columns = 8 }: { columns?: number }) {
 }
 
 /* ---------------- Field mappers & formatting ---------------- */
-function getPrice(tick: any): number {
+function getPrice(tick: Tick | null | undefined): number {
   if (!tick) return NaN;
   return num(tick.c ?? tick.price ?? tick.p);
 }
-function getChange(tick: any): { chg: number; pct: number } {
+function getChange(tick: Tick | null | undefined): { chg: number; pct: number } {
   if (!tick) return { chg: NaN, pct: NaN };
 
-  // absolute change (no default 0)
   const chg = num(tick.chg ?? tick.change);
 
-  // prefer native % if provided (no default 0)
   let pct = num(tick.chgPct ?? tick.changePct ?? tick.pct);
 
-  // derive % if missing/unusable
   if (!isFinite(pct)) {
     const price = num(tick.c ?? tick.price ?? tick.p);
     const prev = num(
@@ -474,12 +512,12 @@ function getChange(tick: any): { chg: number; pct: number } {
 
   return { chg: isFinite(chg) ? chg : NaN, pct: isFinite(pct) ? pct : NaN };
 }
-function getVolume(tick: any): number {
+function getVolume(tick: Tick | null | undefined): number {
   if (!tick) return NaN;
   return num(tick.v ?? tick.volume);
 }
 
-function num(x: any): number {
+function num(x: unknown): number {
   const n = typeof x === "string" ? parseFloat(x) : x;
   return typeof n === "number" && isFinite(n) ? n : NaN;
 }
