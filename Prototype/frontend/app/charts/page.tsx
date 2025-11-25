@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { io, Socket } from "socket.io-client";
 import { createChart, IChartApi, ISeriesApi, UTCTimestamp } from 'lightweight-charts';
 import { Card, CardContent } from "@/components/ui/card";
@@ -63,9 +63,9 @@ export default function Charts() {
 
     const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
 
-    const getCandleStartTime = (timestamp: number) => {
+    const getCandleStartTime = useCallback((timestamp: number) => {
         return Math.floor(timestamp / CANDLE_INTERVAL) * CANDLE_INTERVAL;
-    };
+    }, [CANDLE_INTERVAL]);
 
     const initializeChart = () => {
         if (!chartContainerRef.current || chartRef.current) return;
@@ -142,7 +142,7 @@ export default function Charts() {
         };
     };
 
-    const fetchHistoricalData = async (symbol: string, tf: string) => {
+    const fetchHistoricalData = useCallback(async (symbol: string, tf: string) => {
         setIsLoadingHistory(true);
         try {
             const response = await fetch(
@@ -171,9 +171,9 @@ export default function Charts() {
         } finally {
             setIsLoadingHistory(false);
         }
-    };
+    }, [API_BASE_URL]);
 
-    const updateChartData = () => {
+    const updateChartData = useCallback(() => {
         if (!candlestickSeriesRef.current) return;
 
         const allData = currentCandle
@@ -207,9 +207,9 @@ export default function Charts() {
                 chartRef.current.timeScale().fitContent();
             }
         }
-    };
+    }, [historicalData, currentCandle]);
 
-    const connectWebSocket = (symbol: string) => {
+    const connectWebSocket = useCallback((symbol: string) => {
         if (socketRef.current) {
             socketRef.current.close();
         }
@@ -283,7 +283,7 @@ export default function Charts() {
                 }
             });
         });
-    };
+    }, [API_BASE_URL, getCandleStartTime]);
 
     useEffect(() => {
         initializeChart();
@@ -334,11 +334,11 @@ export default function Charts() {
                 clearInterval(marketCheckIntervalRef.current);
             }
         };
-    }, [stock, timeframe]);
+    }, [stock, timeframe, connectWebSocket, fetchHistoricalData]);
 
     useEffect(() => {
         updateChartData();
-    }, [historicalData, currentCandle]);
+    }, [updateChartData]);
 
     const getStatusText = () => {
         if (isLoadingHistory) return "Loading historical data...";

@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import TopBar from '@/components/topbar';
 
 interface Tick {
@@ -26,19 +26,7 @@ export default function BuyPage() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  useEffect(() => {
-    fetchAllStocks();
-  }, []);
-
-  useEffect(() => {
-    if (selectedStock && quantity > 0) {
-      setTotalPrice(getPrice(selectedStock.tick) * quantity);
-    } else {
-      setTotalPrice(0);
-    }
-  }, [selectedStock, quantity]);
-
-  const fetchAllStocks = async (): Promise<void> => {
+  const fetchAllStocks = useCallback(async (): Promise<void> => {
     try {
       setLoading(true);
       setError(null);
@@ -63,7 +51,19 @@ export default function BuyPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [API_BASE]);
+
+  useEffect(() => {
+    fetchAllStocks();
+  }, [fetchAllStocks]);
+
+  useEffect(() => {
+    if (selectedStock && quantity > 0) {
+      setTotalPrice(getPrice(selectedStock.tick) * quantity);
+    } else {
+      setTotalPrice(0);
+    }
+  }, [selectedStock, quantity]);
 
   const handleStockSelect = (stock: StockData): void => {
     setSelectedStock(stock);

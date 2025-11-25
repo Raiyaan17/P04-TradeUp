@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import TopBar from '@/components/topbar';
 import { useRouter } from 'next/navigation';
 
@@ -20,7 +20,7 @@ export default function Portfolio() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchPortfolio = async () => {
+  const fetchPortfolio = useCallback(async () => {
     const token = localStorage.getItem('access_token');
     if (!token) {
       router.push('/');
@@ -46,11 +46,11 @@ export default function Portfolio() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [router]);
 
   useEffect(() => {
     fetchPortfolio();
-  }, []);
+  }, [fetchPortfolio]);
 
   const handleSell = async (symbol: string, currentQuantity: number) => {
     const quantityToSell = prompt(`How many shares of ${symbol} do you want to sell? (You own ${currentQuantity})`);

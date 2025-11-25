@@ -1,7 +1,6 @@
 'use client'
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import CloseIcon from '@mui/icons-material/Close';
 import { useRouter } from "next/navigation";
@@ -10,8 +9,6 @@ import { getUserProfile, User } from "@/lib/userService";
 export default function TopBar() {
 
     const [hidden, setHidden] = useState<string>('none');
-    const [url, setUrl] = useState<string | null>(null);
-    const [img, setimg] = useState<string | null>(null);
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const router = useRouter();
@@ -43,13 +40,6 @@ export default function TopBar() {
         fetchUserProfile();
     }, [router]);
 
-    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (file) {
-            setUrl(URL.createObjectURL(file));
-        }
-    };
-
     return (
         <div>
             <div className="text-white flex justify-around items-center border-b border-[#23262b] h-25 mb-10">
@@ -60,7 +50,7 @@ export default function TopBar() {
                     <a href="/buy">Trade</a>
                 </div>
                 <Avatar className="scale-130 cursor-pointer" onClick={() => setHidden('flex')}>
-                    <AvatarImage src={img} className="scale-120 border border-[#23262b]" />
+                    <AvatarImage className="scale-120 border border-[#23262b]" />
                     <AvatarFallback className="bg-[#181B20] text-white">
                         {loading ? 'LO' : user?.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase() : 'CN'}
                     </AvatarFallback>
@@ -71,7 +61,7 @@ export default function TopBar() {
                     <CloseIcon className="cursor-pointer" onClick={() => setHidden('none')} />
                 </div>
                 <Avatar className="scale-130 w-15 h-15" onClick={() => setHidden('flex')}>
-                    <AvatarImage src={img} className="scale-120 border border-[#23262b]" />
+                    <AvatarImage className="scale-120 border border-[#23262b]" />
                     <AvatarFallback className="bg-[#111418] text-white">
                         {loading ? 'LO' : user?.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase() : 'CN'}
                     </AvatarFallback>
@@ -84,7 +74,6 @@ export default function TopBar() {
                         if (typeof window !== "undefined") {
                             localStorage.removeItem("access_token");
                         }
-                        setimg(url);
                         setHidden('none');
                         router.push("/");
                     }}>Sign Out</button>

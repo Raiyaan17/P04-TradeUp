@@ -102,7 +102,7 @@ export default function Settings() {
     };
 
     fetchUserProfile();
-    }, []);
+    }, [router, setValue]);
 
     if (loading) {
         return (

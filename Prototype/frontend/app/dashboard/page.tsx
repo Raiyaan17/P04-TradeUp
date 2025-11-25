@@ -1,6 +1,5 @@
 "use client";
 import React from "react";
-import { useRouter } from "next/navigation";
 import TopBar from '@/components/topbar';
 
 /**
@@ -82,29 +81,9 @@ export default function DashboardPage() {
       (typeof window !== "undefined" && localStorage.getItem("access_token")) || null;
   }, []);
 
-  const [authed, setAuthed] = React.useState(false);
-  React.useEffect(() => {
-    setAuthed(!!tokenRef.current);
-  }, []);
-
-  const router = useRouter();
-  function signOut() {
-    // Clear token
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("access_token");
-    }
-    tokenRef.current = null;
-    setAuthed(false);
-    setWatchlist(new Set());
-    setWatchlistRows([]);
-
-    router.push("/");
-  }
 
 
-
-  // ---------- Tiny API helpers ----------
-  async function apiGet(path: string): Promise<unknown> {
+  const apiGet = React.useCallback(async (path: string): Promise<unknown> => {
     const res = await fetch(`${API_BASE}${path}`, {
       cache: "no-store",
       headers: tokenRef.current ? { Authorization: `Bearer ${tokenRef.current}` } : {},
@@ -112,8 +91,9 @@ export default function DashboardPage() {
     const json = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error((json as { message?: string; error?: string })?.message || (json as { message?: string; error?: string })?.error || "Request failed");
     return json;
-  }
-  async function apiPost(path: string, body: Record<string, unknown>): Promise<unknown> {
+  }, [API_BASE]);
+
+  const apiPost = React.useCallback(async (path: string, body: Record<string, unknown>): Promise<unknown> => {
     const res = await fetch(`${API_BASE}${path}`, {
       method: "POST",
       headers: {
@@ -125,8 +105,9 @@ export default function DashboardPage() {
     const json = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error((json as { message?: string; error?: string })?.message || (json as { message?: string; error?: string })?.error || "Request failed");
     return json;
-  }
-  async function apiDelete(path: string): Promise<unknown> {
+  }, [API_BASE]);
+
+  const apiDelete = React.useCallback(async (path: string): Promise<unknown> => {
     const res = await fetch(`${API_BASE}${path}`, {
       method: "DELETE",
       headers: tokenRef.current ? { Authorization: `Bearer ${tokenRef.current}` } : {},
@@ -136,9 +117,9 @@ export default function DashboardPage() {
     try { json = await res.json(); } catch {}
     if (!res.ok) throw new Error(json?.message as string || json?.error as string || "Request failed");
     return json;
-  }
-  // Normalize any /stocks/:symbol shape into the featured-row shape
-function normalizeStock(json: ApiStockResponse, fallbackSymbol?: string): StockData {
+  }, [API_BASE]);
+
+  const normalizeStock = React.useCallback((json: ApiStockResponse, fallbackSymbol?: string): StockData => {
   const stock = json?.stock ?? json ?? {};
   return {
     symbol: stock.symbol ?? fallbackSymbol ?? "—",
@@ -147,7 +128,7 @@ function normalizeStock(json: ApiStockResponse, fallbackSymbol?: string): StockD
     // tick could be at json.tick, json.stock.tick, or json.currentTick
     tick: json?.tick ?? stock?.tick ?? json?.currentTick ?? null,
   };
-}
+  }, []);
 
   // ---------- Loaders ----------
   const fetchFeatured = React.useCallback(async () => {
@@ -161,7 +142,7 @@ function normalizeStock(json: ApiStockResponse, fallbackSymbol?: string): StockD
     } finally {
       setLoading(false);
     }
-  }, [API_BASE]);
+  }, [apiGet]);
 
   const fetchWatchlist = React.useCallback(async () => {
   if (!tokenRef.current) {
@@ -194,7 +175,7 @@ function normalizeStock(json: ApiStockResponse, fallbackSymbol?: string): StockD
     setWatchlist(new Set());
     setWatchlistRows([]);
   }
-}, [API_BASE]);
+}, [apiGet, normalizeStock]);
 
 
 React.useEffect(() => {
@@ -223,8 +204,7 @@ React.useEffect(() => {
   };
 }, [fetchFeatured, fetchWatchlist]);
 
-  // ---------- Actions ----------
-  async function saveSymbol(symbol: string) {
+  const saveSymbol = React.useCallback(async (symbol: string) => {
   if (!tokenRef.current) {
     alert("Please sign in to use your watchlist.");
     return;
@@ -239,10 +219,10 @@ React.useEffect(() => {
     await apiPost("/watchlist", { symbol });
 
     // Immediately fetch the fully-detailed row and prepend it
-    let normalized = { symbol, name: null, marketType: "REG", tick: null };
+    let normalized: StockData = { symbol, name: null, marketType: "REG", tick: null };
     try {
       const raw = await apiGet(`/stocks/${encodeURIComponent(symbol)}`);
-      normalized = normalizeStock(raw, symbol);
+      normalized = normalizeStock(raw as ApiStockResponse, symbol);
     } catch {
       // ignore; keep minimal fallback
     }
@@ -258,9 +238,9 @@ React.useEffect(() => {
     s2.delete(symbol);
     setSaving(s2);
   }
-}
+}, [apiGet, apiPost, normalizeStock, saving, watchlist]);
 
-  async function removeSymbol(symbol: string) {
+  const removeSymbol = React.useCallback(async (symbol: string) => {
     if (!tokenRef.current) return;
     if (removing.has(symbol)) return;
 
@@ -281,7 +261,7 @@ React.useEffect(() => {
       r2.delete(symbol);
       setRemoving(r2);
     }
-  }
+  }, [apiDelete, removing, watchlist]);
 
   // ---------- UI ----------
   return (
