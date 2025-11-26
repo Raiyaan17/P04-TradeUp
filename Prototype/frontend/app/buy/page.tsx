@@ -15,8 +15,7 @@ interface StockData {
 }
 
 export default function BuyPage() {
-  const API_BASE = process.env.
-   || "http://localhost:3001";
+  const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL|| "http://localhost:3001";
   
   const [stocks, setStocks] = useState<StockData[]>([]);
   const [selectedStock, setSelectedStock] = useState<StockData | null>(null);
