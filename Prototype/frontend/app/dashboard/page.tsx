@@ -1,5 +1,6 @@
 "use client";
 import React from "react";
+import { useRouter } from "next/navigation";
 import TopBar from '@/components/topbar';
 
 /**
@@ -60,6 +61,7 @@ interface WatchlistItem {
 }
 
 export default function DashboardPage() {
+  const router = useRouter();
   const API_BASE =
     process.env.NEXT_PUBLIC_API_BASE_URL
       ? process.env.NEXT_PUBLIC_API_BASE_URL
@@ -76,12 +78,24 @@ export default function DashboardPage() {
   const [saving, setSaving] = React.useState<Set<string>>(new Set());
   const [removing, setRemoving] = React.useState<Set<string>>(new Set());
 
-  // Token
+  // Token & auth
   const tokenRef = React.useRef<string | null>(null);
+  const [authed, setAuthed] = React.useState(false);
+
   React.useEffect(() => {
     tokenRef.current =
       (typeof window !== "undefined" && localStorage.getItem("access_token")) || null;
+    setAuthed(!!tokenRef.current);
   }, []);
+
+  const signOut = React.useCallback(() => {
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("access_token");
+    }
+    tokenRef.current = null;
+    setAuthed(false);
+    router.push("/");
+  }, [router]);
 
 
 

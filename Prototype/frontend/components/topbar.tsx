@@ -2,7 +2,6 @@
 import { useEffect, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Label } from "@/components/ui/label"
-import CloseIcon from '@mui/icons-material/Close';
 import { useRouter } from "next/navigation";
 import { getUserProfile, User } from "@/lib/userService";
 
@@ -58,7 +57,15 @@ export default function TopBar() {
             </div>
             <div style={{ display: hidden }} className="text-white rounded-3xl bg-[#181B20] flex flex-col justify-start p-4 items-center gap-4 justify-center absolute top-19 right-10 y-2000 border border-[#23262b] h-65 w-55">
                 <div className="flex justify-end w-[100%] mr-10">
-                    <CloseIcon className="cursor-pointer" onClick={() => setHidden('none')} />
+                    <svg
+                        className="cursor-pointer w-6 h-6"
+                        onClick={() => setHidden('none')}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                    >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
                 </div>
                 <Avatar className="scale-130 w-15 h-15" onClick={() => setHidden('flex')}>
                     <AvatarImage className="scale-120 border border-[#23262b]" />
