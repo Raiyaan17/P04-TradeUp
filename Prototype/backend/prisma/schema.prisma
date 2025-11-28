@@ -15,6 +15,7 @@ model User {
   createdAt    DateTime        @default(now())
   balance      Decimal         @default(1000000)
   name         String?
+  profileImageUrl String?
   portfolio    Portfolio[]
   transactions Transaction[]
   watchlist    WatchlistItem[]

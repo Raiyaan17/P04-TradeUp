@@ -1,8 +1,10 @@
-import { Body, Controller, Put, Request, UseGuards, Get } from '@nestjs/common';
+import { Body, Controller, Put, Request, UseGuards, Get, Post, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { UsersService } from './users.service';
 import * as bcrypt from 'bcrypt';
 import { ConflictException, UnauthorizedException } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 
 interface AuthenticatedRequest {
   user: {
@@ -14,6 +16,33 @@ interface AuthenticatedRequest {
 
 @Controller('users')
 export class UsersController {
+  private readonly logger = new Logger(UsersController.name);
+  @UseGuards(JwtAuthGuard)
+  @Post('profile-picture')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadProfilePicture(@Request() req: any, @UploadedFile() file: any) {
+    if (!file) {
+      this.logger.error('No file uploaded');
+      throw new UnauthorizedException('No file uploaded');
+    }
+    try {
+      // Pass file.mimetype to service for correct contentType
+      const imageUrl = await this.usersService.uploadProfilePicture(req.user.userId, file.buffer, file.originalname, file.mimetype);
+      this.logger.debug(`Image uploaded successfully. URL: ${imageUrl}`);
+      return { imageUrl };
+    } catch (error) {
+      this.logger.error('Error uploading profile image', error.stack);
+      return { error: error.message };
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('profile-picture')
+  async getProfilePicture(@Request() req: any) {
+    // Use userId from auth middleware
+    const imageUrl = await this.usersService.getProfilePictureUrl(req.user.userId);
+    return { imageUrl };
+  }
   constructor(private readonly usersService: UsersService) {}
 
   @UseGuards(JwtAuthGuard)

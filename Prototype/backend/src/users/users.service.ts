@@ -1,9 +1,48 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { createClient } from '@supabase/supabase-js';
+const supabase = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 @Injectable()
 export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
+
+  // Upload profile picture, save URL in DB, and return public URL
+  async uploadProfilePicture(id: number, fileBuffer: Buffer, fileName: string, contentType?: string): Promise<string> {
+    const filePath = `${id}/${fileName}`;
+  let finalContentType = contentType || 'image/png';
+    const { error } = await supabase.storage
+      .from('TradeUp-profile-images')
+      .upload(filePath, fileBuffer, { upsert: true, contentType: finalContentType });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    const { data } = supabase.storage
+      .from('TradeUp-profile-images')
+      .getPublicUrl(filePath);
+
+    // Save the public URL to the user record in Neon DB
+    await this.prisma.user.update({
+      where: { id },
+      data: { profileImageUrl: data.publicUrl },
+    });
+
+    return data.publicUrl;
+  }
+
+  // Fetch profile picture public URL from Neon DB
+  async getProfilePictureUrl(id: number): Promise<string | null> {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: { profileImageUrl: true },
+    });
+    return user?.profileImageUrl || null;
+  }
 
   async findByEmail(email: string) {
     return this.prisma.user.findUnique({ where: { email } });
