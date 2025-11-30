@@ -196,4 +196,28 @@ export class UsersController {
       message: 'Name updated successfully',
     };
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Put('fund-wallet')
+  async fundWallet(
+    @Request() req: AuthenticatedRequest,
+    @Body() body: { amount: number },
+  ) {
+    const userId = req.user.userId;
+    const { amount } = body;
+
+    // Mask userId in logs
+    console.log(
+      'Wallet funding requested for userId:',
+      userId ? '***' + String(userId).slice(-2) : undefined,
+    );
+
+    const user = await this.usersService.findById(userId);
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    return this.usersService.updateBalance({ userId, amount });
+  }
+  
 }

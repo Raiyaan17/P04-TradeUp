@@ -1,6 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { createClient } from '@supabase/supabase-js';
+
+type UpdateBalanceDto = {
+  amount: number;
+  userId: number;
+};
 const supabase = createClient(
   process.env.SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -33,6 +38,18 @@ export class UsersService {
     });
 
     return data.publicUrl;
+  }
+
+  // Update user's wallet balance
+  async updateBalance({ userId, amount }: UpdateBalanceDto) {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        balance: {
+          increment: amount
+        }
+      }
+    });
   }
 
   // Fetch profile picture public URL from Neon DB

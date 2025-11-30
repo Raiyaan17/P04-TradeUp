@@ -1,5 +1,6 @@
 "use client";
-import React from "react";
+import React, { useState } from "react";
+import { useUser } from '@/context/UserContext';
 import TopBar from '@/components/topbar';
 
 /**
@@ -75,6 +76,10 @@ export default function DashboardPage() {
   const [saving, setSaving] = React.useState<Set<string>>(new Set());
   const [removing, setRemoving] = React.useState<Set<string>>(new Set());
 
+  const [showWalletPopup, setShowWalletPopup] = useState<boolean>(false);
+
+  const { user, isLoading, refreshUser } = useUser() || {};
+
   const tokenRef = React.useRef<string | null>(null);
   React.useEffect(() => {
     tokenRef.current =
@@ -82,7 +87,7 @@ export default function DashboardPage() {
   }, []);
 
 
-
+// API GET
   const apiGet = React.useCallback(async (path: string): Promise<unknown> => {
     const res = await fetch(`${API_BASE}${path}`, {
       cache: "no-store",
@@ -93,6 +98,7 @@ export default function DashboardPage() {
     return json;
   }, [API_BASE]);
 
+// API POST
   const apiPost = React.useCallback(async (path: string, body: Record<string, unknown>): Promise<unknown> => {
     const res = await fetch(`${API_BASE}${path}`, {
       method: "POST",
@@ -106,7 +112,7 @@ export default function DashboardPage() {
     if (!res.ok) throw new Error((json as { message?: string; error?: string })?.message || (json as { message?: string; error?: string })?.error || "Request failed");
     return json;
   }, [API_BASE]);
-
+// API DELETE
   const apiDelete = React.useCallback(async (path: string): Promise<unknown> => {
     const res = await fetch(`${API_BASE}${path}`, {
       method: "DELETE",
@@ -119,6 +125,7 @@ export default function DashboardPage() {
     return json;
   }, [API_BASE]);
 
+// Normalize stock data
   const normalizeStock = React.useCallback((json: ApiStockResponse, fallbackSymbol?: string): StockData => {
   const stock = json?.stock ?? json ?? {};
   return {
@@ -177,6 +184,11 @@ export default function DashboardPage() {
   }
 }, [apiGet, normalizeStock]);
 
+React.useEffect(() => {
+  if (user?.balance === -1) { // Default balance check
+    setShowWalletPopup(true);
+  }
+}, [user]); // This will run when the user object changes
 
 React.useEffect(() => {
   fetchFeatured();
@@ -263,20 +275,53 @@ React.useEffect(() => {
     }
   }, [apiDelete, removing, watchlist]);
 
-  // ---------- UI ----------
+  // ---------- UI -----------
   // --- UserContext refresh on mount ---
   // This ensures TopBar gets updated user info after login
-  const { user, isLoading, refreshUser } = require('@/context/UserContext').useUser?.() || {};
+  // const { user, isLoading, refreshUser } = require('@/context/UserContext').useUser?.() || {};
   React.useEffect(() => {
     if (typeof window !== 'undefined' && localStorage.getItem('access_token')) {
       refreshUser?.();
     }
   }, []);
 
+  const handleFundWallet = async (amount: number) => {
+    try {
+      await apiPost('/users/fund-wallet', { amount });
+      await refreshUser(); // Refresh user data to update balance
+      setShowWalletPopup(false);
+    } catch (error) {
+      console.error('Error funding wallet:', error);
+    }
+  };
   // Show loading skeleton until user is loaded
   if (isLoading || !user) {
     return (
       <main className="min-h-screen w-full bg-[#111418] flex items-center justify-center">
+        {showWalletPopup && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg">
+            <h2>Fund Your Wallet</h2>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const amount = parseFloat(e.currentTarget.amount.value);
+              if (amount > 0) handleFundWallet(amount);
+            }}>
+              <input
+                type="number"
+                name="amount"
+                placeholder="Enter amount"
+                className="border p-2 w-full mb-4"
+                required
+                min="1"
+              />
+              <button type="submit" className="bg-blue-500 text-white px-4 py-2 rounded">
+                Add Funds
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
         <div className="w-full max-w-7xl mx-auto">
           <table className="w-full text-sm">
             <tbody>
@@ -285,6 +330,7 @@ React.useEffect(() => {
           </table>
         </div>
       </main>
+      
     );
   }
 

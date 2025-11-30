@@ -8,13 +8,13 @@ datasource db {
 }
 
 model User {
-  id              Int             @id @default(autoincrement())
-  email           String          @unique
-  passwordHash    String
-  role            Role            @default(TRADER)
-  createdAt       DateTime        @default(now())
-  balance         Decimal         @default(1000000)
-  name            String?
+  id           Int             @id @default(autoincrement())
+  email        String          @unique
+  passwordHash String
+  role         Role            @default(TRADER)
+  createdAt    DateTime        @default(now())
+  balance      Decimal         @default(-1)
+  name         String?
   profileImageUrl String?
   portfolio       Portfolio[]
   transactions    Transaction[]
