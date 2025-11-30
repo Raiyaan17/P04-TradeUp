@@ -1,4 +1,6 @@
+
 "use client";
+import { RoleChip } from "./role-chip";
 
 import React, { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -16,6 +18,7 @@ type AuthFormFields = {
 
 export function AuthForm() {
   const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [role, setRole] = useState<"TRADER" | "ADMIN">("TRADER");
   const {
     register,
     handleSubmit,
@@ -51,7 +54,7 @@ export function AuthForm() {
     try {
       const url = mode === "signin" ? "/auth/login" : "/auth/signup";
       const body: { email: string; password: string; role?: string } = { email: data.email, password: data.password };
-      if (mode === "signup") body.role = "USER";
+      if (mode === "signup") body.role = role;
 
       const res = await fetch(`${API_BASE}${url}`, {
         method: "POST",
@@ -82,9 +85,10 @@ export function AuthForm() {
           type: "success",
           text: "Account created. You can sign in now.",
         });
-        setMode("signin");
-        setValue("password", "");
-        setValue("confirm", "");
+  setMode("signin");
+  setValue("password", "");
+  setValue("confirm", "");
+  setRole("TRADER");
       }
     } catch (e: unknown) {
       setMessage({ type: "error", text: (e as Error)?.message || "Request failed." });
@@ -133,7 +137,7 @@ export function AuthForm() {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="px-6 pt-4 pb-6 space-y-4">
+  <form onSubmit={handleSubmit(onSubmit)} className="px-6 pt-4 pb-6 space-y-4">
         <div>
           <Label htmlFor="email">Email</Label>
           <Input
@@ -241,25 +245,36 @@ export function AuthForm() {
         </div>
 
         {mode === "signup" && (
-          <div>
-            <Label htmlFor="confirm">Confirm password</Label>
-            <Input
-              id="confirm"
-              type={showPw ? "text" : "password"}
-              autoComplete="new-password"
-              {...register("confirm", {
-                validate: (value) =>
-                  value === watch("password") || "Passwords do not match",
-              })}
-              placeholder="Repeat password"
-              className="bg-black/20 border-white/20"
-            />
-            {errors.confirm && (
-              <span className="text-red-400 text-xs mt-1">
-                {errors.confirm.message}
-              </span>
-            )}
-          </div>
+          <>
+            <div>
+              <Label htmlFor="confirm">Confirm password</Label>
+              <Input
+                id="confirm"
+                type={showPw ? "text" : "password"}
+                autoComplete="new-password"
+                {...register("confirm", {
+                  validate: (value) =>
+                    value === watch("password") || "Passwords do not match",
+                })}
+                placeholder="Repeat password"
+                className="bg-black/20 border-white/20"
+              />
+              {errors.confirm && (
+                <span className="text-red-400 text-xs mt-1">
+                  {errors.confirm.message}
+                </span>
+              )}
+            </div>
+            <div>
+              <Label>Role</Label>
+              <div className="flex gap-2 mt-1">
+                {/* @ts-ignore */}
+                <RoleChip value="TRADER" current={role} onPick={setRole} />
+                {/* @ts-ignore */}
+                <RoleChip value="ADMIN" current={role} onPick={setRole} />
+              </div>
+            </div>
+          </>
         )}
 
         {message && (

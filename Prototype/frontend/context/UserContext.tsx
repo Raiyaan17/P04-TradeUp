@@ -29,7 +29,25 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(true);
     try {
       const profile = await getUserProfile();
-      setUser(profile);
+        // Fetch signed profile image URL
+        let signedUrl: string | null = null;
+        try {
+          const token = localStorage.getItem('access_token');
+          if (token) {
+            const res = await fetch('http://localhost:3001/users/profile-picture', {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+            });
+            if (res.ok) {
+              const data = await res.json();
+              signedUrl = data.imageUrl || null;
+            }
+          }
+        } catch {}
+        setUser({ ...profile, profileImageUrl: signedUrl || profile.profileImageUrl });
     } catch {
       setUser(null);
     } finally {
