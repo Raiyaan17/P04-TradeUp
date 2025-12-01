@@ -1,6 +1,8 @@
 import { Body, Controller, Put, Request, UseGuards, Get, Post, UseInterceptors, UploadedFile } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/jwt.guard';
+import { Roles } from '../auth/roles.decorator';
+import { RolesGuard } from '../auth/roles.guard';
 import { UsersService } from './users.service';
 import { FundWalletDto } from './dto/fund-wallet.dto';
 import * as bcrypt from 'bcrypt';
@@ -201,6 +203,8 @@ export class UsersController {
   //! Add Funds
   @UseGuards(JwtAuthGuard)
   @Post('fund-wallet')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('TRADER')
   async fundWallet(
     @Request() req: AuthenticatedRequest,
     @Body() fundWalletDto: FundWalletDto,
