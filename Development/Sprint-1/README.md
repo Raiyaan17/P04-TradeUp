@@ -25,9 +25,11 @@ LIST OF REQUIREMENTS COMPLETED IN THE SPRINT
 
 
 <List down use cases completed in the current sprint. For each use case, also mention the name of individual team member who developed it.>
-1. Muhammad Rayyan Khan: Update email/pw, profile picture
+1. Muhammad Rayyan Khan: Update User Info, Update profile picture, Stock news page
 2. Muhammad Ahmad: Stock news page
-
+3. Muhammad Umar Zubair: Ai stock simulation
+4. Mohammad Raiyaan Junaid Hamid: User PnL, Virtual Currency Topup
+5. Muhammad Shamir Sher Qazi: Ai stock simulation
 
 
 ------------------------------------------------------------------------------------------------

@@ -4,7 +4,7 @@ import { Tagline } from "@/components/auth/tagline";
 export default function AuthPage() {
   return (
     <main
-      className="grid place-items-center min-h-screen"
+      className="dark grid place-items-center min-h-screen"
       style={{
         backgroundImage:
           'radial-gradient(circle at 15% 50%, oklch(55.1% 0.15 264 / 30%), oklch(0% 0 0 / 0%) 30%),' +

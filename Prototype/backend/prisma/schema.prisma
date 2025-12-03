@@ -13,12 +13,12 @@ model User {
   passwordHash String
   role         Role            @default(TRADER)
   createdAt    DateTime        @default(now())
-  balance      Decimal         @default(1000000)
+  balance      Decimal         @default(-1)
   name         String?
   profileImageUrl String?
-  portfolio    Portfolio[]
-  transactions Transaction[]
-  watchlist    WatchlistItem[]
+  portfolio       Portfolio[]
+  transactions    Transaction[]
+  watchlist       WatchlistItem[]
 }
 
 model Stock {

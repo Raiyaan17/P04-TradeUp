@@ -1,6 +1,10 @@
 "use client";
-import React from "react";
+import React, { useState } from "react";
+import { useUser } from '@/context/UserContext';
 import TopBar from '@/components/topbar';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 
 /**
  * Dashboard — PSX stocks list + Watchlist (add/remove)
@@ -75,6 +79,9 @@ export default function DashboardPage() {
   const [saving, setSaving] = React.useState<Set<string>>(new Set());
   const [removing, setRemoving] = React.useState<Set<string>>(new Set());
 
+  const [showWalletPopup, setShowWalletPopup] = useState<boolean>(false);
+
+  const { user, isLoading, refreshUser } = useUser() || {};
   const tokenRef = React.useRef<string | null>(null);
   React.useEffect(() => {
     tokenRef.current =
@@ -82,7 +89,7 @@ export default function DashboardPage() {
   }, []);
 
 
-
+// API GET
   const apiGet = React.useCallback(async (path: string): Promise<unknown> => {
     const res = await fetch(`${API_BASE}${path}`, {
       cache: "no-store",
@@ -93,6 +100,7 @@ export default function DashboardPage() {
     return json;
   }, [API_BASE]);
 
+// API POST
   const apiPost = React.useCallback(async (path: string, body: Record<string, unknown>): Promise<unknown> => {
     const res = await fetch(`${API_BASE}${path}`, {
       method: "POST",
@@ -106,7 +114,7 @@ export default function DashboardPage() {
     if (!res.ok) throw new Error((json as { message?: string; error?: string })?.message || (json as { message?: string; error?: string })?.error || "Request failed");
     return json;
   }, [API_BASE]);
-
+// API DELETE
   const apiDelete = React.useCallback(async (path: string): Promise<unknown> => {
     const res = await fetch(`${API_BASE}${path}`, {
       method: "DELETE",
@@ -119,6 +127,7 @@ export default function DashboardPage() {
     return json;
   }, [API_BASE]);
 
+// Normalize stock data
   const normalizeStock = React.useCallback((json: ApiStockResponse, fallbackSymbol?: string): StockData => {
   const stock = json?.stock ?? json ?? {};
   return {
@@ -177,6 +186,12 @@ export default function DashboardPage() {
   }
 }, [apiGet, normalizeStock]);
 
+React.useEffect(() => {
+  if (user?.balance == -1) { // Default balance check
+    setShowWalletPopup(true);
+  }
+  console.log("WalletPopup: ", showWalletPopup);
+}, [user]); // This will run when the user object changes
 
 React.useEffect(() => {
   fetchFeatured();
@@ -263,16 +278,41 @@ React.useEffect(() => {
     }
   }, [apiDelete, removing, watchlist]);
 
-  // ---------- UI ----------
+  // ---------- UI -----------
   // --- UserContext refresh on mount ---
   // This ensures TopBar gets updated user info after login
-  const { user, isLoading, refreshUser } = require('@/context/UserContext').useUser?.() || {};
+  // const { user, isLoading, refreshUser } = require('@/context/UserContext').useUser?.() || {};
   React.useEffect(() => {
     if (typeof window !== 'undefined' && localStorage.getItem('access_token')) {
       refreshUser?.();
     }
   }, []);
 
+  // Adds Funds on Signup. 
+  const handleFundWallet = async (amount: number) => {
+  try {
+    // First, check if user exists
+    if (!user) {
+      console.error('No user logged in');
+      return;
+    }
+    // First, store the current balance for reference
+    const oldBalance = user?.balance;
+    console.log('Old balance:', oldBalance);
+    
+    // Make the API call to update the balance
+    const response = await apiPost('/users/fund-wallet', { amount });
+    console.log('API Response:', response); // Log the full response if needed
+    
+    // Refresh user data to get the updated balance
+    const updatedUser = await refreshUser();
+    console.log('Updated balance:', updatedUser?.balance);
+    
+    setShowWalletPopup(false);
+  } catch (error) {
+    console.error('Error funding wallet:', error);
+  }
+};
   // Show loading skeleton until user is loaded
   if (isLoading || !user) {
     return (
@@ -285,11 +325,49 @@ React.useEffect(() => {
           </table>
         </div>
       </main>
+      
     );
   }
 
+  // Page
   return (
     <main className="min-h-screen w-full bg-[#111418]">
+      {/* Wallet Popup */}
+      {showWalletPopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80">
+          <Card className="w-full max-w-sm">
+            <CardHeader>
+              <CardTitle>Fund Your Wallet</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form
+                onSubmit={e => {
+                  e.preventDefault();
+                  const amount = parseFloat(e.currentTarget.amount.value);
+                  if (amount > 0) handleFundWallet(amount);
+                }}
+              >
+                <div className="grid gap-4">
+                  <div className="grid gap-2">
+                    <Input
+                      id="amount"
+                      name="amount"
+                      type="number"
+                      placeholder="Enter amount"
+                      required
+                      min="1"
+                    />
+                  </div>
+                  <Button type="submit" className="w-full">
+                    Add Funds
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       <TopBar/>
       <div className="mx-auto max-w-7xl">
         <header className="mb-6 flex items-center justify-between mx-10">

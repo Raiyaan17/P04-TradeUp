@@ -2,7 +2,10 @@ import { Body, Controller, Put, Request, UseGuards, Get, Post, UseInterceptors, 
 import { Express } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/jwt.guard';
+import { Roles } from '../auth/roles.decorator';
+import { RolesGuard } from '../auth/roles.guard';
 import { UsersService } from './users.service';
+import { FundWalletDto } from './dto/fund-wallet.dto';
 import * as bcrypt from 'bcrypt';
 import { ConflictException, UnauthorizedException } from '@nestjs/common';
 import { Logger } from '@nestjs/common';
@@ -204,4 +207,31 @@ export class UsersController {
       message: 'Name updated successfully',
     };
   }
+
+  //! Add Funds
+  @UseGuards(JwtAuthGuard)
+  @Post('fund-wallet')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('TRADER')
+  async fundWallet(
+    @Request() req: AuthenticatedRequest,
+    @Body() fundWalletDto: FundWalletDto,
+  ) {
+    const userId = req.user.userId;
+    const { amount } = fundWalletDto;
+
+    // Mask userId in logs
+    console.log(
+      'Wallet funding requested for userId:',
+      userId ? '***' + String(userId).slice(-2) : undefined,
+    );
+
+    const user = await this.usersService.findById(userId);
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    return this.usersService.updateBalance({ userId, amount });
+  }
+  
 }
