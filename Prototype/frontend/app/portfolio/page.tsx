@@ -4,19 +4,31 @@ import TopBar from '@/components/topbar';
 import { useRouter } from 'next/navigation';
 
 interface PortfolioItem {
-  stock: {
-    symbol: string;
-  };
+  symbol: string;
+  name: string | null;
   quantity: number;
-  avgPrice: number;
-  currentPrice: number;
-  pnl: number;
+  avgPrice: string;
+  currentPrice: string;
+  invested: string;
+  currentValue: string;
+  unrealizedPnl: string;
+  pnlPercentage: string;
+  createdAt: string;
+}
+
+interface PortfolioData {
+  balance: string;
+  totalInvested: string;
+  totalPortfolioValue: string;
+  totalUnrealizedPnl: string;
+  totalPnlPercentage: string;
+  totalAccountValue: string;
+  portfolio: PortfolioItem[];
 }
 
 export default function Portfolio() {
   const router = useRouter();
-  const [balance, setBalance] = useState<number>(0);
-  const [portfolio, setPortfolio] = useState<PortfolioItem[]>([]);
+  const [portfolioData, setPortfolioData] = useState<PortfolioData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,8 +51,7 @@ export default function Portfolio() {
       }
 
       const data = await response.json();
-      setBalance(data.balance);
-      setPortfolio(data.portfolio);
+      setPortfolioData(data);
     } catch (err: unknown) {
       setError((err as Error).message);
     } finally {
@@ -89,6 +100,20 @@ export default function Portfolio() {
     }
   };
 
+  const formatCurrency = (value: string): string => {
+    return parseFloat(value).toLocaleString('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  };
+
+  const formatPercentage = (value: string): string => {
+    const numValue = parseFloat(value);
+    return `${numValue >= 0 ? '+' : ''}${numValue.toFixed(2)}%`;
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#111418] flex items-center justify-center">
@@ -105,60 +130,117 @@ export default function Portfolio() {
     );
   }
 
+  if (!portfolioData) {
+    return (
+      <div className="min-h-screen bg-[#111418] flex items-center justify-center">
+        <span className="text-white text-xl">No data available</span>
+      </div>
+    );
+  }
+
+  const totalPnlIsPositive = parseFloat(portfolioData.totalUnrealizedPnl) >= 0;
+
   return (
     <div className="min-h-screen bg-[#111418]">
       <TopBar />
-      <div id="container" className="flex justify-center gap-10 mt-10 p-4 md:p-10 flex-wrap">
-        <div className="bg-[#181B20] text-white rounded-3xl flex flex-col w-full md:w-96 p-7 gap-4">
-          <h1 className="font-semibold text-3xl mb-6">Portfolio</h1>
-          <h2>Total Balance</h2>
-          <h3 className="text-5xl mb-10">
-            {balance.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
-          </h3>
-        </div>
-        <div className="bg-[#181B20] text-white rounded-3xl flex flex-col flex-grow p-7 gap-4 overflow-x-auto">
-          <h1 className="font-semibold text-3xl mb-6">Holdings</h1>
-          <table className="text-left w-full">
-            <thead>
-              <tr className="border-b border-[#23262A]">
-                <th className="py-3 px-4">Symbol</th>
-                <th className="py-3 px-4">Shares</th>
-                <th className="py-3 px-4">Avg. Price</th>
-                <th className="py-3 px-4">Current</th>
-                <th className="py-3 px-4">P/L</th>
-                <th className="py-3 px-4">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {portfolio.length > 0 ? (
-                portfolio.map((item) => (
-                  <tr key={item.stock.symbol} className="border-t border-[#23262A]">
-                    <td className="py-4 px-4">{item.stock.symbol}</td>
-                    <td className="py-4 px-4">{item.quantity}</td>
-                    <td className="py-4 px-4">{item.avgPrice.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</td>
-                    <td className="py-4 px-4">{item.currentPrice.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</td>
-                    <td className={`py-4 px-4 ${item.pnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                      {item.pnl.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
-                    </td>
-                    <td className="py-4 px-4">
-                      <button
-                        onClick={() => handleSell(item.stock.symbol, item.quantity)}
-                        className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
-                      >
-                        Sell
-                      </button>
+      <div className="p-4 md:p-10">
+        <div className="flex flex-col gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-[#181B20] text-white rounded-2xl p-6">
+              <p className="text-gray-400 text-sm mb-2">Cash Balance</p>
+              <p className="text-3xl font-semibold">{formatCurrency(portfolioData.balance)}</p>
+            </div>
+
+            <div className="bg-[#181B20] text-white rounded-2xl p-6">
+              <p className="text-gray-400 text-sm mb-2">Total Invested</p>
+              <p className="text-3xl font-semibold">{formatCurrency(portfolioData.totalInvested)}</p>
+            </div>
+
+            <div className="bg-[#181B20] text-white rounded-2xl p-6">
+              <p className="text-gray-400 text-sm mb-2">Portfolio Value</p>
+              <p className="text-3xl font-semibold">{formatCurrency(portfolioData.totalPortfolioValue)}</p>
+            </div>
+
+            <div className="bg-[#181B20] text-white rounded-2xl p-6">
+              <p className="text-gray-400 text-sm mb-2">Total Account Value</p>
+              <p className="text-3xl font-semibold">{formatCurrency(portfolioData.totalAccountValue)}</p>
+            </div>
+          </div>
+
+          <div className="bg-[#181B20] text-white rounded-2xl p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-400 text-sm mb-2">Total Unrealized P&L</p>
+                <p className={`text-4xl font-bold ${totalPnlIsPositive ? 'text-green-500' : 'text-red-500'}`}>
+                  {formatCurrency(portfolioData.totalUnrealizedPnl)}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-gray-400 text-sm mb-2">Return</p>
+                <p className={`text-4xl font-bold ${totalPnlIsPositive ? 'text-green-500' : 'text-red-500'}`}>
+                  {formatPercentage(portfolioData.totalPnlPercentage)}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-[#181B20] text-white rounded-2xl p-6 overflow-x-auto">
+            <h2 className="text-2xl font-semibold mb-6">Holdings</h2>
+            <table className="text-left w-full min-w-[800px]">
+              <thead>
+                <tr className="border-b border-[#23262A]">
+                  <th className="py-3 px-4">Symbol</th>
+                  <th className="py-3 px-4">Name</th>
+                  <th className="py-3 px-4 text-right">Quantity</th>
+                  <th className="py-3 px-4 text-right">Avg. Price</th>
+                  <th className="py-3 px-4 text-right">Current Price</th>
+                  <th className="py-3 px-4 text-right">Invested</th>
+                  <th className="py-3 px-4 text-right">Current Value</th>
+                  <th className="py-3 px-4 text-right">P&L</th>
+                  <th className="py-3 px-4 text-right">P&L %</th>
+                  <th className="py-3 px-4 text-center">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {portfolioData.portfolio.length > 0 ? (
+                  portfolioData.portfolio.map((item) => {
+                    const pnlIsPositive = parseFloat(item.unrealizedPnl) >= 0;
+                    return (
+                      <tr key={item.symbol} className="border-t border-[#23262A] hover:bg-[#1F2229]">
+                        <td className="py-4 px-4 font-semibold">{item.symbol}</td>
+                        <td className="py-4 px-4 text-gray-400">{item.name || '-'}</td>
+                        <td className="py-4 px-4 text-right">{item.quantity}</td>
+                        <td className="py-4 px-4 text-right">{formatCurrency(item.avgPrice)}</td>
+                        <td className="py-4 px-4 text-right">{formatCurrency(item.currentPrice)}</td>
+                        <td className="py-4 px-4 text-right">{formatCurrency(item.invested)}</td>
+                        <td className="py-4 px-4 text-right">{formatCurrency(item.currentValue)}</td>
+                        <td className={`py-4 px-4 text-right font-semibold ${pnlIsPositive ? 'text-green-500' : 'text-red-500'}`}>
+                          {formatCurrency(item.unrealizedPnl)}
+                        </td>
+                        <td className={`py-4 px-4 text-right font-semibold ${pnlIsPositive ? 'text-green-500' : 'text-red-500'}`}>
+                          {formatPercentage(item.pnlPercentage)}
+                        </td>
+                        <td className="py-4 px-4 text-center">
+                          <button
+                            onClick={() => handleSell(item.symbol, item.quantity)}
+                            className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded transition-colors"
+                          >
+                            Sell
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                ) : (
+                  <tr>
+                    <td colSpan={10} className="text-center py-10 text-gray-400">
+                      You have no holdings. Start trading to see your portfolio here.
                     </td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={6} className="text-center py-10">
-                    You have no holdings.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>

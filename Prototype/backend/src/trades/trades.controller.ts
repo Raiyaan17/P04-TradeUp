@@ -5,6 +5,8 @@ import {
   Request,
   UseGuards,
   Get,
+  Query,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { BuyStockDto } from './dto/buy-stock.dto';
@@ -28,6 +30,21 @@ export class TradesController {
   getPortfolio(@Request() req: AuthenticatedRequest) {
     const userId = req.user.userId;
     return this.tradesService.getPortfolio(userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('transactions')
+  getTransactions(
+    @Request() req,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
+    @Query('offset', new ParseIntPipe({ optional: true })) offset?: number,
+  ) {
+    const userId = req.user.userId;
+    return this.tradesService.getTransactions(
+      userId,
+      limit || 50,
+      offset || 0,
+    );
   }
 
   @UseGuards(JwtAuthGuard)

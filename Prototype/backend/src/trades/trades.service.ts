@@ -181,33 +181,98 @@ export class TradesService {
       include: { stock: true },
     });
 
+    let totalPortfolioValue = new Decimal(0);
+    let totalInvested = new Decimal(0);
+    let totalUnrealizedPnl = new Decimal(0);
+
     const portfolioWithPnl = await Promise.all(
       portfolioItems.map(async (item) => {
         const tick = await this.stocks.getTick(item.stock.symbol);
         const currentPriceValue = tick?.price ?? 0;
         const currentPrice = new Decimal(currentPriceValue);
 
-        const previousDayClose = await this.stocks.getPreviousDayClose(
-          item.stock.symbol,
-        );
+        const invested = item.avgPrice.mul(item.quantity);
+        const currentValue = currentPrice.mul(item.quantity);
+        const unrealizedPnl = currentValue.sub(invested);
+        const pnlPercentage = invested.isZero()
+          ? new Decimal(0)
+          : unrealizedPnl.div(invested).mul(100);
 
-        let pnl = new Decimal(0);
-        if (previousDayClose != null) {
-          const previousClosePrice = new Decimal(previousDayClose);
-          pnl = currentPrice.sub(previousClosePrice).mul(item.quantity);
-        }
+        totalPortfolioValue = totalPortfolioValue.add(currentValue);
+        totalInvested = totalInvested.add(invested);
+        totalUnrealizedPnl = totalUnrealizedPnl.add(unrealizedPnl);
 
         return {
-          ...item,
-          currentPrice,
-          pnl,
+          symbol: item.stock.symbol,
+          name: item.stock.name,
+          quantity: item.quantity,
+          avgPrice: item.avgPrice,
+          currentPrice: currentPrice,
+          invested: invested,
+          currentValue: currentValue,
+          unrealizedPnl: unrealizedPnl,
+          pnlPercentage: pnlPercentage,
+          createdAt: item.createdAt,
         };
       }),
     );
 
+    const totalPnlPercentage = totalInvested.isZero()
+      ? new Decimal(0)
+      : totalUnrealizedPnl.div(totalInvested).mul(100);
+
+    const totalAccountValue = user.balance.add(totalPortfolioValue);
+
     return {
       balance: user.balance,
+      totalInvested: totalInvested,
+      totalPortfolioValue: totalPortfolioValue,
+      totalUnrealizedPnl: totalUnrealizedPnl,
+      totalPnlPercentage: totalPnlPercentage,
+      totalAccountValue: totalAccountValue,
       portfolio: portfolioWithPnl,
+    };
+  }
+
+  async getTransactions(
+    userId: number,
+    limit: number = 50,
+    offset: number = 0,
+  ) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException(`User with ID ${userId} not found.`);
+    }
+
+    const transactions = await this.prisma.transaction.findMany({
+      where: { userId },
+      include: { stock: true },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      skip: offset,
+    });
+
+    const total = await this.prisma.transaction.count({
+      where: { userId },
+    });
+
+    return {
+      transactions: transactions.map((tx) => ({
+        id: tx.id,
+        symbol: tx.stock.symbol,
+        name: tx.stock.name,
+        type: tx.type,
+        quantity: tx.quantity,
+        price: tx.price,
+        total: tx.total,
+        createdAt: tx.createdAt,
+      })),
+      total,
+      limit,
+      offset,
     };
   }
 }
