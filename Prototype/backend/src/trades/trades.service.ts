@@ -187,8 +187,18 @@ export class TradesService {
 
     const portfolioWithPnl = await Promise.all(
       portfolioItems.map(async (item) => {
-        const tick = await this.stocks.getTick(item.stock.symbol);
-        const currentPriceValue = tick?.price ?? 0;
+        let currentPriceValue = 0;
+        try {
+          const tick = await this.stocks.getTick(item.stock.symbol);
+          if (tick && typeof tick.price === 'number') {
+            currentPriceValue = tick.price;
+          } else {
+            console.error(`Invalid tick data for ${item.stock.symbol}:`, tick);
+          }
+        } catch (error) {
+          console.error(`Failed to get tick for ${item.stock.symbol}:`, error);
+        }
+
         const currentPrice = new Decimal(currentPriceValue);
 
         const invested = item.avgPrice.mul(item.quantity);
