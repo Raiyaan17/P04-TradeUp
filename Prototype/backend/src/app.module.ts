@@ -10,6 +10,7 @@ import { WatchlistModule } from './watchlist/watchlist.module';
 import { WsModule } from './ws/ws.module';
 import { NewsModule } from './news/news.module';
 import { TradesModule } from './trades/trades.module';
+import { SimulationModule } from './simulation/simulation.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { TradesModule } from './trades/trades.module';
     WsModule,
     NewsModule,
     TradesModule,
+    SimulationModule,
   ],
   controllers: [AppController],
   providers: [AppService],

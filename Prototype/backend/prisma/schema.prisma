@@ -20,6 +20,7 @@ model User {
   portfolio       Portfolio[]
   transactions    Transaction[]
   watchlist       WatchlistItem[]
+  simulations     Simulation[]
 }
 
 model Stock {
@@ -70,6 +71,16 @@ model Transaction {
   user      User            @relation(fields: [userId], references: [id])
 }
 
+model Simulation {
+  id              Int            @id @default(autoincrement())
+  userId          Int
+  stockSymbol     String
+  scenarioType    MarketScenario
+  predictedPrices Json
+  createdAt       DateTime       @default(now())
+  user            User           @relation(fields: [userId], references: [id])
+}
+
 enum Role {
   TRADER
   ADMIN
@@ -83,4 +94,10 @@ enum Gender {
 enum TransactionType {
   BUY
   SELL
+}
+
+enum MarketScenario {
+  CRASH
+  BULL
+  STAGNANT
 }
