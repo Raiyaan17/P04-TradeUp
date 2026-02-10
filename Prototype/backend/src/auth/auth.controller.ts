@@ -14,7 +14,7 @@ function maskEmail(email: string): string {
 export class AuthController {
   private readonly logger = new Logger(AuthController.name);
 
-  constructor(private readonly auth: AuthService) { }
+  constructor(private readonly auth: AuthService) {}
 
   @Post('signup')
   async signup(@Body() dto: SignupDto) {
@@ -34,7 +34,9 @@ export class AuthController {
         dto.gender,
       );
       const duration = Date.now() - start;
-      this.logger.log(`Signup completed [email=${masked}, duration=${duration}ms]`);
+      this.logger.log(
+        `Signup completed [email=${masked}, duration=${duration}ms]`,
+      );
       return result;
     } catch (error) {
       const duration = Date.now() - start;
@@ -55,7 +57,9 @@ export class AuthController {
     try {
       const result = await this.auth.login(dto.email, dto.password);
       const duration = Date.now() - start;
-      this.logger.log(`Login completed [email=${masked}, duration=${duration}ms]`);
+      this.logger.log(
+        `Login completed [email=${masked}, duration=${duration}ms]`,
+      );
       return result;
     } catch (error) {
       const duration = Date.now() - start;

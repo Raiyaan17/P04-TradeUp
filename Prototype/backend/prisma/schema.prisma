@@ -106,3 +106,25 @@ enum FriendshipStatus {
   DECLINED
 }
 
+enum PresetType {
+  STEADY_CLIMB
+  FLASH_CRASH
+  IMF_ROLLERCOASTER
+  REALISTIC_OUTLOOK
+}
+
+model SimulationScenario {
+  id             String     @id @default(uuid())
+  presetType     PresetType
+  stockSymbol    String
+  createdAt      DateTime   @default(now())
+  expiresAt      DateTime?
+  trajectoryJson Json
+  newsJson       Json
+  basePrice      Float
+
+  @@index([presetType, stockSymbol])
+  @@index([expiresAt])
+}
+
+

@@ -24,7 +24,7 @@ interface AuthenticatedRequest {
 
 @Controller('trades')
 export class TradesController {
-  constructor(private readonly tradesService: TradesService) { }
+  constructor(private readonly tradesService: TradesService) {}
 
   @UseGuards(JwtAuthGuard)
   @Get('portfolio')

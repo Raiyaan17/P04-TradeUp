@@ -31,4 +31,3 @@ export class SignupDto {
   @IsIn(['MALE', 'FEMALE'])
   gender!: 'MALE' | 'FEMALE';
 }
-

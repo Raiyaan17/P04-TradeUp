@@ -13,7 +13,7 @@ const supabase = createClient(
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   // Upload profile picture, save URL in DB, and return public URL
   async uploadProfilePicture(

@@ -10,4 +10,4 @@ import { FriendsModule } from '../friends/friends.module';
   controllers: [TradesController],
   providers: [TradesService],
 })
-export class TradesModule { }
+export class TradesModule {}

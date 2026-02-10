@@ -11,6 +11,7 @@ import { WsModule } from './ws/ws.module';
 import { NewsModule } from './news/news.module';
 import { TradesModule } from './trades/trades.module';
 import { FriendsModule } from './friends/friends.module';
+import { OracleModule } from './oracle/oracle.module';
 
 @Module({
   imports: [
@@ -31,9 +32,9 @@ import { FriendsModule } from './friends/friends.module';
     NewsModule,
     TradesModule,
     FriendsModule,
+    OracleModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule { }
-
+export class AppModule {}

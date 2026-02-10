@@ -69,16 +69,16 @@ export default function Charts() {
       height: 500,
       layout: {
         background: { color: 'transparent' },
-        textColor: 'hsl(var(--foreground))',
+        textColor: '#171717',
       },
       grid: {
-        vertLines: { color: 'hsl(var(--border))' },
-        horzLines: { color: 'hsl(var(--border))' },
+        vertLines: { color: '#e5e5e5' },
+        horzLines: { color: '#e5e5e5' },
       },
       timeScale: {
         timeVisible: true,
         secondsVisible: true,
-        borderColor: 'hsl(var(--border))',
+        borderColor: '#e5e5e5',
         rightOffset: 12,
         barSpacing: 10,
         fixLeftEdge: false,
@@ -86,7 +86,7 @@ export default function Charts() {
         lockVisibleTimeRangeOnResize: false,
       },
       rightPriceScale: {
-        borderColor: 'hsl(var(--border))',
+        borderColor: '#e5e5e5',
         scaleMargins: {
           top: 0.1,
           bottom: 0.1,
@@ -96,12 +96,12 @@ export default function Charts() {
       crosshair: {
         mode: 1,
         vertLine: {
-          color: 'hsl(var(--muted-foreground))',
+          color: '#737373',
           width: 1,
           style: 2,
         },
         horzLine: {
-          color: 'hsl(var(--muted-foreground))',
+          color: '#737373',
           width: 1,
           style: 2,
         },

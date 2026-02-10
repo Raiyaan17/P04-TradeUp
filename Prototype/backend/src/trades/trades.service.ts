@@ -16,7 +16,7 @@ export class TradesService {
     private readonly prisma: PrismaService,
     private readonly stocks: StocksService,
     private readonly friendsService: FriendsService,
-  ) { }
+  ) {}
 
   async buyStock(userId: number, symbol: string, quantity: number) {
     const tick = await this.stocks.getTick(symbol);
@@ -255,7 +255,7 @@ export class TradesService {
     }
 
     // 2. Get portfolio data (reusing getPortfolio logic partially or calling it)
-    // Calling getPortfolio is easiest but might be slightly inefficient. 
+    // Calling getPortfolio is easiest but might be slightly inefficient.
     // Optimization not critical for prototype.
     const fullPortfolio = await this.getPortfolio(targetUserId);
 
@@ -273,12 +273,12 @@ export class TradesService {
     let topPerformer: { symbol: string; pnlPercentage: Decimal } | null = null;
     if (fullPortfolio.portfolio.length > 0) {
       const sorted = [...fullPortfolio.portfolio].sort((a, b) =>
-        b.pnlPercentage.sub(a.pnlPercentage).toNumber()
+        b.pnlPercentage.sub(a.pnlPercentage).toNumber(),
       );
       const top = sorted[0];
       topPerformer = {
         symbol: top.symbol,
-        pnlPercentage: top.pnlPercentage
+        pnlPercentage: top.pnlPercentage,
       };
     }
 
@@ -287,21 +287,21 @@ export class TradesService {
       totalPortfolioValue: fullPortfolio.totalPortfolioValue,
       totalUnrealizedPnl: fullPortfolio.totalUnrealizedPnl,
       totalPnlPercentage: fullPortfolio.totalPnlPercentage,
-      portfolio: fullPortfolio.portfolio.map(p => ({
+      portfolio: fullPortfolio.portfolio.map((p) => ({
         symbol: p.symbol,
         name: p.name,
         quantity: p.quantity,
         avgPrice: p.avgPrice,
         currentPrice: p.currentPrice,
         unrealizedPnl: p.unrealizedPnl,
-        pnlPercentage: p.pnlPercentage
+        pnlPercentage: p.pnlPercentage,
       })),
       stats: {
         totalTrades,
         memberSince: user?.createdAt,
         portfolioDiversity: fullPortfolio.portfolio.length,
-        topPerformer
-      }
+        topPerformer,
+      },
     };
   }
 

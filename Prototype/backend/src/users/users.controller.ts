@@ -18,7 +18,11 @@ import { RolesGuard } from '../auth/roles.guard';
 import { UsersService } from './users.service';
 import { FundWalletDto } from './dto/fund-wallet.dto';
 import * as bcrypt from 'bcrypt';
-import { ConflictException, UnauthorizedException, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  UnauthorizedException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Logger } from '@nestjs/common';
 
 interface AuthenticatedRequest {
@@ -78,7 +82,7 @@ export class UsersController {
     );
     return { imageUrl };
   }
-  constructor(private readonly usersService: UsersService) { }
+  constructor(private readonly usersService: UsersService) {}
 
   @UseGuards(JwtAuthGuard)
   @Get('profile')
@@ -272,5 +276,4 @@ export class UsersController {
   test() {
     return { message: 'Users controller is working!' };
   }
-
 }

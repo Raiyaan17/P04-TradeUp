@@ -22,6 +22,7 @@ const NAV_LINKS = [
   { href: "/portfolio", label: "Portfolio" },
   { href: "/charts", label: "Markets" },
   { href: "/buy", label: "Trade" },
+  { href: "/oracle", label: "Game" },
   { href: "/news", label: "News" },
   { href: "/help", label: "Help" },
 ];
