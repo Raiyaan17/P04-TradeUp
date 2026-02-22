@@ -3,15 +3,19 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { io, Socket } from "socket.io-client";
 import { createChart, IChartApi, ISeriesApi, UTCTimestamp, ColorType, CrosshairMode } from 'lightweight-charts';
-import { Activity, AlertTriangle, Building2, LineChart } from "lucide-react";
+import { Activity, AlertTriangle, Building2, LineChart, Plus, Minus, TrendingUp, TrendingDown } from "lucide-react";
 import { AppShell } from "@/components/layout";
 import { PageHeader } from "@/components/common";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { http } from "@/lib/http";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { http, ApiException } from "@/lib/http";
 import { formatDecimal, formatVolume } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { parseKlines, Candle } from "@/lib/chartUtils";
+import { useTheme } from "next-themes";
+import { toast } from "sonner";
 
 interface TickOHLC {
   o: number;
@@ -25,16 +29,18 @@ interface TickOHLC {
 }
 
 interface TickData {
-  tick: TickOHLC;
+  symbol: string;
+  source: string;
   timestamp: number;
+  tick: TickOHLC;
 }
 
 type CandleData = Candle;
 
 interface MarketStatus {
   isConnected: boolean;
-  lastUpdateTime: number;
   isMarketClosed: boolean;
+  lastUpdateTime: number | null;
 }
 
 // Stats interface for the top bar
@@ -64,6 +70,16 @@ interface Fundamentals {
   freeFloat: string;
 }
 
+interface PortfolioItem {
+  symbol: string;
+  quantity: number;
+}
+
+interface PortfolioData {
+  balance: string;
+  portfolio: PortfolioItem[];
+}
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
 const CANDLE_INTERVAL = 1 * 60 * 1000;
 const MARKET_CLOSED_TIMEOUT = 5000;
@@ -78,6 +94,7 @@ const TIMEFRAMES = [
 ];
 
 export default function Charts() {
+  const { resolvedTheme } = useTheme();
   const [tickData, setTickData] = useState<TickData | null>(null);
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -100,12 +117,23 @@ export default function Charts() {
   const marketCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [marketStatus, setMarketStatus] = useState<MarketStatus>({
     isConnected: false,
-    lastUpdateTime: 0,
+    lastUpdateTime: null,
     isMarketClosed: false
   });
 
   // Active module selection (Chart vs Company)
   const [activeModule, setActiveModule] = useState<'chart' | 'company'>('chart');
+
+  // Trade quantities 
+  const [buyQuantity, setBuyQuantity] = useState<number>(1);
+  const [sellQuantity, setSellQuantity] = useState<number>(1);
+
+  // Submission states
+  const [isSubmittingBuy, setIsSubmittingBuy] = useState<boolean>(false);
+  const [isSubmittingSell, setIsSubmittingSell] = useState<boolean>(false);
+
+  // Portfolio data
+  const [portfolioData, setPortfolioData] = useState<PortfolioData | null>(null);
 
   // Handle URL parameters for initial symbol selection
   useEffect(() => {
@@ -125,6 +153,10 @@ export default function Charts() {
   const initializeChart = useCallback(() => {
     if (!chartContainerRef.current || chartRef.current) return;
 
+    const isDark = resolvedTheme === 'dark';
+    const textColor = isDark ? '#9ca3af' : '#4b5563'; // gray-400 : gray-600
+    const gridColor = isDark ? '#374151' : '#e5e7eb'; // gray-700 : gray-200
+
     // Use our app's Tailwind colors for the chart
     // Background: transparent so it blends with the Card
     // Grid/Text: muted foregrounds
@@ -133,16 +165,16 @@ export default function Charts() {
       height: 500,
       layout: {
         background: { type: ColorType.Solid, color: 'transparent' },
-        textColor: 'hsl(var(--muted-foreground))',
+        textColor: textColor,
       },
       grid: {
-        vertLines: { color: 'hsl(var(--border) / 0.5)' },
-        horzLines: { color: 'hsl(var(--border) / 0.5)' },
+        vertLines: { color: gridColor },
+        horzLines: { color: gridColor },
       },
       timeScale: {
         timeVisible: true,
         secondsVisible: false,
-        borderColor: 'hsl(var(--border))',
+        borderColor: gridColor,
         rightOffset: 12,
         barSpacing: 10,
         fixLeftEdge: false,
@@ -150,7 +182,7 @@ export default function Charts() {
         lockVisibleTimeRangeOnResize: false,
       },
       rightPriceScale: {
-        borderColor: 'hsl(var(--border))',
+        borderColor: gridColor,
         autoScale: true,
       },
       crosshair: {
@@ -228,7 +260,32 @@ export default function Charts() {
     return () => {
       resizeObserver.disconnect();
     };
-  }, []);
+  }, [resolvedTheme]);
+
+  // Update chart colors when theme changes dynamically
+  useEffect(() => {
+    if (chartRef.current) {
+      const isDark = resolvedTheme === 'dark';
+      const textColor = isDark ? '#9ca3af' : '#4b5563';
+      const gridColor = isDark ? '#374151' : '#e5e7eb';
+
+      chartRef.current.applyOptions({
+        layout: {
+          textColor: textColor,
+        },
+        grid: {
+          vertLines: { color: gridColor },
+          horzLines: { color: gridColor },
+        },
+        timeScale: {
+          borderColor: gridColor,
+        },
+        rightPriceScale: {
+          borderColor: gridColor,
+        },
+      });
+    }
+  }, [resolvedTheme]);
 
   const setChartContainerEl = useCallback((el: HTMLDivElement | null) => {
     chartContainerRef.current = el;
@@ -333,6 +390,8 @@ export default function Charts() {
           chgPct: res.tick.changePercent || 0,
         };
         setTickData({
+          symbol: symbol, // Add symbol
+          source: 'REST', // Add source
           tick: mappedTick,
           timestamp: res.tick.timestamp ? res.tick.timestamp * 1000 : Date.now()
         });
@@ -445,7 +504,57 @@ export default function Charts() {
     });
   }, [getCandleStartTime]);
 
+  const fetchPortfolio = useCallback(async () => {
+    try {
+      const data = await http.get<PortfolioData>('/trades/portfolio');
+      setPortfolioData(data);
+    } catch (err) {
+      console.error("Failed to fetch portfolio:", err);
+    }
+  }, []);
+
+  const handleBuySubmit = async () => {
+    if (!stock || buyQuantity <= 0 || isSubmittingBuy) return;
+
+    try {
+      setIsSubmittingBuy(true);
+      await http.post("/trades/buy", {
+        symbol: stock,
+        quantity: buyQuantity,
+      });
+      toast.success(`Successfully bought ${buyQuantity} shares of ${stock}!`);
+      setBuyQuantity(1); // Reset after successful buy
+      fetchPortfolio(); // Refresh holdings
+    } catch (err) {
+      const message = err instanceof ApiException ? err.message : "Failed to place buy order. Please try again.";
+      toast.error(message);
+    } finally {
+      setIsSubmittingBuy(false);
+    }
+  };
+
+  const handleSellSubmit = async () => {
+    if (!stock || sellQuantity <= 0 || isSubmittingSell) return;
+
+    try {
+      setIsSubmittingSell(true);
+      await http.post("/trades/sell", {
+        symbol: stock,
+        quantity: sellQuantity,
+      });
+      toast.success(`Successfully sold ${sellQuantity} shares of ${stock}!`);
+      setSellQuantity(1); // Reset after successful sell
+      fetchPortfolio(); // Refresh holdings
+    } catch (err) {
+      const message = err instanceof ApiException ? err.message : "Failed to place sell order. Please try again.";
+      toast.error(message);
+    } finally {
+      setIsSubmittingSell(false);
+    }
+  };
+
   useEffect(() => {
+    fetchPortfolio();
     initializeChart();
     return () => {
       if (chartRef.current) {
@@ -472,10 +581,10 @@ export default function Charts() {
 
     marketCheckIntervalRef.current = setInterval(() => {
       setMarketStatus(prev => {
-        const timeSinceLastUpdate = Date.now() - prev.lastUpdateTime;
+        const timeSinceLastUpdate = prev.lastUpdateTime ? Date.now() - prev.lastUpdateTime : 0;
         const shouldMarkClosed = prev.isConnected &&
           hasReceivedTick &&
-          prev.lastUpdateTime > 0 &&
+          prev.lastUpdateTime !== null &&
           timeSinceLastUpdate > MARKET_CLOSED_TIMEOUT;
 
         return {
@@ -626,6 +735,122 @@ export default function Charts() {
                 <p className={cn("font-medium", activeModule === 'company' ? "text-foreground" : "text-muted-foreground")}>Company</p>
                 <p className="text-xs text-muted-foreground">Profile Available</p>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Buy Card */}
+          <Card className="border-emerald-500/20 bg-emerald-500/5 transition-colors hover:bg-emerald-500/10">
+            <CardContent className="flex flex-col items-center justify-between p-4 h-full gap-3">
+              <div className="flex flex-col w-full gap-2 mb-1">
+                <div className="flex items-center w-full justify-between">
+                  <span className="font-semibold text-emerald-500 flex items-center gap-1">
+                    <TrendingUp className="w-4 h-4" /> Buy {stock}
+                  </span>
+                  <Badge variant="outline" className="text-emerald-500 border-emerald-500/30 bg-emerald-500/10 text-[10px] px-1.5 font-mono">
+                    {currentPrice > 0 ? formatDecimal(currentPrice) : '---'}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>Buying Power</span>
+                  <span className="font-mono text-emerald-500">PKR {portfolioData ? formatDecimal(parseFloat(portfolioData.balance)) : '---'}</span>
+                </div>
+              </div>
+
+              <div className="flex items-center w-full gap-2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8 border-emerald-500/30 text-emerald-500 hover:bg-emerald-500 hover:text-white transition-colors"
+                  onClick={() => setBuyQuantity(Math.max(1, buyQuantity - 1))}
+                >
+                  <Minus className="h-3 w-3" />
+                </Button>
+                <Input
+                  type="number"
+                  min={1}
+                  value={buyQuantity}
+                  onChange={(e) => setBuyQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="h-8 text-center font-mono border-emerald-500/30 focus-visible:ring-emerald-500"
+                />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8 border-emerald-500/30 text-emerald-500 hover:bg-emerald-500 hover:text-white transition-colors"
+                  onClick={() => setBuyQuantity(buyQuantity + 1)}
+                >
+                  <Plus className="h-3 w-3" />
+                </Button>
+              </div>
+
+              <Button
+                className="w-full h-8 bg-emerald-500 hover:bg-emerald-600 text-white font-medium shadow-none transition-colors"
+                onClick={handleBuySubmit}
+                disabled={isSubmittingBuy || !marketStatus.isConnected}
+              >
+                {isSubmittingBuy ? "Processing..." : "Execute Buy"}
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Sell Card */}
+          <Card className="border-rose-500/20 bg-rose-500/5 transition-colors hover:bg-rose-500/10">
+            <CardContent className="flex flex-col items-center justify-between p-4 h-full gap-3">
+              <div className="flex flex-col w-full gap-2 mb-1">
+                <div className="flex items-center w-full justify-between">
+                  <span className="font-semibold text-rose-500 flex items-center gap-1">
+                    <TrendingDown className="w-4 h-4" /> Sell {stock}
+                  </span>
+                  <Badge variant="outline" className="text-rose-500 border-rose-500/30 bg-rose-500/10 text-[10px] px-1.5 font-mono">
+                    {currentPrice > 0 ? formatDecimal(currentPrice) : '---'}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>Available</span>
+                  <button
+                    onClick={() => {
+                      const avail = portfolioData?.portfolio.find(p => p.symbol === stock)?.quantity || 0;
+                      if (avail > 0) setSellQuantity(avail);
+                    }}
+                    className="font-mono text-rose-500 hover:underline transition-all"
+                  >
+                    {portfolioData?.portfolio.find(p => p.symbol === stock)?.quantity || 0} Shares
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center w-full gap-2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8 border-rose-500/30 text-rose-500 hover:bg-rose-500 hover:text-white transition-colors"
+                  onClick={() => setSellQuantity(Math.max(1, sellQuantity - 1))}
+                >
+                  <Minus className="h-3 w-3" />
+                </Button>
+                <Input
+                  type="number"
+                  min={1}
+                  value={sellQuantity}
+                  onChange={(e) => setSellQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="h-8 text-center font-mono border-rose-500/30 focus-visible:ring-rose-500"
+                />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8 border-rose-500/30 text-rose-500 hover:bg-rose-500 hover:text-white transition-colors"
+                  onClick={() => setSellQuantity(sellQuantity + 1)}
+                >
+                  <Plus className="h-3 w-3" />
+                </Button>
+              </div>
+
+              <Button
+                className="w-full h-8 bg-rose-500 hover:bg-rose-600 text-white font-medium shadow-none transition-colors"
+                onClick={handleSellSubmit}
+                disabled={isSubmittingSell || !marketStatus.isConnected}
+              >
+                {isSubmittingSell ? "Processing..." : "Execute Sell"}
+              </Button>
             </CardContent>
           </Card>
         </div>
