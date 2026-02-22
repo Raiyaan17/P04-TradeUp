@@ -156,16 +156,16 @@ export default function Charts() {
       crosshair: {
         mode: CrosshairMode.Normal,
         vertLine: {
-          color: 'hsl(var(--muted-foreground) / 0.5)',
+          color: 'rgba(156, 163, 175, 0.5)', // gray-400 with opacity
           width: 1,
-          style: 2,
-          labelBackgroundColor: 'hsl(var(--secondary))',
+          style: 1, // LineStyle.Dotted
+          labelBackgroundColor: '#374151', // gray-700
         },
         horzLine: {
-          color: 'hsl(var(--muted-foreground) / 0.5)',
+          color: 'rgba(156, 163, 175, 0.5)',
           width: 1,
-          style: 2,
-          labelBackgroundColor: 'hsl(var(--secondary))',
+          style: 1, // LineStyle.Dotted
+          labelBackgroundColor: '#374151',
         },
       },
       handleScroll: {
