@@ -33,7 +33,7 @@ export interface Kline {
 export class StocksService {
   private readonly base = PSX_API_BASE;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   getFeaturedSymbols() {
     return FEATURED_SYMBOLS as readonly string[];
@@ -133,5 +133,39 @@ export class StocksService {
     }
 
     return stock;
+  }
+
+  async getCompanyProfile(symbol: string): Promise<any> {
+    const url = `${this.base}/api/companies/${encodeURIComponent(symbol)}`;
+    try {
+      const { data } = await axios.get<PsxApiResponse<any>>(url, {
+        timeout: 5000,
+      });
+      if (data?.success) return data.data;
+      return null;
+    } catch (error) {
+      console.error(
+        `Failed to fetch company profile for ${symbol}:`,
+        (error as Error).message,
+      );
+      return null;
+    }
+  }
+
+  async getFundamentals(symbol: string): Promise<any> {
+    const url = `${this.base}/api/fundamentals/${encodeURIComponent(symbol)}`;
+    try {
+      const { data } = await axios.get<PsxApiResponse<any>>(url, {
+        timeout: 5000,
+      });
+      if (data?.success) return data.data;
+      return null;
+    } catch (error) {
+      console.error(
+        `Failed to fetch fundamentals for ${symbol}:`,
+        (error as Error).message,
+      );
+      return null;
+    }
   }
 }

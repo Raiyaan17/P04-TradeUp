@@ -15,7 +15,6 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    DialogTrigger,
 } from "@/components/ui/dialog";
 import {
     searchUsers,
@@ -29,12 +28,6 @@ import {
     FriendRequest,
 } from '@/lib/friendsService';
 import Link from 'next/link';
-
-const TABS = [
-    { id: 'friends', label: 'Friends' },
-    { id: 'requests', label: 'Requests' },
-    { id: 'search', label: 'Search' },
-];
 
 export function FriendsSection() {
     const [activeTab, setActiveTab] = useState('friends');
