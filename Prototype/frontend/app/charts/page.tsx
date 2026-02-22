@@ -326,7 +326,7 @@ export default function Charts() {
     }
   }, [initializeChart]);
 
-  const fetchHistoricalData = useCallback(async (symbol: string, tf: string) => {
+  const fetchHistoricalData = useCallback(async (symbol: string, tf: string, signal?: AbortSignal) => {
     try {
       setIsLoadingHistory(true);
       setHistoricalData([]);
@@ -337,8 +337,10 @@ export default function Charts() {
 
       const result = await http.get<{ data: unknown[] }>(
         `/stocks/${encodeURIComponent(symbol)}/klines/${tf}?limit=100`,
-        { noAuth: true }
+        { noAuth: true, signal }
       );
+
+      if (signal?.aborted) return;
 
       if (result && result.data && Array.isArray(result.data)) {
         const parsedData = parseKlines(result.data);
@@ -382,14 +384,24 @@ export default function Charts() {
           const sma200Data = calculateSMA(uniqueData, 200).map(d => ({ time: d.time as UTCTimestamp, value: d.value }));
           sma200SeriesRef.current.setData(sma200Data);
         }
+
+        // Force WebAssembly engine to snap camera viewport back onto the active dataset
+        // Prevents small timeframe vectors from vanishing outside macro viewport edges.
+        if (chartRef.current) {
+          chartRef.current.timeScale().fitContent();
+        }
       } else {
         setHistoricalData([]);
       }
     } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') return;
+      if (signal?.aborted) return;
       console.error('Failed to fetch historical data:', error);
       setHistoricalData([]);
     } finally {
-      setIsLoadingHistory(false);
+      if (!signal?.aborted) {
+        setIsLoadingHistory(false);
+      }
     }
   }, []);
 
@@ -630,12 +642,14 @@ export default function Charts() {
   }, [initializeChart]);
 
   useEffect(() => {
+    const abortController = new AbortController();
+
     setCurrentCandle(null);
     setTickData(null);
     setHasReceivedTick(false);
 
     // Initial fetch
-    fetchHistoricalData(stock, timeframe);
+    fetchHistoricalData(stock, timeframe, abortController.signal);
     fetchCompanyData(stock);
     fetchInitialTick(stock);
     connectWebSocket(stock);
@@ -660,6 +674,7 @@ export default function Charts() {
     }, 1000);
 
     return () => {
+      abortController.abort();
       if (socketRef.current) {
         socketRef.current.close();
         socketRef.current = null;
