@@ -57,6 +57,17 @@ export default function Charts() {
     isMarketClosed: false
   });
 
+  // Handle URL parameters for initial symbol selection
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const symbolParam = params.get('symbol');
+      if (symbolParam && symbolParam !== stock) {
+        setStock(symbolParam);
+      }
+    }
+  }, [stock]);
+
   const getCandleStartTime = useCallback((timestamp: number) => {
     return Math.floor(timestamp / CANDLE_INTERVAL) * CANDLE_INTERVAL;
   }, []);

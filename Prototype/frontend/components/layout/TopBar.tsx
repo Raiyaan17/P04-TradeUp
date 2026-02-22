@@ -20,7 +20,7 @@ import { getFriendRequests } from "@/lib/friendsService";
 
 const NAV_LINKS = [
   { href: "/portfolio", label: "Portfolio" },
-  { href: "/charts", label: "Markets" },
+  { href: "/markets", label: "Markets" },
   { href: "/buy", label: "Trade" },
   { href: "/oracle", label: "Game" },
   { href: "/news", label: "News" },
