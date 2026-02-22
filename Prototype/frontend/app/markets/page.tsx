@@ -18,7 +18,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { http } from '@/lib/http';
-import { formatDecimal, formatSigned, formatVolume, getPnLClass } from '@/lib/format';
+import { formatDecimal, formatVolume } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
 // --- Types ---
@@ -233,10 +233,8 @@ export default function MarketsPage() {
                                 <TableHeader>
                                     <TableRow className="hover:bg-transparent">
                                         <TableHead>Symbol</TableHead>
-                                        <TableHead>Name</TableHead>
                                         <TableHead className="text-right">Price (PKR)</TableHead>
                                         <TableHead className="text-right">Volume</TableHead>
-                                        <TableHead className="text-right">Change</TableHead>
                                         <TableHead className="text-right">Change %</TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -253,15 +251,11 @@ export default function MarketsPage() {
                                                 onClick={() => handleRowClick(stock.symbol)}
                                             >
                                                 <TableCell className="font-semibold">{stock.symbol}</TableCell>
-                                                <TableCell className="text-muted-foreground">{stock.name || "—"}</TableCell>
                                                 <TableCell className="text-right tabular-nums font-medium">
                                                     {formatDecimal(price)}
                                                 </TableCell>
                                                 <TableCell className="text-right tabular-nums">
                                                     {formatVolume(vol)}
-                                                </TableCell>
-                                                <TableCell className={cn("text-right tabular-nums", getPnLClass(chg))}>
-                                                    {formatSigned(chg)}
                                                 </TableCell>
                                                 <TableCell className="text-right">
                                                     <Badge

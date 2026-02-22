@@ -19,7 +19,7 @@ interface CandleResponse {
 
 @Controller('stocks')
 export class StocksController {
-  constructor(private readonly stocks: StocksService) {}
+  constructor(private readonly stocks: StocksService) { }
 
   @Get('featured')
   async featured() {
@@ -67,6 +67,18 @@ export class StocksController {
     }
 
     return { symbol, timeframe, data };
+  }
+
+  @Get(':symbol/company')
+  async getCompanyProfile(@Param('symbol') symbol: string) {
+    const data = await this.stocks.getCompanyProfile(symbol);
+    return { symbol, data };
+  }
+
+  @Get(':symbol/fundamentals')
+  async getFundamentals(@Param('symbol') symbol: string) {
+    const data = await this.stocks.getFundamentals(symbol);
+    return { symbol, data };
   }
 
   @Get(':symbol')
