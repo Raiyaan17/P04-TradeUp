@@ -172,3 +172,54 @@ export function deduplicateCandles(candles: Candle[]): Candle[] {
 
   return Array.from(map.values()).sort((a, b) => a.time - b.time);
 }
+
+/**
+ * Calculate Simple Moving Average for a series of candles.
+ * Efficiently computes the N-period SMA.
+ */
+export function calculateSMA(candles: Candle[], period: number): { time: number; value: number }[] {
+  const result: { time: number; value: number }[] = [];
+
+  if (candles.length < period) return result;
+
+  let sum = 0;
+  // Initialize the first window
+  for (let i = 0; i < period; i++) {
+    sum += candles[i].close;
+  }
+
+  // Push the first valid SMA
+  result.push({ time: candles[period - 1].time, value: sum / period });
+
+  // Slide the window
+  for (let i = period; i < candles.length; i++) {
+    sum = sum - candles[i - period].close + candles[i].close;
+    result.push({ time: candles[i].time, value: sum / period });
+  }
+
+  return result;
+}
+
+/**
+ * Calculate the latest SMA point given the historical array and the current live candle.
+ * Extremely efficient O(N) where N=period, safe for high-frequency live ticks.
+ */
+export function calculateLatestSMA(historicalCandles: Candle[], currentCandle: Candle, period: number): number | null {
+  // We need at least (period - 1) historical candles plus the current one
+  if (historicalCandles.length < period - 1) return null;
+
+  // Gather the closing prices contributing to this period
+  const neededHistoricalCount = period - 1;
+  let sum = 0;
+
+  // Sum up the required trailing historical closes
+  const startIdx = historicalCandles.length - neededHistoricalCount;
+  for (let i = startIdx; i < historicalCandles.length; i++) {
+    sum += historicalCandles[i].close;
+  }
+
+  // Add the live tick close
+  sum += currentCandle.close;
+
+  return sum / period;
+}

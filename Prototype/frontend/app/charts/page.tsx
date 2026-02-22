@@ -10,10 +10,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { http, ApiException } from "@/lib/http";
 import { formatDecimal, formatVolume } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { parseKlines, Candle } from "@/lib/chartUtils";
+import { parseKlines, Candle, calculateSMA, calculateLatestSMA } from "@/lib/chartUtils";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
 
@@ -100,6 +101,8 @@ export default function Charts() {
   const chartRef = useRef<IChartApi | null>(null);
   const candlestickSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
+  const sma50SeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const sma200SeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const socketRef = useRef<Socket | null>(null);
 
   const [currentCandle, setCurrentCandle] = useState<CandleData | null>(null);
@@ -127,6 +130,10 @@ export default function Charts() {
   // Trade quantities 
   const [buyQuantity, setBuyQuantity] = useState<number>(1);
   const [sellQuantity, setSellQuantity] = useState<number>(1);
+
+  // Custom Overlays
+  const [showSMA50, setShowSMA50] = useState<boolean>(true);
+  const [showSMA200, setShowSMA200] = useState<boolean>(true);
 
   // Submission states
   const [isSubmittingBuy, setIsSubmittingBuy] = useState<boolean>(false);
@@ -226,24 +233,38 @@ export default function Charts() {
       wickDownColor: '#ef4444',
     });
 
+    candlestickSeriesRef.current = candlestickSeries;
+
     const volumeSeries = chart.addHistogramSeries({
       color: '#26a69a',
-      priceFormat: {
-        type: 'volume',
-      },
-      priceScaleId: '', // Overlay over main chart
+      priceFormat: { type: 'volume' },
+      priceScaleId: '', // Set as an overlay by using an empty priceScaleId
     });
-
     volumeSeries.priceScale().applyOptions({
       scaleMargins: {
         top: 0.8, // highest point of the series will be at 80% of the chart height
         bottom: 0,
       },
     });
+    volumeSeriesRef.current = volumeSeries;
+
+    const sma50Series = chart.addLineSeries({
+      color: '#3B82F6', // Blue for 50 SMA
+      lineWidth: 2,
+      title: '50 SMA',
+      visible: showSMA50,
+    });
+    sma50SeriesRef.current = sma50Series;
+
+    const sma200Series = chart.addLineSeries({
+      color: '#F97316', // Orange for 200 SMA
+      lineWidth: 2,
+      title: '200 SMA',
+      visible: showSMA200,
+    });
+    sma200SeriesRef.current = sma200Series;
 
     chartRef.current = chart;
-    candlestickSeriesRef.current = candlestickSeries;
-    volumeSeriesRef.current = volumeSeries;
 
     const resizeObserver = new ResizeObserver(() => {
       if (chartRef.current && chartContainerRef.current) {
@@ -260,7 +281,16 @@ export default function Charts() {
     return () => {
       resizeObserver.disconnect();
     };
-  }, [resolvedTheme]);
+  }, [resolvedTheme]); // Removed showSMA states from dependencies to stop re-rendering the whole chart on checkbox toggle
+
+  // Update SMA visibilities when states change
+  useEffect(() => {
+    if (sma50SeriesRef.current) sma50SeriesRef.current.applyOptions({ visible: showSMA50 });
+  }, [showSMA50]);
+
+  useEffect(() => {
+    if (sma200SeriesRef.current) sma200SeriesRef.current.applyOptions({ visible: showSMA200 });
+  }, [showSMA200]);
 
   // Update chart colors when theme changes dynamically
   useEffect(() => {
@@ -291,55 +321,66 @@ export default function Charts() {
     chartContainerRef.current = el;
 
     if (el && !chartRef.current) {
+      console.log('Mounting Chart Container - Turbopack Cache Bust');
       initializeChart();
     }
   }, [initializeChart]);
 
   const fetchHistoricalData = useCallback(async (symbol: string, tf: string) => {
-    setIsLoadingHistory(true);
     try {
-      // The wrapper returns { symbol, timeframe, data: [...] }
+      setIsLoadingHistory(true);
+      setHistoricalData([]);
+      if (candlestickSeriesRef.current) candlestickSeriesRef.current.setData([]);
+      if (volumeSeriesRef.current) volumeSeriesRef.current.setData([]);
+      if (sma50SeriesRef.current) sma50SeriesRef.current.setData([]);
+      if (sma200SeriesRef.current) sma200SeriesRef.current.setData([]);
+
       const result = await http.get<{ data: unknown[] }>(
         `/stocks/${encodeURIComponent(symbol)}/klines/${tf}?limit=100`,
         { noAuth: true }
       );
 
       if (result && result.data && Array.isArray(result.data)) {
-        const candles = parseKlines(result.data);
-        setHistoricalData(candles);
+        const parsedData = parseKlines(result.data);
 
-        // Push initial full dataset to chart directly
+        // Deduplicate initial parsedData before feeding it to chart API to prevent duplicate-time hard crashes 
+        const uniqueData = parsedData.reduce((acc: Candle[], candle) => {
+          const existingIndex = acc.findIndex(c => c.time === candle.time);
+          if (existingIndex >= 0) acc[existingIndex] = candle;
+          else acc.push(candle);
+          return acc;
+        }, []);
+
+        setHistoricalData(uniqueData);
+
         if (candlestickSeriesRef.current) {
-          const uniqueData = candles.reduce((acc: CandleData[], candle) => {
-            const existingIndex = acc.findIndex(c => c.time === candle.time);
-            if (existingIndex >= 0) acc[existingIndex] = candle;
-            else acc.push(candle);
-            return acc;
-          }, []);
-
           const chartData = uniqueData.map(candle => ({
             time: candle.time as UTCTimestamp,
             open: candle.open,
             high: candle.high,
             low: candle.low,
             close: candle.close,
-          })).sort((a, b) => a.time - b.time);
-
+          }));
           candlestickSeriesRef.current.setData(chartData);
+        }
 
-          const volumeData = uniqueData.map(candle => ({
-            time: candle.time as UTCTimestamp,
-            value: candle.volume || 0,
-            color: candle.close >= candle.open ? 'rgba(34, 197, 94, 0.5)' : 'rgba(239, 68, 68, 0.5)'
-          })).sort((a, b) => a.time - b.time);
+        if (volumeSeriesRef.current) {
+          const volumeData = uniqueData.map(c => ({
+            time: c.time as UTCTimestamp,
+            value: c.volume || 0,
+            color: c.close >= c.open ? 'rgba(34, 197, 94, 0.5)' : 'rgba(239, 68, 68, 0.5)', // Match current green/red with opacity
+          }));
+          volumeSeriesRef.current.setData(volumeData);
+        }
 
-          if (volumeSeriesRef.current) {
-            volumeSeriesRef.current.setData(volumeData);
-          }
+        if (sma50SeriesRef.current) {
+          const sma50Data = calculateSMA(uniqueData, 50).map(d => ({ time: d.time as UTCTimestamp, value: d.value }));
+          sma50SeriesRef.current.setData(sma50Data);
+        }
 
-          if (chartRef.current) {
-            // chartRef.current.timeScale().fitContent();
-          }
+        if (sma200SeriesRef.current) {
+          const sma200Data = calculateSMA(uniqueData, 200).map(d => ({ time: d.time as UTCTimestamp, value: d.value }));
+          sma200SeriesRef.current.setData(sma200Data);
         }
       } else {
         setHistoricalData([]);
@@ -499,10 +540,34 @@ export default function Charts() {
           });
         }
 
+        // Live recalculate SMA lines
+        // For SMA, we need to consider if we have enough historical data. Since performance is critical, 
+        // we use a utility method to parse the rolling buffer directly.
+
+        if (sma50SeriesRef.current && showSMA50) {
+          setHistoricalData(hData => {
+            const nextSMA50 = calculateLatestSMA(hData, newCandle as Candle, 50);
+            if (nextSMA50 !== null) {
+              sma50SeriesRef.current!.update({ time: newCandle.time as UTCTimestamp, value: nextSMA50 });
+            }
+            return hData; // React state setter safely accesses state without triggering redraw if we return unchanged
+          });
+        }
+
+        if (sma200SeriesRef.current && showSMA200) {
+          setHistoricalData(hData => {
+            const nextSMA200 = calculateLatestSMA(hData, newCandle as Candle, 200);
+            if (nextSMA200 !== null) {
+              sma200SeriesRef.current!.update({ time: newCandle.time as UTCTimestamp, value: nextSMA200 });
+            }
+            return hData;
+          });
+        }
+
         return newCandle;
       });
     });
-  }, [getCandleStartTime]);
+  }, [getCandleStartTime, showSMA50, showSMA200]);
 
   const fetchPortfolio = useCallback(async () => {
     try {
@@ -858,8 +923,8 @@ export default function Charts() {
         {/* Main Content Area */}
         <Card className={cn("flex flex-col overflow-hidden border-border bg-card", activeModule !== 'chart' && "hidden")}>
           {/* Chart Toolbar */}
-          <div className="flex items-center justify-between p-2 border-b border-border/50 bg-secondary/20">
-            <div className="flex items-center gap-1">
+          <div className="flex items-center justify-between p-2 border-b border-border/50 bg-secondary/20 overflow-x-auto">
+            <div className="flex items-center gap-1 shrink-0">
               {TIMEFRAMES.map((tf) => (
                 <button
                   key={tf.value}
@@ -876,21 +941,55 @@ export default function Charts() {
               ))}
             </div>
 
+            <div className="flex items-center gap-4 shrink-0 mx-4">
+              <div
+                className="flex items-center space-x-2 border-l border-border/50 pl-4"
+                title="Price above 50 SMA = short-term uptrend"
+              >
+                <Checkbox
+                  id="sma50"
+                  checked={showSMA50}
+                  onCheckedChange={(c: boolean | "indeterminate") => setShowSMA50(c === true)}
+                />
+                <label
+                  htmlFor="sma50"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-blue-500 cursor-pointer"
+                >
+                  50 SMA
+                </label>
+              </div>
+
+              <div
+                className="flex items-center space-x-2"
+                title="200 SMA acts as a long-term baseline"
+              >
+                <Checkbox
+                  id="sma200"
+                  checked={showSMA200}
+                  onCheckedChange={(c: boolean | "indeterminate") => setShowSMA200(c === true)}
+                />
+                <label
+                  htmlFor="sma200"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-orange-500 cursor-pointer"
+                >
+                  200 SMA
+                </label>
+              </div>
+            </div>
           </div>
 
           {/* Chart Container */}
-          <CardContent className="p-0">
-            {isLoadingHistory && historicalData.length === 0 ? (
-              <div className="w-full h-[500px] flex items-center justify-center text-muted-foreground flex-col gap-4">
+          <CardContent className="p-0 relative">
+            {isLoadingHistory && historicalData.length === 0 && (
+              <div className="absolute inset-0 z-10 flex flex-col gap-4 items-center justify-center bg-card/80 backdrop-blur-sm">
                 <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-                <p>Loading chart data...</p>
+                <p className="text-muted-foreground font-medium">Loading chart data...</p>
               </div>
-            ) : (
-              <div
-                ref={setChartContainerEl}
-                className="w-full h-[500px]"
-              />
             )}
+            <div
+              ref={setChartContainerEl}
+              className="w-full h-[500px]"
+            />
           </CardContent>
         </Card>
 
