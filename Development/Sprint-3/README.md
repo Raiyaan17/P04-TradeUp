@@ -20,9 +20,9 @@ LIST OF REQUIREMENTS COMPLETED IN THE SPRINT
 
 Muhammad Rayyan Khan: community post creation and deletion, reacting on posts, commenting on posts, mute and block users
 Muhammad Ahmad: community post creation and deletion, reacting on posts, commenting on posts, mute and block users
-Mohammad Raiyaan Junaid Hamid: Profile UI revamp, social features
+Mohammad Raiyaan Junaid Hamid: Profile UI revamp, social features (search and friends, view friend portfolio), Add improved charts with more information detail and interactability, Add buying/selling feature on chart page for faster decision making, Improved charts page UI and separated stock charts through a data table on Markets page.
 Muhammad Shamir Sher Qazi: AI model development
-Muhammad Umar Zubair: AI model development
+Muhammad Umar Zubair: AI model development, CI/CD pipeline development
 
 HOW TO ACCESS THE SYSTEM
 
