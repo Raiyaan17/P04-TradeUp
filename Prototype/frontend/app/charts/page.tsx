@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { io, Socket } from "socket.io-client";
 import { createChart, IChartApi, ISeriesApi, UTCTimestamp, ColorType, CrosshairMode } from 'lightweight-charts';
-import { Activity, AlertTriangle, Building2, LineChart, Plus, Minus, TrendingUp, TrendingDown } from "lucide-react";
+import { Activity, Building2, LineChart, Plus, Minus, TrendingUp, TrendingDown } from "lucide-react";
 import { AppShell } from "@/components/layout";
 import { PageHeader } from "@/components/common";
 import { Card, CardContent } from "@/components/ui/card";
@@ -44,13 +44,7 @@ interface MarketStatus {
   lastUpdateTime: number | null;
 }
 
-// Stats interface for the top bar
-interface DailyStats {
-  high24h: number;
-  low24h: number;
-  vol24h: number;
-  value24h: number; // Not always available, but requested in design
-}
+
 
 interface CompanyProfile {
   businessDescription: string;
@@ -281,7 +275,8 @@ export default function Charts() {
     return () => {
       resizeObserver.disconnect();
     };
-  }, [resolvedTheme]); // Removed showSMA states from dependencies to stop re-rendering the whole chart on checkbox toggle
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resolvedTheme]); // showSMA50/showSMA200 intentionally omitted — toggling them via applyOptions, not re-creating the chart
 
   // Update SMA visibilities when states change
   useEffect(() => {
@@ -427,9 +422,16 @@ export default function Charts() {
     }
   }, []);
 
+  interface RestTickResponse {
+    tick: {
+      open?: number; high?: number; low?: number; price?: number;
+      volume?: number; value?: number; change?: number; changePercent?: number; timestamp?: number;
+    } | null;
+  }
+
   const fetchInitialTick = useCallback(async (symbol: string) => {
     try {
-      const res = await http.get<{ tick: any }>(`/stocks/${encodeURIComponent(symbol)}`, { noAuth: true });
+      const res = await http.get<RestTickResponse>(`/stocks/${encodeURIComponent(symbol)}`, { noAuth: true });
       if (res?.tick) {
         // Map REST response (long keys) to WebSocket format (short keys) so the rest of the app works seamlessly
         const mappedTick: TickOHLC = {
@@ -639,7 +641,7 @@ export default function Charts() {
         chartRef.current = null;
       }
     };
-  }, [initializeChart]);
+  }, [initializeChart, fetchPortfolio]);
 
   useEffect(() => {
     const abortController = new AbortController();
@@ -683,7 +685,7 @@ export default function Charts() {
         clearInterval(marketCheckIntervalRef.current);
       }
     };
-  }, [stock, timeframe, connectWebSocket, fetchHistoricalData, fetchCompanyData, fetchInitialTick]);
+  }, [stock, timeframe, connectWebSocket, fetchHistoricalData, fetchCompanyData, fetchInitialTick, hasReceivedTick]);
 
 
 

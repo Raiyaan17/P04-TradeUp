@@ -71,13 +71,13 @@ export class StocksController {
 
   @Get(':symbol/company')
   async getCompanyProfile(@Param('symbol') symbol: string) {
-    const data = await this.stocks.getCompanyProfile(symbol);
+    const data: unknown = await this.stocks.getCompanyProfile(symbol);
     return { symbol, data };
   }
 
   @Get(':symbol/fundamentals')
   async getFundamentals(@Param('symbol') symbol: string) {
-    const data = await this.stocks.getFundamentals(symbol);
+    const data: unknown = await this.stocks.getFundamentals(symbol);
     return { symbol, data };
   }
 

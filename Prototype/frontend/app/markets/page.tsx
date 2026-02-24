@@ -171,7 +171,8 @@ export default function MarketsPage() {
         return () => {
             socket.close();
         };
-    }, [stocks.length]); // Re-run if stock list gets populated/changes length
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [stocks.length]); // stocks.length intentionally used — full array ref would reconnect on every tick update
 
     // 3. Search Filter
     useEffect(() => {

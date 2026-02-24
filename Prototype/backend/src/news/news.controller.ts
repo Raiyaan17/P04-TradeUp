@@ -302,7 +302,7 @@ export class NewsController {
         title: item.title || 'Untitled',
         link: item.link || '',
         pubDate: item.pubDate || item.isoDate || new Date().toISOString(),
-        content: item.content || item.description || '',
+        content: item.content || (item.description as string | undefined) || '',
         contentSnippet: item.contentSnippet || '',
         source: 'Dawn',
         category: 'Business',
