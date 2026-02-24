@@ -12,6 +12,7 @@ import { NewsModule } from './news/news.module';
 import { TradesModule } from './trades/trades.module';
 import { FriendsModule } from './friends/friends.module';
 import { OracleModule } from './oracle/oracle.module';
+import { CommunityModule } from './community/community.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { OracleModule } from './oracle/oracle.module';
     TradesModule,
     FriendsModule,
     OracleModule,
+    CommunityModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -23,6 +23,11 @@ model User {
   watchlist           WatchlistItem[]
   sentFriendships     Friendship[]    @relation("SentFriendships")
   receivedFriendships Friendship[]    @relation("ReceivedFriendships")
+  posts               Post[]
+  comments            Comment[]
+  reactions           Reaction[]
+  blockedUsers        UserBlock[]     @relation("BlockedByUser")
+  blockedByUsers      UserBlock[]     @relation("BlockedUser")
 }
 
 model Friendship {
@@ -125,6 +130,84 @@ model SimulationScenario {
 
   @@index([presetType, stockSymbol])
   @@index([expiresAt])
+}
+
+// ─── Community Models ───────────────────────────────────────────────
+
+model Post {
+  id        Int        @id @default(autoincrement())
+  authorId  Int
+  title     String
+  content   String
+  tag       PostTag    @default(GENERAL)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  author    User       @relation(fields: [authorId], references: [id])
+  comments  Comment[]
+  reactions Reaction[]
+
+  @@index([authorId])
+  @@index([createdAt])
+}
+
+model Comment {
+  id        Int       @id @default(autoincrement())
+  postId    Int
+  authorId  Int
+  parentId  Int?
+  content   String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  post      Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author    User      @relation(fields: [authorId], references: [id])
+  parent    Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   Comment[] @relation("CommentReplies")
+
+  @@index([postId])
+  @@index([authorId])
+  @@index([parentId])
+}
+
+model Reaction {
+  id        Int          @id @default(autoincrement())
+  postId    Int
+  userId    Int
+  type      ReactionType
+  createdAt DateTime     @default(now())
+  post      Post         @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User         @relation(fields: [userId], references: [id])
+
+  @@unique([postId, userId])
+  @@index([postId])
+}
+
+model UserBlock {
+  id        Int       @id @default(autoincrement())
+  blockerId Int
+  blockedId Int
+  createdAt DateTime  @default(now())
+  blocker   User      @relation("BlockedByUser", fields: [blockerId], references: [id])
+  blocked   User      @relation("BlockedUser", fields: [blockedId], references: [id])
+
+  @@unique([blockerId, blockedId])
+  @@index([blockerId])
+}
+
+enum PostTag {
+  GENERAL
+  STOCKS
+  CRYPTO
+  NEWS
+  ANALYSIS
+  QUESTION
+}
+
+enum ReactionType {
+  LIKE
+  LOVE
+  FIRE
+  BEARISH
+  BULLISH
 }
 
 

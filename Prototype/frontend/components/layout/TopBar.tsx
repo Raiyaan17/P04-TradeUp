@@ -23,6 +23,7 @@ const NAV_LINKS = [
   { href: "/markets", label: "Markets" },
   { href: "/buy", label: "Trade" },
   { href: "/oracle", label: "Game" },
+  { href: "/community", label: "Community" },
   { href: "/news", label: "News" },
   { href: "/help", label: "Help" },
 ];
