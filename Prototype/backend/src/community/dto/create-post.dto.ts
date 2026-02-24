@@ -1,4 +1,10 @@
-import { IsString, IsNotEmpty, MaxLength, IsEnum, IsOptional } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  MaxLength,
+  IsEnum,
+  IsOptional,
+} from 'class-validator';
 
 export enum PostTagDto {
   GENERAL = 'GENERAL',

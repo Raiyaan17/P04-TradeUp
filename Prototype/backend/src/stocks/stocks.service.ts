@@ -33,7 +33,7 @@ export interface Kline {
 export class StocksService {
   private readonly base = PSX_API_BASE;
 
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   getFeaturedSymbols() {
     return FEATURED_SYMBOLS as readonly string[];

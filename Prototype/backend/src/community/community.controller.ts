@@ -55,9 +55,10 @@ export class CommunityController {
   ) {
     const pageNum = page ? parseInt(page, 10) : 1;
     const limitNum = limit ? parseInt(limit, 10) : 20;
-    const postTag = tag && Object.values(PostTag).includes(tag as PostTag)
-      ? (tag as PostTag)
-      : undefined;
+    const postTag =
+      tag && Object.values(PostTag).includes(tag as PostTag)
+        ? (tag as PostTag)
+        : undefined;
 
     return this.community.getPosts(req.user.userId, pageNum, limitNum, postTag);
   }
@@ -126,10 +127,7 @@ export class CommunityController {
   // ─── BLOCK / MUTE ──────────────────────────────────────────────────
 
   @Post('block')
-  async blockUser(
-    @Req() req: AuthenticatedRequest,
-    @Body() dto: BlockUserDto,
-  ) {
+  async blockUser(@Req() req: AuthenticatedRequest, @Body() dto: BlockUserDto) {
     return this.community.blockUser(req.user.userId, dto.blockedId);
   }
 

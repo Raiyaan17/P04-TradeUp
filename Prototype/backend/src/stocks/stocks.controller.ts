@@ -19,7 +19,7 @@ interface CandleResponse {
 
 @Controller('stocks')
 export class StocksController {
-  constructor(private readonly stocks: StocksService) { }
+  constructor(private readonly stocks: StocksService) {}
 
   @Get('featured')
   async featured() {

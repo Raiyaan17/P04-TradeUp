@@ -184,7 +184,9 @@ export class CommunityService {
       });
       if (!parent) throw new NotFoundException('Parent comment not found');
       if (parent.postId !== postId) {
-        throw new BadRequestException('Parent comment does not belong to this post');
+        throw new BadRequestException(
+          'Parent comment does not belong to this post',
+        );
       }
     }
 
@@ -209,9 +211,8 @@ export class CommunityService {
       include: {
         author: { select: AUTHOR_SELECT },
         replies: {
-          where: blockedIds.length > 0
-            ? { authorId: { notIn: blockedIds } }
-            : {},
+          where:
+            blockedIds.length > 0 ? { authorId: { notIn: blockedIds } } : {},
           include: {
             author: { select: AUTHOR_SELECT },
           },
