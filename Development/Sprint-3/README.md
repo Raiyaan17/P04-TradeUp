@@ -18,8 +18,8 @@ LIST OF REQUIREMENTS COMPLETED IN THE SPRINT
 
 <List down use cases completed in the current sprint. For each use case, also mention the name of individual team member who developed it.>
 
-Muhammad Rayyan Khan: News Sentiment Analysis
-Muhammad Ahmad: Local and International News segmentation
+Muhammad Rayyan Khan: community post creation and deletion, reacting on posts, commenting on posts, mute and block users
+Muhammad Ahmad: community post creation and deletion, reacting on posts, commenting on posts, mute and block users
 Mohammad Raiyaan Junaid Hamid: Profile UI revamp, social features
 Muhammad Shamir Sher Qazi: AI model development
 Muhammad Umar Zubair: AI model development
