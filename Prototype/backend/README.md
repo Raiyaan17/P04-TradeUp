@@ -89,7 +89,22 @@ I implemented the full Prototype Phase 1 backend in your NestJS app using Postgr
 Create `Prototype/backend/.env` (see `Prototype/backend/env.example`) and set:
 - `DATABASE_URL` (Postgres connection string)
 - `JWT_SECRET` (strong secret used to sign JWTs)
+- `GEMINI_API_KEY` (Required for the AI Chatbot and Oracle)
 - Optional: `PSX_API_BASE` (defaults to `https://psxterminal.com`)
+
+# AI Chatbot & Advisor
+
+The platform includes an AI Advisor powered by **Gemini API** that provides:
+- **Expert Behavior Analysis:** Tracks the user's trading patterns (e.g., panic selling, over-concentration) and provides constructive feedback.
+- **P&L Tracking:** Deep analysis of the user's Profit and Loss records, including unrealized gains/losses.
+- **Performance Reviews:** Can generate weekly or monthly reviews of the user's trading efficiency and risk management.
+- **Stock Predictions:** Uses a baseline model trained on historical simulation data and current market trends.
+
+### Baseline Model Training
+The baseline model is "trained" by aggregating historical simulation data from Prisma into a structured context for the LLM. 
+- **Training Source:** `SimulationScenario` trajectories and patterns.
+- **Auto-Training:** Performs initial data ingestion on startup (`onModuleInit`).
+- **Manual Retraining:** Can be triggered via a POST request to `/chatbot/train`.
 
 # How to Run
 
