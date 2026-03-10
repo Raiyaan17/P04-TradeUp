@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { MessageCircle, X, Send, Bot, User, GripHorizontal } from 'lucide-react'
+import { MessageCircle, X, Send, Bot, GripHorizontal } from 'lucide-react'
 import { http } from '@/lib/http'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -14,6 +14,13 @@ interface Message {
   content: string
 }
 
+const MIN_WIDTH = 300
+const MIN_HEIGHT = 350
+const MAX_WIDTH = 700
+const MAX_HEIGHT = 800
+const DEFAULT_WIDTH = 380
+const DEFAULT_HEIGHT = 500
+
 export function Chatbot() {
   const { user } = useUser()
   const [isOpen, setIsOpen] = useState(false)
@@ -22,7 +29,13 @@ export function Chatbot() {
   ])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [sessionId, setSessionId] = useState<number | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+
+  // Resize state
+  const [chatSize, setChatSize] = useState({ width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT })
+  const isResizing = useRef(false)
+  const resizeStart = useRef({ x: 0, y: 0, w: 0, h: 0 })
 
   // Scroll to bottom on new message
   useEffect(() => {
@@ -31,8 +44,41 @@ export function Chatbot() {
     }
   }, [messages])
 
+  // Fetch session and history on chat open
+  useEffect(() => {
+    if (isOpen && !sessionId && user) {
+      const initSession = async () => {
+        setIsLoading(true)
+        try {
+          const sessionRes = await http.post<{ sessionId: number }>('/chatbot/session', {})
+          setSessionId(sessionRes.sessionId)
+          
+          const historyRes = await http.get<{ messages: any[] }>(`/chatbot/history/${sessionRes.sessionId}`)
+          if (historyRes.messages && historyRes.messages.length > 0) {
+            const mappedHistory: Message[] = historyRes.messages.map((m: any) => ({
+              role: (m.role.toLowerCase() === 'user' ? 'user' : 'bot') as 'user' | 'bot',
+              content: m.content
+            }))
+            setMessages(mappedHistory)
+          }
+        } catch (error) {
+          console.error('Failed to init session', error)
+        } finally {
+          setIsLoading(false)
+        }
+      }
+      initSession()
+    }
+  }, [isOpen, sessionId, user])
+
   const handleSend = async () => {
     if (!input.trim() || isLoading) return
+    
+    if (!sessionId) {
+      console.error('Session not initialized')
+      setMessages(prev => [...prev, { role: 'bot', content: 'Session not initialized. Please try reopening the chat.' }])
+      return
+    }
 
     const userMsg = input.trim()
     setInput('')
@@ -40,7 +86,10 @@ export function Chatbot() {
     setIsLoading(true)
 
     try {
-      const res = await http.post<{ response: string }>('/chatbot/chat', { message: userMsg })
+      const res = await http.post<{ response: string }>('/chatbot/chat', { 
+        sessionId,
+        message: userMsg 
+      })
       setMessages(prev => [...prev, { role: 'bot', content: res.response }])
     } catch (error) {
       console.error('Chatbot error:', error)
@@ -55,8 +104,44 @@ export function Chatbot() {
     e.stopPropagation()
   }
 
+  // ─── Resize handlers (top-left corner drag) ───
+  const handleResizeStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    isResizing.current = true
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY
+    resizeStart.current = { x: clientX, y: clientY, w: chatSize.width, h: chatSize.height }
+
+    const handleResizeMove = (ev: MouseEvent | TouchEvent) => {
+      if (!isResizing.current) return
+      const cx = 'touches' in ev ? ev.touches[0].clientX : (ev as MouseEvent).clientX
+      const cy = 'touches' in ev ? ev.touches[0].clientY : (ev as MouseEvent).clientY
+      // Dragging top-left: moving left increases width, moving up increases height
+      const dw = resizeStart.current.x - cx
+      const dh = resizeStart.current.y - cy
+      setChatSize({
+        width: Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, resizeStart.current.w + dw)),
+        height: Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, resizeStart.current.h + dh)),
+      })
+    }
+
+    const handleResizeEnd = () => {
+      isResizing.current = false
+      document.removeEventListener('mousemove', handleResizeMove)
+      document.removeEventListener('mouseup', handleResizeEnd)
+      document.removeEventListener('touchmove', handleResizeMove)
+      document.removeEventListener('touchend', handleResizeEnd)
+    }
+
+    document.addEventListener('mousemove', handleResizeMove)
+    document.addEventListener('mouseup', handleResizeEnd)
+    document.addEventListener('touchmove', handleResizeMove, { passive: false })
+    document.addEventListener('touchend', handleResizeEnd)
+  }, [chatSize])
+
   return (
-    <div className="fixed z-[9999] pointer-events-none inset-0 pointer-events-none">
+    <div className="fixed z-[9999] pointer-events-none inset-0">
       <motion.div
         drag
         dragMomentum={false}
@@ -77,7 +162,7 @@ export function Chatbot() {
               {isOpen ? <X size={24} /> : <MessageCircle size={24} />}
             </motion.button>
             
-            {/* Drag Handle hint (the icon itself is draggable, but this shows it) */}
+            {/* Drag Handle hint */}
             <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-secondary/80 backdrop-blur-sm rounded-full px-2 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
               <GripHorizontal size={10} className="text-muted-foreground" />
               <span className="text-[8px] font-medium text-muted-foreground uppercase tracking-wider">Drag</span>
@@ -92,17 +177,28 @@ export function Chatbot() {
                 animate={{ opacity: 1, scale: 1, y: 0, x: 0 }}
                 exit={{ opacity: 0, scale: 0.9, y: 20, x: 20 }}
                 onPointerDown={stopPropagation}
-                className="absolute bottom-20 right-0 w-[320px] sm:w-[380px] max-h-[500px] h-[70vh] bg-card border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+                style={{ width: chatSize.width, height: chatSize.height }}
+                className="absolute bottom-20 right-0 bg-card border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden"
               >
+                {/* Resize handle — top-left corner */}
+                <div
+                  onMouseDown={handleResizeStart}
+                  onTouchStart={handleResizeStart}
+                  className="absolute top-0 left-0 w-5 h-5 cursor-nw-resize z-10 group/resize"
+                  title="Drag to resize"
+                >
+                  <div className="absolute top-1 left-1 w-2.5 h-2.5 border-t-2 border-l-2 border-muted-foreground/30 group-hover/resize:border-primary rounded-tl-sm transition-colors" />
+                </div>
+
                 {/* Header */}
-                <div className="p-4 bg-primary text-primary-foreground flex items-center justify-between shadow-sm">
+                <div className="p-4 bg-primary text-primary-foreground flex items-center justify-between shadow-sm flex-shrink-0">
                   <div className="flex items-center gap-2">
                     <div className="bg-primary-foreground/20 p-1.5 rounded-lg">
                       <Bot size={18} />
                     </div>
                     <div>
                       <h3 className="font-bold text-sm leading-tight">TradeUp AI Advisor</h3>
-                      <p className="text-[10px] opacity-70">Powered by OpenAI</p>
+                      <p className="text-[10px] opacity-70">Powered by Gemini</p>
                     </div>
                   </div>
                   <button 
@@ -163,7 +259,7 @@ export function Chatbot() {
                 </div>
 
                 {/* Input Area */}
-                <div className="p-4 bg-card border-t border-border">
+                <div className="p-4 bg-card border-t border-border flex-shrink-0">
                   <form
                     onSubmit={(e) => { e.preventDefault(); handleSend(); }}
                     className="relative flex items-center"

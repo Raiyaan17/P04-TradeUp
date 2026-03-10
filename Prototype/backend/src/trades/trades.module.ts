@@ -9,5 +9,6 @@ import { FriendsModule } from '../friends/friends.module';
   imports: [PrismaModule, StocksModule, FriendsModule],
   controllers: [TradesController],
   providers: [TradesService],
+  exports: [TradesService],
 })
 export class TradesModule {}

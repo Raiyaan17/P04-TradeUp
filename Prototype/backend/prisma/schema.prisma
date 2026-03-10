@@ -28,6 +28,7 @@ model User {
   reactions           Reaction[]
   blockedUsers        UserBlock[]     @relation("BlockedByUser")
   blockedByUsers      UserBlock[]     @relation("BlockedUser")
+  chatSessions        ChatSession[]
 }
 
 model Friendship {
@@ -210,4 +211,27 @@ enum ReactionType {
   BULLISH
 }
 
+// ─── Chatbot Models ───────────────────────────────────────────────
+
+model ChatSession {
+  id           Int           @id @default(autoincrement())
+  userId       Int
+  createdAt    DateTime      @default(now())
+  lastActiveAt DateTime      @default(now())
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages     ChatMessage[]
+
+  @@index([userId])
+}
+
+model ChatMessage {
+  id        Int         @id @default(autoincrement())
+  sessionId Int
+  role      String
+  content   String
+  createdAt DateTime    @default(now())
+  session   ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+}
 
