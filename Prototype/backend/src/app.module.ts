@@ -39,4 +39,4 @@ import { CommunityModule } from './community/community.module';
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule { }
