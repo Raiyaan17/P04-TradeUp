@@ -20,7 +20,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { http, ApiException } from "@/lib/http";
-import { formatDecimal, formatSigned, formatVolume, formatTimeAgo, getPnLClass } from "@/lib/format";
+import { formatDecimal, formatPercent, formatSigned, formatVolume, formatTimeAgo, getPnLClass } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 interface Tick {
@@ -347,7 +347,7 @@ export default function DashboardPage() {
                           {formatSigned(chg)}
                         </TableCell>
                         <TableCell className={cn("text-right tabular-nums", getPnLClass(pct))}>
-                          {isFinite(pct) ? `${pct.toFixed(2)}%` : "—"}
+                          {formatPercent(pct)}
                         </TableCell>
                         <TableCell className="text-right tabular-nums">
                           {formatVolume(vol)}
@@ -426,7 +426,7 @@ export default function DashboardPage() {
                         {formatSigned(chg)}
                       </TableCell>
                       <TableCell className={cn("text-right tabular-nums", getPnLClass(pct))}>
-                        {isFinite(pct) ? `${pct.toFixed(2)}%` : "—"}
+                        {formatPercent(pct)}
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
                         {formatVolume(vol)}

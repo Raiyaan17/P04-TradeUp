@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useUser } from "@/context/UserContext";
 import { TopBar } from "./TopBar";
 import { cn } from "@/lib/utils";
+import { Chatbot } from "../chatbot/Chatbot";
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -80,6 +81,7 @@ export function AppShell({
       >
         {children}
       </main>
+      <Chatbot />
     </div>
   );
 }

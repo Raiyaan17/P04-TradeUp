@@ -10,6 +10,7 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { useUser } from "@/context/UserContext";
+import { http, ApiException } from "@/lib/http";
 
 type AuthFormFields = {
   email: string;
@@ -45,8 +46,7 @@ export function AuthForm() {
     router.push("/dashboard");
   }
 
-  const API_BASE =
-    process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3001";
+
 
   async function onSubmit(data: AuthFormFields) {
     setMessage(null);
@@ -68,22 +68,7 @@ export function AuthForm() {
         body.gender = gender!;
       }
 
-      const res = await fetch(`${API_BASE}${url}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-
-      const result = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        const serverMsg =
-          (result && (result.message || result.error)) ||
-          "Something went wrong.";
-        throw new Error(
-          Array.isArray(serverMsg) ? serverMsg.join(" \u2022 ") : serverMsg
-        );
-      }
+      const result = await http.post<{ access_token?: string }>(url, body, { noAuth: true });
 
       if (mode === "signin") {
         const token = result?.access_token;
@@ -111,7 +96,8 @@ export function AuthForm() {
         setGender(null);
       }
     } catch (e: unknown) {
-      setMessage({ type: "error", text: (e as Error)?.message || "Request failed." });
+      const msg = e instanceof ApiException ? e.message : "Request failed.";
+      setMessage({ type: "error", text: msg });
     } finally {
       setIsLoading(false);
     }
