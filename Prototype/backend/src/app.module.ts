@@ -13,6 +13,7 @@ import { TradesModule } from './trades/trades.module';
 import { FriendsModule } from './friends/friends.module';
 import { OracleModule } from './oracle/oracle.module';
 import { CommunityModule } from './community/community.module';
+import { ChatbotModule } from './chatbot/chatbot.module';
 
 @Module({
   imports: [
@@ -35,8 +36,9 @@ import { CommunityModule } from './community/community.module';
     FriendsModule,
     OracleModule,
     CommunityModule,
+    ChatbotModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule { }

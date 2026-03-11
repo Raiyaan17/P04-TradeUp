@@ -8,5 +8,6 @@ import { StocksModule } from '../stocks/stocks.module';
   imports: [PrismaModule, StocksModule],
   providers: [WatchlistService],
   controllers: [WatchlistController],
+  exports: [WatchlistService],
 })
 export class WatchlistModule {}

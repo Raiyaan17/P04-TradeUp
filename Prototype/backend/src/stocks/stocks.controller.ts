@@ -19,7 +19,7 @@ interface CandleResponse {
 
 @Controller('stocks')
 export class StocksController {
-  constructor(private readonly stocks: StocksService) {}
+  constructor(private readonly stocks: StocksService) { }
 
   @Get('featured')
   async featured() {
@@ -34,6 +34,9 @@ export class StocksController {
     @Query('end') end?: string,
     @Query('limit') limit?: string,
   ) {
+    // Ensure the stock is lazy-loaded/tracked in our DB
+    await this.stocks.findOrCreateStock(symbol);
+
     const options: KlineOptions = {};
     if (start) options.start = parseInt(start, 10);
     if (end) options.end = parseInt(end, 10);
@@ -83,7 +86,9 @@ export class StocksController {
 
   @Get(':symbol')
   async bySymbol(@Param('symbol') symbol: string) {
+    // Ensure the stock is lazy-loaded/tracked in our DB
+    const dbStock = await this.stocks.findOrCreateStock(symbol);
     const tick = await this.stocks.getTick(symbol);
-    return { symbol, tick };
+    return { symbol, name: dbStock.name || symbol, tick };
   }
 }

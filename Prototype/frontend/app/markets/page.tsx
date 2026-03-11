@@ -18,7 +18,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { http } from '@/lib/http';
-import { formatDecimal, formatVolume } from '@/lib/format';
+import { formatDecimal, formatPercent, formatVolume } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
 // --- Types ---
@@ -268,7 +268,7 @@ export default function MarketsPage() {
                                                                     "bg-muted text-muted-foreground"
                                                         )}
                                                     >
-                                                        {isFinite(pct) ? `${pct > 0 ? '+' : ''}${pct.toFixed(2)}%` : "—"}
+                                                        {formatPercent(pct)}
                                                     </Badge>
                                                 </TableCell>
                                             </TableRow>

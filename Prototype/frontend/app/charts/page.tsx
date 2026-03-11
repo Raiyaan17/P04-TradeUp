@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { http, ApiException } from "@/lib/http";
-import { formatDecimal, formatVolume } from "@/lib/format";
+import { formatDecimal, formatPercent, formatVolume } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { parseKlines, Candle, calculateSMA, calculateLatestSMA } from "@/lib/chartUtils";
 import { useTheme } from "next-themes";
@@ -754,7 +754,7 @@ export default function Charts() {
                     isPositive ? "bg-emerald-500/10 text-emerald-500" : "bg-rose-500/10 text-rose-500"
                   )}
                 >
-                  {isPositive ? '+' : ''}{changePct.toFixed(2)}%
+                  {formatPercent(changePct)}
                 </Badge>
                 <span className={cn(
                   "text-sm font-medium tabular-nums",
@@ -1076,7 +1076,7 @@ export default function Charts() {
                           <div className="flex justify-between items-center py-2 border-b border-border/50">
                             <span className="text-sm text-muted-foreground">P/E Ratio</span>
                             <span className="text-sm font-medium font-mono">
-                              {fundamentalsData.peRatio ? fundamentalsData.peRatio.toFixed(2) : '---'}
+                              {fundamentalsData.peRatio ? formatDecimal(fundamentalsData.peRatio) : '---'}
                             </span>
                           </div>
                           <div className="flex justify-between items-center py-2">

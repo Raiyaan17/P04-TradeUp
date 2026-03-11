@@ -33,7 +33,7 @@ export interface Kline {
 export class StocksService {
   private readonly base = PSX_API_BASE;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   getFeaturedSymbols() {
     return FEATURED_SYMBOLS as readonly string[];
@@ -58,9 +58,21 @@ export class StocksService {
 
   async listFeaturedWithTicks() {
     const symbols = this.getFeaturedSymbols();
+
     const results = await Promise.all(
-      symbols.map(async (s) => ({ symbol: s, tick: await this.getTick(s) })),
+      symbols.map(async (s) => {
+        // findOrCreateStock now guarantees a stock record with a populated name if available
+        const dbStock = await this.findOrCreateStock(s);
+        const tick = await this.getTick(s);
+
+        return {
+          symbol: s,
+          name: dbStock.name || s,
+          tick,
+        };
+      }),
     );
+
     return results;
   }
 
@@ -130,6 +142,27 @@ export class StocksService {
       stock = await this.prisma.stock.create({
         data: { symbol },
       });
+    }
+
+    // Lazy load the company name if it's missing
+    if (!stock.name) {
+      try {
+        const profile = await this.getCompanyProfile(symbol);
+        const description = profile?.businessDescription || '';
+
+        // Extract the formal company name using regex (everything before " is a ", " was ", " is incorporated ", etc)
+        const match = description.match(/^(.*?)(?:'s|’s)?\s+(?:is a|was incorporated|is incorporated|was established|was formed|is an|is the|main activity is)\s+/i);
+
+        if (match && match[1]) {
+          const extractedName = match[1].trim();
+          stock = await this.prisma.stock.update({
+            where: { id: stock.id },
+            data: { name: extractedName },
+          });
+        }
+      } catch (error) {
+        console.error(`Error lazy-loading name for ${symbol}:`, error);
+      }
     }
 
     return stock;
