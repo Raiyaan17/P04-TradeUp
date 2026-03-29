@@ -141,6 +141,7 @@ model Post {
   authorId  Int
   title     String
   content   String
+  imageUrl  String?
   tag       PostTag    @default(GENERAL)
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
@@ -159,6 +160,7 @@ model Comment {
   authorId  Int
   parentId  Int?
   content   String
+  imageUrl  String?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   post      Post      @relation(fields: [postId], references: [id], onDelete: Cascade)

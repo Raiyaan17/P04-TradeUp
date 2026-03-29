@@ -21,6 +21,7 @@ import {
   Users,
   X,
   Bookmark,
+  Image as ImageIcon,
 } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import { AppShell } from "@/components/layout";
@@ -62,6 +63,7 @@ import {
   savePost,
   getSavedPosts,
   isPostSaved,
+  uploadCommunityImage,
 } from "@/lib/communityService";
 import type {
   CommunityPost,
@@ -188,6 +190,15 @@ function CommentItem({
             </span>
           </div>
           <p className="text-sm text-foreground mt-0.5">{comment.content}</p>
+          {comment.imageUrl && (
+            <div className="mt-2 rounded-lg overflow-hidden border border-border">
+              <img
+                src={comment.imageUrl}
+                alt="Comment image"
+                className="max-w-xs max-h-64 object-cover"
+              />
+            </div>
+          )}
           <div className="flex items-center gap-2 mt-1">
             {depth === 0 && (
               <Button
@@ -301,6 +312,9 @@ function PostCard({ post, currentUserId, onDelete, onReaction, onBlock, onSave }
   const [comments, setComments] = useState<PostComment[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
   const [commentContent, setCommentContent] = useState("");
+  const [commentImageUrl, setCommentImageUrl] = useState("");
+  const [commentImageFile, setCommentImageFile] = useState<File | null>(null);
+  const [uploadingCommentImage, setUploadingCommentImage] = useState(false);
   const [submittingComment, setSubmittingComment] = useState(false);
   const [replyingTo, setReplyingTo] = useState<number | null>(null);
   const [replyContent, setReplyContent] = useState("");
@@ -312,6 +326,7 @@ function PostCard({ post, currentUserId, onDelete, onReaction, onBlock, onSave }
   // Mention state for comments
   const { mentions: commentMentions, addMention: addCommentMention, clearMentions: clearCommentMentions } = useMentions();
   const commentTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const commentImageInputRef = useRef<HTMLInputElement>(null);
 
   // Mention state for replies
   const { mentions: replyMentions, addMention: addReplyMention, clearMentions: clearReplyMentions } = useMentions();
@@ -342,8 +357,10 @@ function PostCard({ post, currentUserId, onDelete, onReaction, onBlock, onSave }
     if (!commentContent.trim()) return;
     setSubmittingComment(true);
     try {
-      await createComment(post.id, commentContent.trim());
+      await createComment(post.id, commentContent.trim(), undefined, commentImageUrl || undefined);
       setCommentContent("");
+      setCommentImageUrl("");
+      setCommentImageFile(null);
       clearCommentMentions();
       toast.success("Comment added");
       loadComments();
@@ -393,6 +410,27 @@ function PostCard({ post, currentUserId, onDelete, onReaction, onBlock, onSave }
       toast.error((e as Error).message || "Failed to save post");
     } finally {
       setSavingPost(false);
+    }
+  };
+
+  const handleCommentImageUpload = async (file: File) => {
+    setUploadingCommentImage(true);
+    try {
+      const uploadedUrl = await uploadCommunityImage(file);
+      setCommentImageUrl(uploadedUrl);
+      setCommentImageFile(file);
+      toast.success("Image uploaded");
+    } catch (e) {
+      toast.error((e as Error).message || "Failed to upload image");
+    } finally {
+      setUploadingCommentImage(false);
+    }
+  };
+
+  const handleCommentImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleCommentImageUpload(file);
     }
   };
 
@@ -463,6 +501,15 @@ function PostCard({ post, currentUserId, onDelete, onReaction, onBlock, onSave }
           <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">
             {post.content}
           </p>
+          {post.imageUrl && (
+            <div className="mt-3 rounded-lg overflow-hidden border border-border">
+              <img
+                src={post.imageUrl}
+                alt={post.title}
+                className="w-full max-h-96 object-cover"
+              />
+            </div>
+          )}
         </div>
 
         {/* Reactions bar */}
@@ -612,7 +659,7 @@ function PostCard({ post, currentUserId, onDelete, onReaction, onBlock, onSave }
             )}
 
             {/* New comment input */}
-            <div>
+            <div className="space-y-2">
               <MentionAutocomplete
                 ref={commentTextareaRef}
                 value={commentContent}
@@ -634,12 +681,50 @@ function PostCard({ post, currentUserId, onDelete, onReaction, onBlock, onSave }
                   >
                     <Send className="h-4 w-4" />
                   </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => commentImageInputRef.current?.click()}
+                    disabled={uploadingCommentImage}
+                  >
+                    <ImageIcon className="h-4 w-4 mr-1" />
+                    {uploadingCommentImage ? "Uploading..." : "Image"}
+                  </Button>
+                  <input
+                    ref={commentImageInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleCommentImageFileChange}
+                  />
                 </div>
               </MentionAutocomplete>
               
+              {/* Image preview */}
+              {commentImageUrl && (
+                <div className="rounded-lg overflow-hidden border border-border relative">
+                  <img
+                    src={commentImageUrl}
+                    alt="Comment image preview"
+                    className="max-h-40 w-full object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCommentImageUrl("");
+                      setCommentImageFile(null);
+                    }}
+                    className="absolute top-2 right-2 bg-background/80 hover:bg-background rounded-full p-1"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
+              
               {/* Mentioned users display */}
               {commentMentions.length > 0 && (
-                <div className="mt-2 space-y-1">
+                <div className="space-y-1">
                   <p className="text-xs font-medium text-muted-foreground">
                     Mentioned: {commentMentions.map((u) => `@${u.username}`).join(", ")}
                   </p>
@@ -680,11 +765,15 @@ export default function CommunityPage() {
   const [newTitle, setNewTitle] = useState("");
   const [newContent, setNewContent] = useState("");
   const [newTag, setNewTag] = useState<PostTag>("GENERAL");
+  const [newImageUrl, setNewImageUrl] = useState("");
+  const [newImageFile, setNewImageFile] = useState<File | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   // Mention state
   const { mentions, mentionedUserIds, addMention, clearMentions } = useMentions();
   const newPostTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const postImageInputRef = useRef<HTMLInputElement>(null);
 
   // Block state
   const [blockDialog, setBlockDialog] = useState<{
@@ -750,15 +839,38 @@ export default function CommunityPage() {
 
   // ─── Handlers ──────────────────────────────────────────────────
 
+  const handlePostImageUpload = async (file: File) => {
+    setUploadingImage(true);
+    try {
+      const uploadedUrl = await uploadCommunityImage(file);
+      setNewImageUrl(uploadedUrl);
+      setNewImageFile(file);
+      toast.success("Image uploaded");
+    } catch (e) {
+      toast.error((e as Error).message || "Failed to upload image");
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handlePostImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handlePostImageUpload(file);
+    }
+  };
+
   const handleCreatePost = async () => {
     if (!newTitle.trim() || !newContent.trim()) return;
     setSubmitting(true);
     try {
-      await createPost(newTitle.trim(), newContent.trim(), newTag);
+      await createPost(newTitle.trim(), newContent.trim(), newTag, newImageUrl || undefined);
       toast.success("Post created!");
       setNewTitle("");
       setNewContent("");
       setNewTag("GENERAL");
+      setNewImageUrl("");
+      setNewImageFile(null);
       clearMentions();
       setShowNewPost(false);
       if (newPostTextareaRef.current) {
@@ -1198,6 +1310,62 @@ export default function CommunityPage() {
                   {t.label}
                 </Button>
               ))}
+            </div>
+            <div>
+              <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                <ImageIcon className="h-4 w-4 inline mr-2" />
+                Image (optional)
+              </label>
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="https://example.com/image.png"
+                    value={newImageUrl}
+                    onChange={(e) => setNewImageUrl(e.target.value)}
+                    type="url"
+                    className="flex-1"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => postImageInputRef.current?.click()}
+                    disabled={uploadingImage}
+                  >
+                    {uploadingImage ? "Uploading..." : "Upload"}
+                  </Button>
+                  <input
+                    ref={postImageInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handlePostImageFileChange}
+                  />
+                </div>
+              </div>
+              {newImageUrl && (
+                <div className="mt-3 rounded-lg overflow-hidden border border-border relative">
+                  <img
+                    src={newImageUrl}
+                    alt="Preview"
+                    className="max-h-48 w-full object-cover"
+                    onError={() => {
+                      toast.error("Invalid image URL");
+                      setNewImageUrl("");
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewImageUrl("");
+                      setNewImageFile(null);
+                    }}
+                    className="absolute top-2 right-2 bg-background/80 hover:bg-background rounded-full p-1"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              )}
             </div>
           </div>
           <DialogFooter>

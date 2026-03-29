@@ -1,4 +1,5 @@
 import API_BASE_URL from './api';
+import { uploadFile, ApiException } from '@/lib/http';
 import type {
   CommunityPost,
   PostsResponse,
@@ -21,17 +22,29 @@ const getAuthHeaders = (): Record<string, string> => {
   };
 };
 
+// ─── IMAGE UPLOAD ────────────────────────────────────────────────
+
+export const uploadCommunityImage = async (file: File): Promise<string> => {
+  const response = await uploadFile<{ imageUrl: string }>(
+    '/community/upload-image',
+    file,
+    'file'
+  );
+  return response.imageUrl;
+};
+
 // ─── POSTS ────────────────────────────────────────────────────────
 
 export const createPost = async (
   title: string,
   content: string,
   tag?: PostTag,
+  imageUrl?: string,
 ): Promise<CommunityPost> => {
   const response = await fetch(`${API_BASE_URL}/community/posts`, {
     method: 'POST',
     headers: getAuthHeaders(),
-    body: JSON.stringify({ title, content, tag }),
+    body: JSON.stringify({ title, content, tag, imageUrl }),
   });
 
   if (!response.ok) {
@@ -111,11 +124,12 @@ export const createComment = async (
   postId: number,
   content: string,
   parentId?: number,
+  imageUrl?: string,
 ): Promise<PostComment> => {
   const response = await fetch(`${API_BASE_URL}/community/comments`, {
     method: 'POST',
     headers: getAuthHeaders(),
-    body: JSON.stringify({ postId, content, parentId }),
+    body: JSON.stringify({ postId, content, parentId, imageUrl }),
   });
 
   if (!response.ok) {

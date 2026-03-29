@@ -6,6 +6,13 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { PostTag, ReactionType } from '@prisma/client';
+import { createClient } from '@supabase/supabase-js';
+import { LocalStorageService } from '../storage/local-storage.service';
+
+const supabase = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+);
 
 // ─── Author select reusable fragment ──────────────────────────────
 const AUTHOR_SELECT = {
@@ -17,7 +24,10 @@ const AUTHOR_SELECT = {
 
 @Injectable()
 export class CommunityService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly localStorage: LocalStorageService,
+  ) {}
 
   // ─── Helper: get IDs of users the caller blocked or who blocked them ──
   private async getBlockedIdPair(userId: number): Promise<number[]> {
@@ -43,9 +53,10 @@ export class CommunityService {
     title: string,
     content: string,
     tag: PostTag = 'GENERAL',
+    imageUrl?: string,
   ) {
     return this.prisma.post.create({
-      data: { authorId, title, content, tag },
+      data: { authorId, title, content, tag, imageUrl },
       include: {
         author: { select: AUTHOR_SELECT },
         _count: { select: { comments: true, reactions: true } },
@@ -98,6 +109,7 @@ export class CommunityService {
         id: post.id,
         title: post.title,
         content: post.content,
+        imageUrl: post.imageUrl,
         tag: post.tag,
         createdAt: post.createdAt,
         updatedAt: post.updatedAt,
@@ -145,6 +157,7 @@ export class CommunityService {
       id: post.id,
       title: post.title,
       content: post.content,
+      imageUrl: post.imageUrl,
       tag: post.tag,
       createdAt: post.createdAt,
       updatedAt: post.updatedAt,
@@ -178,6 +191,7 @@ export class CommunityService {
     postId: number,
     content: string,
     parentId?: number,
+    imageUrl?: string,
   ) {
     // Verify post exists
     const post = await this.prisma.post.findUnique({ where: { id: postId } });
@@ -197,7 +211,7 @@ export class CommunityService {
     }
 
     return this.prisma.comment.create({
-      data: { postId, authorId, content, parentId },
+      data: { postId, authorId, content, parentId, imageUrl },
       include: {
         author: { select: AUTHOR_SELECT },
       },
@@ -343,7 +357,6 @@ export class CommunityService {
 
   // ─── USER MENTIONS & SEARCH ──────────────────────────────────────────
 
-  
   async searchMentions(
     userId: number,
     query: string,
@@ -411,58 +424,44 @@ export class CommunityService {
       if (aIsFriend && !bIsFriend) return -1;
       if (!aIsFriend && bIsFriend) return 1;
 
-      // Within same category, if there's a search term, sort by match
-      if (searchTerm.length > 0) {
-        const aUsernameMatch = a.username.toLowerCase().startsWith(searchTerm);
-        const bUsernameMatch = b.username.toLowerCase().startsWith(searchTerm);
+      // Otherwise sort by match relevance (prefix match > substring match)
+      const aUsernamePrefix = a.username.toLowerCase().startsWith(searchTerm);
+      const bUsernamePrefix = b.username.toLowerCase().startsWith(searchTerm);
+      if (aUsernamePrefix && !bUsernamePrefix) return -1;
+      if (!aUsernamePrefix && bUsernamePrefix) return 1;
 
-        if (aUsernameMatch && !bUsernameMatch) return -1;
-        if (!aUsernameMatch && bUsernameMatch) return 1;
-      }
-
-      // Finally, sort alphabetically by username
-      return a.username.localeCompare(b.username);
+      return 0;
     });
 
-    // Return top results with isFriend flag
-    return sorted.slice(0, limit).map((user) => ({
-      id: user.id,
-      username: user.username,
-      name: user.name,
-      profileImageUrl: user.profileImageUrl,
-      isFriend: friendIds.has(user.id),
-    }));
+    return sorted.slice(0, limit);
   }
 
   // ─── SAVED POSTS ────────────────────────────────────────────────────
 
   async savePost(userId: number, postId: number) {
+    const post = await this.prisma.post.findUnique({
+      where: { id: postId },
+    });
+    if (!post) throw new NotFoundException('Post not found');
 
-    const post = await this.prisma.post.findUnique({ where: { id: postId } });
-    if (!post) {
-      throw new NotFoundException('Post not found');
-    }
-
-  
     const existing = await this.prisma.savedPost.findUnique({
       where: { userId_postId: { userId, postId } },
     });
 
     if (existing) {
-      return this.prisma.savedPost.delete({
-        where: { userId_postId: { userId, postId } },
-      });
+      // Already saved, unsave it
+      await this.prisma.savedPost.delete({ where: { id: existing.id } });
+      return { ok: true, saved: false };
     }
-    return this.prisma.savedPost.create({
+
+    // Save the post
+    await this.prisma.savedPost.create({
       data: { userId, postId },
     });
+    return { ok: true, saved: true };
   }
 
-  async getSavedPosts(
-    userId: number,
-    page: number = 1,
-    limit: number = 20,
-  ) {
+  async getSavedPosts(userId: number, page: number = 1, limit: number = 20) {
     const skip = (page - 1) * limit;
 
     const [savedPosts, total] = await Promise.all([
@@ -484,7 +483,8 @@ export class CommunityService {
       this.prisma.savedPost.count({ where: { userId } }),
     ]);
 
-    const enriched = savedPosts.map(({ post }) => {
+    const posts = savedPosts.map((sp) => {
+      const post = sp.post;
       const myReaction =
         post.reactions.find((r) => r.userId === userId)?.type ?? null;
 
@@ -497,6 +497,7 @@ export class CommunityService {
         id: post.id,
         title: post.title,
         content: post.content,
+        imageUrl: post.imageUrl,
         tag: post.tag,
         createdAt: post.createdAt,
         updatedAt: post.updatedAt,
@@ -510,7 +511,7 @@ export class CommunityService {
       };
     });
 
-    return { posts: enriched, total, page, limit };
+    return { posts, total, page, limit };
   }
 
   async isPostSaved(userId: number, postId: number): Promise<boolean> {
@@ -518,5 +519,64 @@ export class CommunityService {
       where: { userId_postId: { userId, postId } },
     });
     return !!saved;
+  }
+
+  // ─── IMAGE UPLOAD ──────────────────────────────────────────────────
+
+  async uploadImage(
+    userId: number,
+    fileBuffer: Buffer,
+    originalFileName: string,
+    mimeType: string,
+  ): Promise<string> {
+    try {
+      console.log('Starting image upload for user:', userId);
+      console.log('File size:', fileBuffer.length, 'bytes');
+      
+      // Try Supabase first (if configured)
+      if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        try {
+          console.log('Attempting Supabase upload...');
+          const fileName = `community/${Date.now()}-${Math.random().toString(36).substring(7)}-${originalFileName}`;
+
+          const { data, error } = await supabase.storage
+            .from('tradeup-images')
+            .upload(fileName, fileBuffer, {
+              contentType: mimeType,
+            });
+
+          if (error) {
+            console.warn('Supabase upload error, falling back to local storage:', error);
+          } else {
+            console.log('Supabase upload successful');
+            const { data: urlData } = supabase.storage
+              .from('tradeup-images')
+              .getPublicUrl(data.path);
+            
+            console.log('Public URL:', urlData.publicUrl);
+            return urlData.publicUrl;
+          }
+        } catch (supabaseError) {
+          console.warn('Supabase error, falling back to local storage:', supabaseError);
+        }
+      }
+
+      // Fallback to local storage
+      console.log('Using local storage for image upload');
+      const localUrl = await this.localStorage.uploadImage(
+        userId,
+        fileBuffer,
+        originalFileName,
+        mimeType,
+      );
+      console.log('Local storage URL:', localUrl);
+      return localUrl;
+    } catch (error) {
+      console.error('Image upload exception:', error);
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      throw new Error(
+        `Image upload failed: ${errorMsg}`,
+      );
+    }
   }
 }

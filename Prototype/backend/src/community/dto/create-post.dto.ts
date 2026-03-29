@@ -4,6 +4,7 @@ import {
   MaxLength,
   IsEnum,
   IsOptional,
+  IsUrl,
 } from 'class-validator';
 
 export enum PostTagDto {
@@ -25,6 +26,10 @@ export class CreatePostDto {
   @IsNotEmpty()
   @MaxLength(5000)
   content!: string;
+
+  @IsUrl()
+  @IsOptional()
+  imageUrl?: string;
 
   @IsEnum(PostTagDto)
   @IsOptional()
