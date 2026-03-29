@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "sonner";
 import {
   MessageSquare,
@@ -19,10 +19,15 @@ import {
   ChevronDown,
   ChevronUp,
   Users,
+  X,
+  Bookmark,
+  Image as ImageIcon,
 } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import { AppShell } from "@/components/layout";
 import { PageHeader, PageState, usePageState } from "@/components/common";
+import { MentionAutocomplete, MentionSuggestion } from "@/components/common/MentionAutocomplete";
+import { useMentions } from "@/hooks/useMentions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -55,6 +60,10 @@ import {
   blockUser,
   unblockUser,
   getBlockedUsers,
+  savePost,
+  getSavedPosts,
+  isPostSaved,
+  uploadCommunityImage,
 } from "@/lib/communityService";
 import type {
   CommunityPost,
@@ -136,6 +145,8 @@ interface CommentItemProps {
   onSubmitReply: () => void;
   submittingReply: boolean;
   depth?: number;
+  replyMentions?: any[];
+  onReplyMention?: (user: MentionSuggestion) => void;
 }
 
 function CommentItem({
@@ -150,6 +161,8 @@ function CommentItem({
   onSubmitReply,
   submittingReply,
   depth = 0,
+  replyMentions,
+  onReplyMention,
 }: CommentItemProps) {
   const isOwn = comment.author.id === currentUserId;
 
@@ -177,6 +190,15 @@ function CommentItem({
             </span>
           </div>
           <p className="text-sm text-foreground mt-0.5">{comment.content}</p>
+          {comment.imageUrl && (
+            <div className="mt-2 rounded-lg overflow-hidden border border-border">
+              <img
+                src={comment.imageUrl}
+                alt="Comment image"
+                className="max-w-xs max-h-64 object-cover"
+              />
+            </div>
+          )}
           <div className="flex items-center gap-2 mt-1">
             {depth === 0 && (
               <Button
@@ -214,27 +236,39 @@ function CommentItem({
 
       {/* Reply input */}
       {replyingTo === comment.id && (
-        <div className="ml-10 flex items-center gap-2">
-          <Input
-            placeholder="Write a reply..."
+        <div className="ml-10 space-y-2">
+          <MentionAutocomplete
             value={replyContent}
-            onChange={(e) => onReplyContentChange(e.target.value)}
+            onChange={onReplyContentChange}
+            onMention={onReplyMention || (() => {})}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
                 onSubmitReply();
               }
             }}
-            className="text-sm h-8"
-          />
-          <Button
-            size="sm"
-            className="h-8"
-            onClick={onSubmitReply}
-            disabled={!replyContent.trim() || submittingReply}
+            placeholder="Write a reply... Type @ to mention someone"
           >
-            <Send className="h-3 w-3" />
-          </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                className="h-8"
+                onClick={onSubmitReply}
+                disabled={!replyContent.trim() || submittingReply}
+              >
+                <Send className="h-3 w-3" />
+              </Button>
+            </div>
+          </MentionAutocomplete>
+          
+          {/* Mentioned users display for reply */}
+          {replyMentions && replyMentions.length > 0 && (
+            <div className="mt-1">
+              <p className="text-xs font-medium text-muted-foreground">
+                Mentioned: {replyMentions.map((u) => `@${u.username}`).join(", ")}
+              </p>
+            </div>
+          )}
         </div>
       )}
 
@@ -254,6 +288,8 @@ function CommentItem({
             onSubmitReply={onSubmitReply}
             submittingReply={submittingReply}
             depth={depth + 1}
+            replyMentions={replyMentions}
+            onReplyMention={onReplyMention}
           />
         ))}
     </div>
@@ -268,18 +304,33 @@ interface PostCardProps {
   onDelete: (postId: number) => void;
   onReaction: (postId: number, type: ReactionType) => void;
   onBlock: (userId: number, username: string) => void;
+  onSave?: (postId: number, isSaved: boolean) => void;
 }
 
-function PostCard({ post, currentUserId, onDelete, onReaction, onBlock }: PostCardProps) {
+function PostCard({ post, currentUserId, onDelete, onReaction, onBlock, onSave }: PostCardProps) {
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState<PostComment[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
   const [commentContent, setCommentContent] = useState("");
+  const [commentImageUrl, setCommentImageUrl] = useState("");
+  const [commentImageFile, setCommentImageFile] = useState<File | null>(null);
+  const [uploadingCommentImage, setUploadingCommentImage] = useState(false);
   const [submittingComment, setSubmittingComment] = useState(false);
   const [replyingTo, setReplyingTo] = useState<number | null>(null);
   const [replyContent, setReplyContent] = useState("");
   const [submittingReply, setSubmittingReply] = useState(false);
   const [showReactions, setShowReactions] = useState(false);
+  const [isSaved, setIsSaved] = useState(post.isSaved ?? false);
+  const [savingPost, setSavingPost] = useState(false);
+
+  // Mention state for comments
+  const { mentions: commentMentions, addMention: addCommentMention, clearMentions: clearCommentMentions } = useMentions();
+  const commentTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const commentImageInputRef = useRef<HTMLInputElement>(null);
+
+  // Mention state for replies
+  const { mentions: replyMentions, addMention: addReplyMention, clearMentions: clearReplyMentions } = useMentions();
+  const replyTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   const isOwn = post.author.id === currentUserId;
 
@@ -306,8 +357,11 @@ function PostCard({ post, currentUserId, onDelete, onReaction, onBlock }: PostCa
     if (!commentContent.trim()) return;
     setSubmittingComment(true);
     try {
-      await createComment(post.id, commentContent.trim());
+      await createComment(post.id, commentContent.trim(), undefined, commentImageUrl || undefined);
       setCommentContent("");
+      setCommentImageUrl("");
+      setCommentImageFile(null);
+      clearCommentMentions();
       toast.success("Comment added");
       loadComments();
     } catch (e) {
@@ -323,6 +377,7 @@ function PostCard({ post, currentUserId, onDelete, onReaction, onBlock }: PostCa
     try {
       await createComment(post.id, replyContent.trim(), replyingTo);
       setReplyContent("");
+      clearReplyMentions();
       setReplyingTo(null);
       toast.success("Reply added");
       loadComments();
@@ -340,6 +395,42 @@ function PostCard({ post, currentUserId, onDelete, onReaction, onBlock }: PostCa
       loadComments();
     } catch (e) {
       toast.error((e as Error).message || "Failed to delete comment");
+    }
+  };
+
+  const handleSavePost = async () => {
+    setSavingPost(true);
+    try {
+      await savePost(post.id);
+      const newIsSaved = !isSaved;
+      setIsSaved(newIsSaved);
+      onSave?.(post.id, newIsSaved);
+      toast.success(newIsSaved ? "Post saved" : "Post removed from saved");
+    } catch (e) {
+      toast.error((e as Error).message || "Failed to save post");
+    } finally {
+      setSavingPost(false);
+    }
+  };
+
+  const handleCommentImageUpload = async (file: File) => {
+    setUploadingCommentImage(true);
+    try {
+      const uploadedUrl = await uploadCommunityImage(file);
+      setCommentImageUrl(uploadedUrl);
+      setCommentImageFile(file);
+      toast.success("Image uploaded");
+    } catch (e) {
+      toast.error((e as Error).message || "Failed to upload image");
+    } finally {
+      setUploadingCommentImage(false);
+    }
+  };
+
+  const handleCommentImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleCommentImageUpload(file);
     }
   };
 
@@ -410,6 +501,15 @@ function PostCard({ post, currentUserId, onDelete, onReaction, onBlock }: PostCa
           <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">
             {post.content}
           </p>
+          {post.imageUrl && (
+            <div className="mt-3 rounded-lg overflow-hidden border border-border">
+              <img
+                src={post.imageUrl}
+                alt={post.title}
+                className="w-full max-h-96 object-cover"
+              />
+            </div>
+          )}
         </div>
 
         {/* Reactions bar */}
@@ -499,6 +599,25 @@ function PostCard({ post, currentUserId, onDelete, onReaction, onBlock }: PostCa
               <ChevronDown className="h-3 w-3" />
             )}
           </Button>
+
+          {/* Save post button */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className={cn(
+              "h-8 px-2 text-xs gap-1",
+              isSaved
+                ? "text-primary"
+                : "text-muted-foreground"
+            )}
+            onClick={handleSavePost}
+            disabled={savingPost}
+          >
+            <Bookmark className={cn("h-4 w-4", isSaved && "fill-current")} />
+            {post.saveCount > 0 && (
+              <span className="tabular-nums">{post.saveCount}</span>
+            )}
+          </Button>
         </div>
 
         {/* Comments section */}
@@ -523,6 +642,7 @@ function PostCard({ post, currentUserId, onDelete, onReaction, onBlock }: PostCa
                     onReply={(id) => {
                       setReplyingTo(replyingTo === id ? null : id);
                       setReplyContent("");
+                      clearReplyMentions();
                     }}
                     onDelete={handleDeleteComment}
                     onBlock={onBlock}
@@ -531,32 +651,85 @@ function PostCard({ post, currentUserId, onDelete, onReaction, onBlock }: PostCa
                     onReplyContentChange={setReplyContent}
                     onSubmitReply={handleSubmitReply}
                     submittingReply={submittingReply}
+                    replyMentions={replyMentions}
+                    onReplyMention={addReplyMention}
                   />
                 ))}
               </>
             )}
 
             {/* New comment input */}
-            <div className="flex items-center gap-2">
-              <Input
-                placeholder="Write a comment..."
+            <div className="space-y-2">
+              <MentionAutocomplete
+                ref={commentTextareaRef}
                 value={commentContent}
-                onChange={(e) => setCommentContent(e.target.value)}
+                onChange={setCommentContent}
+                onMention={addCommentMention}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
                     handleAddComment();
                   }
                 }}
-                className="text-sm"
-              />
-              <Button
-                size="sm"
-                onClick={handleAddComment}
-                disabled={!commentContent.trim() || submittingComment}
+                placeholder="Write a comment... Type @ to mention someone"
               >
-                <Send className="h-4 w-4" />
-              </Button>
+                <div className="flex items-center gap-2 mt-2">
+                  <Button
+                    size="sm"
+                    onClick={handleAddComment}
+                    disabled={!commentContent.trim() || submittingComment}
+                  >
+                    <Send className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => commentImageInputRef.current?.click()}
+                    disabled={uploadingCommentImage}
+                  >
+                    <ImageIcon className="h-4 w-4 mr-1" />
+                    {uploadingCommentImage ? "Uploading..." : "Image"}
+                  </Button>
+                  <input
+                    ref={commentImageInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleCommentImageFileChange}
+                  />
+                </div>
+              </MentionAutocomplete>
+              
+              {/* Image preview */}
+              {commentImageUrl && (
+                <div className="rounded-lg overflow-hidden border border-border relative">
+                  <img
+                    src={commentImageUrl}
+                    alt="Comment image preview"
+                    className="max-h-40 w-full object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCommentImageUrl("");
+                      setCommentImageFile(null);
+                    }}
+                    className="absolute top-2 right-2 bg-background/80 hover:bg-background rounded-full p-1"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
+              
+              {/* Mentioned users display */}
+              {commentMentions.length > 0 && (
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Mentioned: {commentMentions.map((u) => `@${u.username}`).join(", ")}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -581,12 +754,26 @@ export default function CommunityPage() {
   const [total, setTotal] = useState(0);
   const [filterTag, setFilterTag] = useState<PostTag | undefined>(undefined);
 
+  // Saved posts state
+  const [savedPosts, setSavedPosts] = useState<CommunityPost[]>([]);
+  const [loadingSaved, setLoadingSaved] = useState(false);
+  const [savedPage, setSavedPage] = useState(1);
+  const [savedTotal, setSavedTotal] = useState(0);
+
   // New post state
   const [showNewPost, setShowNewPost] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newContent, setNewContent] = useState("");
   const [newTag, setNewTag] = useState<PostTag>("GENERAL");
+  const [newImageUrl, setNewImageUrl] = useState("");
+  const [newImageFile, setNewImageFile] = useState<File | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  // Mention state
+  const { mentions, mentionedUserIds, addMention, clearMentions } = useMentions();
+  const newPostTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const postImageInputRef = useRef<HTMLInputElement>(null);
 
   // Block state
   const [blockDialog, setBlockDialog] = useState<{
@@ -631,23 +818,64 @@ export default function CommunityPage() {
     }
   }, []);
 
+  const fetchSavedPosts = useCallback(async () => {
+    setLoadingSaved(true);
+    try {
+      const data = await getSavedPosts(savedPage, 20);
+      setSavedPosts(data.posts);
+      setSavedTotal(data.total);
+    } catch (e) {
+      toast.error((e as Error).message || "Failed to load saved posts");
+    } finally {
+      setLoadingSaved(false);
+    }
+  }, [savedPage]);
+
   useEffect(() => {
     if (activeTab === "feed") fetchPosts();
     if (activeTab === "blocked") fetchBlocked();
-  }, [activeTab, fetchPosts, fetchBlocked]);
+    if (activeTab === "saved") fetchSavedPosts();
+  }, [activeTab, fetchPosts, fetchBlocked, fetchSavedPosts]);
 
   // ─── Handlers ──────────────────────────────────────────────────
+
+  const handlePostImageUpload = async (file: File) => {
+    setUploadingImage(true);
+    try {
+      const uploadedUrl = await uploadCommunityImage(file);
+      setNewImageUrl(uploadedUrl);
+      setNewImageFile(file);
+      toast.success("Image uploaded");
+    } catch (e) {
+      toast.error((e as Error).message || "Failed to upload image");
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handlePostImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handlePostImageUpload(file);
+    }
+  };
 
   const handleCreatePost = async () => {
     if (!newTitle.trim() || !newContent.trim()) return;
     setSubmitting(true);
     try {
-      await createPost(newTitle.trim(), newContent.trim(), newTag);
+      await createPost(newTitle.trim(), newContent.trim(), newTag, newImageUrl || undefined);
       toast.success("Post created!");
       setNewTitle("");
       setNewContent("");
       setNewTag("GENERAL");
+      setNewImageUrl("");
+      setNewImageFile(null);
+      clearMentions();
       setShowNewPost(false);
+      if (newPostTextareaRef.current) {
+        newPostTextareaRef.current.value = "";
+      }
       fetchPosts();
     } catch (e) {
       toast.error((e as Error).message || "Failed to create post");
@@ -735,6 +963,25 @@ export default function CommunityPage() {
     setBlockDialog({ open: true, userId, username });
   };
 
+  const handleSavePostUpdate = (postId: number, isSaved: boolean) => {
+    setPosts((prev) =>
+      prev.map((p) =>
+        p.id === postId
+          ? {
+              ...p,
+              isSaved,
+              saveCount: isSaved ? p.saveCount + 1 : Math.max(0, p.saveCount - 1),
+            }
+          : p,
+      ),
+    );
+    setSavedPosts((prev) =>
+      isSaved
+        ? prev
+        : prev.filter((p) => p.id !== postId),
+    );
+  };
+
   const confirmBlock = async () => {
     try {
       await blockUser(blockDialog.userId);
@@ -774,6 +1021,7 @@ export default function CommunityPage() {
       <Tabs
         tabs={[
           { id: "feed", label: "Feed" },
+          { id: "saved", label: "Saved Posts" },
           { id: "blocked", label: "Blocked Users" },
         ]}
         activeTab={activeTab}
@@ -844,6 +1092,7 @@ export default function CommunityPage() {
                   onDelete={handleDeletePost}
                   onReaction={handleReaction}
                   onBlock={handleBlockUser}
+                  onSave={handleSavePostUpdate}
                 />
               ))}
             </div>
@@ -867,6 +1116,52 @@ export default function CommunityPage() {
                   size="sm"
                   disabled={page >= totalPages}
                   onClick={() => setPage((p) => p + 1)}
+                >
+                  Next
+                </Button>
+              </div>
+            )}
+          </PageState>
+        </div>
+      )}
+
+      {/* ─── Saved Posts Tab ────────────────────────────────────── */}
+      {activeTab === "saved" && (
+        <div className="mt-4 space-y-4">
+          <PageState state={loadingSaved ? "loading" : savedPosts.length === 0 ? "empty" : "ready"}>
+            <div className="space-y-4">
+              {savedPosts.map((post) => (
+                <PostCard
+                  key={post.id}
+                  post={{ ...post, isSaved: true }}
+                  currentUserId={user!.id}
+                  onDelete={handleDeletePost}
+                  onReaction={handleReaction}
+                  onBlock={handleBlockUser}
+                  onSave={handleSavePostUpdate}
+                />
+              ))}
+            </div>
+
+            {/* Pagination */}
+            {savedTotal > 20 && (
+              <div className="flex justify-center gap-2 mt-6">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={savedPage === 1}
+                  onClick={() => setSavedPage((p) => p - 1)}
+                >
+                  Previous
+                </Button>
+                <span className="text-sm text-muted-foreground flex items-center px-4">
+                  Page {savedPage} of {Math.ceil(savedTotal / 20)}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={savedPage >= Math.ceil(savedTotal / 20)}
+                  onClick={() => setSavedPage((p) => p + 1)}
                 >
                   Next
                 </Button>
@@ -956,13 +1251,51 @@ export default function CommunityPage() {
               />
             </div>
             <div>
-              <textarea
-                className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 min-h-[120px] resize-y"
-                placeholder="What's on your mind?"
-                value={newContent}
-                onChange={(e) => setNewContent(e.target.value)}
-                maxLength={5000}
+              <MentionAutocomplete
+                ref={newPostTextareaRef}
+                onMention={addMention}
+                placeholder="What's on your mind? Type @ to mention someone..."
               />
+              
+              {/* Mentioned users display */}
+              {mentions.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Mentioned users ({mentions.length}):
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {mentions.map((user) => (
+                      <div
+                        key={user.id}
+                        className="inline-flex items-center gap-2 px-3 py-1 bg-primary/10 border border-primary/20 rounded-full"
+                      >
+                        <span className="text-sm font-medium text-primary">
+                          @{user.username}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const textArea = newPostTextareaRef.current;
+                            if (textArea) {
+                              const text = textArea.value;
+                              const mention = `@${user.username}`;
+                              const index = text.lastIndexOf(mention);
+                              if (index !== -1) {
+                                const newText =
+                                  text.slice(0, index) + text.slice(index + mention.length);
+                                setNewContent(newText);
+                              }
+                            }
+                          }}
+                          className="text-primary/60 hover:text-primary"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-sm text-muted-foreground">Tag:</span>
@@ -977,6 +1310,62 @@ export default function CommunityPage() {
                   {t.label}
                 </Button>
               ))}
+            </div>
+            <div>
+              <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                <ImageIcon className="h-4 w-4 inline mr-2" />
+                Image (optional)
+              </label>
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="https://example.com/image.png"
+                    value={newImageUrl}
+                    onChange={(e) => setNewImageUrl(e.target.value)}
+                    type="url"
+                    className="flex-1"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => postImageInputRef.current?.click()}
+                    disabled={uploadingImage}
+                  >
+                    {uploadingImage ? "Uploading..." : "Upload"}
+                  </Button>
+                  <input
+                    ref={postImageInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handlePostImageFileChange}
+                  />
+                </div>
+              </div>
+              {newImageUrl && (
+                <div className="mt-3 rounded-lg overflow-hidden border border-border relative">
+                  <img
+                    src={newImageUrl}
+                    alt="Preview"
+                    className="max-h-48 w-full object-cover"
+                    onError={() => {
+                      toast.error("Invalid image URL");
+                      setNewImageUrl("");
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewImageUrl("");
+                      setNewImageFile(null);
+                    }}
+                    className="absolute top-2 right-2 bg-background/80 hover:bg-background rounded-full p-1"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              )}
             </div>
           </div>
           <DialogFooter>

@@ -4,6 +4,7 @@ import {
   MaxLength,
   IsInt,
   IsOptional,
+  IsUrl,
 } from 'class-validator';
 
 export class CreateCommentDto {
@@ -14,6 +15,10 @@ export class CreateCommentDto {
   @IsNotEmpty()
   @MaxLength(2000)
   content!: string;
+
+  @IsUrl()
+  @IsOptional()
+  imageUrl?: string;
 
   @IsInt()
   @IsOptional()

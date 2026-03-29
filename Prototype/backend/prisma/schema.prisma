@@ -28,6 +28,7 @@ model User {
   reactions           Reaction[]
   blockedUsers        UserBlock[]     @relation("BlockedByUser")
   blockedByUsers      UserBlock[]     @relation("BlockedUser")
+  savedPosts          SavedPost[]
   chatSessions        ChatSession[]
 }
 
@@ -140,12 +141,14 @@ model Post {
   authorId  Int
   title     String
   content   String
+  imageUrl  String?
   tag       PostTag    @default(GENERAL)
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
   author    User       @relation(fields: [authorId], references: [id])
   comments  Comment[]
   reactions Reaction[]
+  savedBy   SavedPost[]
 
   @@index([authorId])
   @@index([createdAt])
@@ -157,6 +160,7 @@ model Comment {
   authorId  Int
   parentId  Int?
   content   String
+  imageUrl  String?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   post      Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
@@ -192,6 +196,19 @@ model UserBlock {
 
   @@unique([blockerId, blockedId])
   @@index([blockerId])
+}
+
+model SavedPost {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  postId    Int
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post      Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+  @@index([userId])
+  @@index([postId])
 }
 
 enum PostTag {

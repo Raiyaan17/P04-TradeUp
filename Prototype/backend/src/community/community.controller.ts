@@ -9,14 +9,25 @@ import {
   UseGuards,
   Req,
   ParseIntPipe,
+  UseInterceptors,
+  UploadedFile,
+  Logger,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { CommunityService } from './community.service';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { CreatePostDto } from './dto/create-post.dto';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { ToggleReactionDto } from './dto/toggle-reaction.dto';
 import { BlockUserDto } from './dto/block-user.dto';
+import { SearchMentionDto } from './dto/search-mention.dto';
 import { PostTag } from '@prisma/client';
+
+type UploadedFileType = {
+  buffer: Buffer;
+  originalname: string;
+  mimetype: string;
+};
 
 interface AuthenticatedRequest {
   user: {
@@ -43,6 +54,7 @@ export class CommunityController {
       dto.title,
       dto.content,
       (dto.tag as PostTag) ?? 'GENERAL',
+      dto.imageUrl,
     );
   }
 
@@ -91,6 +103,7 @@ export class CommunityController {
       dto.postId,
       dto.content,
       dto.parentId,
+      dto.imageUrl,
     );
   }
 
@@ -142,5 +155,77 @@ export class CommunityController {
   @Get('blocked')
   async getBlockedUsers(@Req() req: AuthenticatedRequest) {
     return this.community.getBlockedUsers(req.user.userId);
+  }
+
+  // ─── USER MENTIONS ──────────────────────────────────────────────────
+
+  @Post('mentions/search')
+  async searchMentions(
+    @Req() req: AuthenticatedRequest,
+    @Body() dto: SearchMentionDto,
+  ) {
+    return this.community.searchMentions(
+      req.user.userId,
+      dto.query,
+      10, // default limit
+    );
+  }
+
+  // ─── SAVED POSTS ────────────────────────────────────────────────────
+
+  @Post('posts/:id/save')
+  async savePost(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseIntPipe) postId: number,
+  ) {
+    return this.community.savePost(req.user.userId, postId);
+  }
+
+  @Get('saved-posts')
+  async getSavedPosts(
+    @Req() req: AuthenticatedRequest,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const pageNum = page ? parseInt(page, 10) : 1;
+    const limitNum = limit ? parseInt(limit, 10) : 20;
+    return this.community.getSavedPosts(req.user.userId, pageNum, limitNum);
+  }
+
+  @Get('posts/:id/is-saved')
+  async isPostSaved(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseIntPipe) postId: number,
+  ) {
+    const isSaved = await this.community.isPostSaved(
+      req.user.userId,
+      postId,
+    );
+    return { isSaved };
+  }
+
+  // ─── IMAGE UPLOAD ──────────────────────────────────────────────────
+
+  @Post('upload-image')
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadImage(
+    @Req() req: AuthenticatedRequest,
+    @UploadedFile() file: UploadedFileType,
+  ) {
+    if (!file) {
+      throw new Error('No file uploaded');
+    }
+    try {
+      const imageUrl = await this.community.uploadImage(
+        req.user.userId,
+        file.buffer,
+        file.originalname,
+        file.mimetype,
+      );
+      return { imageUrl };
+    } catch (error) {
+      throw new Error((error as Error).message);
+    }
   }
 }

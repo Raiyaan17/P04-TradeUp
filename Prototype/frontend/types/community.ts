@@ -23,6 +23,7 @@ export interface CommunityPost {
   id: number;
   title: string;
   content: string;
+  imageUrl?: string | null;
   tag: PostTag;
   createdAt: string;
   updatedAt: string;
@@ -31,6 +32,8 @@ export interface CommunityPost {
   reactionCounts: Record<string, number>;
   totalReactions: number;
   myReaction: ReactionType | null;
+  isSaved: boolean;
+  saveCount: number;
 }
 
 export interface PostsResponse {
@@ -47,6 +50,7 @@ export interface PostComment {
   authorId: number;
   parentId: number | null;
   content: string;
+  imageUrl?: string | null;
   createdAt: string;
   updatedAt: string;
   author: PostAuthor;

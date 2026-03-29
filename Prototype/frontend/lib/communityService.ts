@@ -1,4 +1,5 @@
 import API_BASE_URL from './api';
+import { uploadFile, ApiException } from '@/lib/http';
 import type {
   CommunityPost,
   PostsResponse,
@@ -21,17 +22,29 @@ const getAuthHeaders = (): Record<string, string> => {
   };
 };
 
+// ─── IMAGE UPLOAD ────────────────────────────────────────────────
+
+export const uploadCommunityImage = async (file: File): Promise<string> => {
+  const response = await uploadFile<{ imageUrl: string }>(
+    '/community/upload-image',
+    file,
+    'file'
+  );
+  return response.imageUrl;
+};
+
 // ─── POSTS ────────────────────────────────────────────────────────
 
 export const createPost = async (
   title: string,
   content: string,
   tag?: PostTag,
+  imageUrl?: string,
 ): Promise<CommunityPost> => {
   const response = await fetch(`${API_BASE_URL}/community/posts`, {
     method: 'POST',
     headers: getAuthHeaders(),
-    body: JSON.stringify({ title, content, tag }),
+    body: JSON.stringify({ title, content, tag, imageUrl }),
   });
 
   if (!response.ok) {
@@ -111,11 +124,12 @@ export const createComment = async (
   postId: number,
   content: string,
   parentId?: number,
+  imageUrl?: string,
 ): Promise<PostComment> => {
   const response = await fetch(`${API_BASE_URL}/community/comments`, {
     method: 'POST',
     headers: getAuthHeaders(),
-    body: JSON.stringify({ postId, content, parentId }),
+    body: JSON.stringify({ postId, content, parentId, imageUrl }),
   });
 
   if (!response.ok) {
@@ -197,4 +211,56 @@ export const getBlockedUsers = async (): Promise<BlockedUserEntry[]> => {
     throw new Error('Failed to fetch blocked users');
   }
   return response.json() as Promise<BlockedUserEntry[]>;
+};
+
+// ─── SAVED POSTS ─────────────────────────────────────────────────
+
+export const savePost = async (postId: number): Promise<void> => {
+  const response = await fetch(
+    `${API_BASE_URL}/community/posts/${postId}/save`,
+    {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    },
+  );
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(
+      (error as { message?: string }).message || 'Failed to save post',
+    );
+  }
+};
+
+export const getSavedPosts = async (
+  page: number = 1,
+  limit: number = 20,
+): Promise<PostsResponse> => {
+  const params = new URLSearchParams({
+    page: String(page),
+    limit: String(limit),
+  });
+
+  const response = await fetch(
+    `${API_BASE_URL}/community/saved-posts?${params.toString()}`,
+    { method: 'GET', headers: getAuthHeaders() },
+  );
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch saved posts');
+  }
+  return response.json() as Promise<PostsResponse>;
+};
+
+export const isPostSaved = async (postId: number): Promise<boolean> => {
+  const response = await fetch(
+    `${API_BASE_URL}/community/posts/${postId}/is-saved`,
+    { method: 'GET', headers: getAuthHeaders() },
+  );
+
+  if (!response.ok) {
+    throw new Error('Failed to check if post is saved');
+  }
+  const result = await response.json() as { isSaved: boolean };
+  return result.isSaved;
 };
