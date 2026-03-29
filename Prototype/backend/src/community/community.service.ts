@@ -328,10 +328,103 @@ export class CommunityService {
       where: {
         OR: [
           { blockerId, blockedId },
-          { blockerId: blockedId, blockedId: blockerId },
+          { blockedId: blockerId, blockerId: blockedId },
         ],
       },
     });
     return !!block;
+  }
+
+  // ─── USER MENTIONS & SEARCH ──────────────────────────────────────────
+
+  
+  async searchMentions(
+    userId: number,
+    query: string,
+    limit: number = 10,
+  ) {
+    const searchTerm = query.toLowerCase().trim();
+    
+    // Get list of blocked users
+    const blockedIds = await this.getBlockedIdPair(userId);
+
+    // Get user's accepted friendships
+    const friendships = await this.prisma.friendship.findMany({
+      where: {
+        status: 'ACCEPTED',
+        OR: [{ senderId: userId }, { receiverId: userId }],
+      },
+      select: {
+        senderId: true,
+        receiverId: true,
+      },
+    });
+
+    // Extract friend IDs
+    const friendIds = new Set<number>();
+    friendships.forEach((f) => {
+      if (f.senderId === userId) friendIds.add(f.receiverId);
+      if (f.receiverId === userId) friendIds.add(f.senderId);
+    });
+
+    // Build the search filter
+    const searchFilter = {
+      AND: [
+        ...(searchTerm.length > 0
+          ? [
+              {
+                OR: [
+                  { username: { contains: searchTerm, mode: 'insensitive' as const } },
+                  { name: { contains: searchTerm, mode: 'insensitive' as const } },
+                ],
+              },
+            ]
+          : []),
+        { id: { notIn: [userId, ...blockedIds] } },
+      ],
+    };
+
+    // Fetch users matching the search query
+    const users = await this.prisma.user.findMany({
+      where: searchFilter,
+      select: {
+        id: true,
+        username: true,
+        name: true,
+        profileImageUrl: true,
+      },
+      take: limit * 2, // Fetch extra to have room for sorting
+    });
+
+    // Sort with friends first, then by username/name match relevance
+    const sorted = users.sort((a, b): number => {
+      const aIsFriend = friendIds.has(a.id);
+      const bIsFriend = friendIds.has(b.id);
+
+      // Friends come first
+      if (aIsFriend && !bIsFriend) return -1;
+      if (!aIsFriend && bIsFriend) return 1;
+
+      // Within same category, if there's a search term, sort by match
+      if (searchTerm.length > 0) {
+        const aUsernameMatch = a.username.toLowerCase().startsWith(searchTerm);
+        const bUsernameMatch = b.username.toLowerCase().startsWith(searchTerm);
+
+        if (aUsernameMatch && !bUsernameMatch) return -1;
+        if (!aUsernameMatch && bUsernameMatch) return 1;
+      }
+
+      // Finally, sort alphabetically by username
+      return a.username.localeCompare(b.username);
+    });
+
+    // Return top results with isFriend flag
+    return sorted.slice(0, limit).map((user) => ({
+      id: user.id,
+      username: user.username,
+      name: user.name,
+      profileImageUrl: user.profileImageUrl,
+      isFriend: friendIds.has(user.id),
+    }));
   }
 }

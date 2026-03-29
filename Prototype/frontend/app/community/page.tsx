@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "sonner";
 import {
   MessageSquare,
@@ -19,10 +19,13 @@ import {
   ChevronDown,
   ChevronUp,
   Users,
+  X,
 } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import { AppShell } from "@/components/layout";
 import { PageHeader, PageState, usePageState } from "@/components/common";
+import { MentionAutocomplete, MentionSuggestion } from "@/components/common/MentionAutocomplete";
+import { useMentions } from "@/hooks/useMentions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -136,6 +139,8 @@ interface CommentItemProps {
   onSubmitReply: () => void;
   submittingReply: boolean;
   depth?: number;
+  replyMentions?: any[];
+  onReplyMention?: (user: MentionSuggestion) => void;
 }
 
 function CommentItem({
@@ -150,6 +155,8 @@ function CommentItem({
   onSubmitReply,
   submittingReply,
   depth = 0,
+  replyMentions,
+  onReplyMention,
 }: CommentItemProps) {
   const isOwn = comment.author.id === currentUserId;
 
@@ -214,27 +221,39 @@ function CommentItem({
 
       {/* Reply input */}
       {replyingTo === comment.id && (
-        <div className="ml-10 flex items-center gap-2">
-          <Input
-            placeholder="Write a reply..."
+        <div className="ml-10 space-y-2">
+          <MentionAutocomplete
             value={replyContent}
-            onChange={(e) => onReplyContentChange(e.target.value)}
+            onChange={onReplyContentChange}
+            onMention={onReplyMention || (() => {})}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
                 onSubmitReply();
               }
             }}
-            className="text-sm h-8"
-          />
-          <Button
-            size="sm"
-            className="h-8"
-            onClick={onSubmitReply}
-            disabled={!replyContent.trim() || submittingReply}
+            placeholder="Write a reply... Type @ to mention someone"
           >
-            <Send className="h-3 w-3" />
-          </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                className="h-8"
+                onClick={onSubmitReply}
+                disabled={!replyContent.trim() || submittingReply}
+              >
+                <Send className="h-3 w-3" />
+              </Button>
+            </div>
+          </MentionAutocomplete>
+          
+          {/* Mentioned users display for reply */}
+          {replyMentions && replyMentions.length > 0 && (
+            <div className="mt-1">
+              <p className="text-xs font-medium text-muted-foreground">
+                Mentioned: {replyMentions.map((u) => `@${u.username}`).join(", ")}
+              </p>
+            </div>
+          )}
         </div>
       )}
 
@@ -254,6 +273,8 @@ function CommentItem({
             onSubmitReply={onSubmitReply}
             submittingReply={submittingReply}
             depth={depth + 1}
+            replyMentions={replyMentions}
+            onReplyMention={onReplyMention}
           />
         ))}
     </div>
@@ -280,6 +301,14 @@ function PostCard({ post, currentUserId, onDelete, onReaction, onBlock }: PostCa
   const [replyContent, setReplyContent] = useState("");
   const [submittingReply, setSubmittingReply] = useState(false);
   const [showReactions, setShowReactions] = useState(false);
+
+  // Mention state for comments
+  const { mentions: commentMentions, addMention: addCommentMention, clearMentions: clearCommentMentions } = useMentions();
+  const commentTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Mention state for replies
+  const { mentions: replyMentions, addMention: addReplyMention, clearMentions: clearReplyMentions } = useMentions();
+  const replyTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   const isOwn = post.author.id === currentUserId;
 
@@ -308,6 +337,7 @@ function PostCard({ post, currentUserId, onDelete, onReaction, onBlock }: PostCa
     try {
       await createComment(post.id, commentContent.trim());
       setCommentContent("");
+      clearCommentMentions();
       toast.success("Comment added");
       loadComments();
     } catch (e) {
@@ -323,6 +353,7 @@ function PostCard({ post, currentUserId, onDelete, onReaction, onBlock }: PostCa
     try {
       await createComment(post.id, replyContent.trim(), replyingTo);
       setReplyContent("");
+      clearReplyMentions();
       setReplyingTo(null);
       toast.success("Reply added");
       loadComments();
@@ -523,6 +554,7 @@ function PostCard({ post, currentUserId, onDelete, onReaction, onBlock }: PostCa
                     onReply={(id) => {
                       setReplyingTo(replyingTo === id ? null : id);
                       setReplyContent("");
+                      clearReplyMentions();
                     }}
                     onDelete={handleDeleteComment}
                     onBlock={onBlock}
@@ -531,32 +563,47 @@ function PostCard({ post, currentUserId, onDelete, onReaction, onBlock }: PostCa
                     onReplyContentChange={setReplyContent}
                     onSubmitReply={handleSubmitReply}
                     submittingReply={submittingReply}
+                    replyMentions={replyMentions}
+                    onReplyMention={addReplyMention}
                   />
                 ))}
               </>
             )}
 
             {/* New comment input */}
-            <div className="flex items-center gap-2">
-              <Input
-                placeholder="Write a comment..."
+            <div>
+              <MentionAutocomplete
+                ref={commentTextareaRef}
                 value={commentContent}
-                onChange={(e) => setCommentContent(e.target.value)}
+                onChange={setCommentContent}
+                onMention={addCommentMention}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
                     handleAddComment();
                   }
                 }}
-                className="text-sm"
-              />
-              <Button
-                size="sm"
-                onClick={handleAddComment}
-                disabled={!commentContent.trim() || submittingComment}
+                placeholder="Write a comment... Type @ to mention someone"
               >
-                <Send className="h-4 w-4" />
-              </Button>
+                <div className="flex items-center gap-2 mt-2">
+                  <Button
+                    size="sm"
+                    onClick={handleAddComment}
+                    disabled={!commentContent.trim() || submittingComment}
+                  >
+                    <Send className="h-4 w-4" />
+                  </Button>
+                </div>
+              </MentionAutocomplete>
+              
+              {/* Mentioned users display */}
+              {commentMentions.length > 0 && (
+                <div className="mt-2 space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Mentioned: {commentMentions.map((u) => `@${u.username}`).join(", ")}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -587,6 +634,10 @@ export default function CommunityPage() {
   const [newContent, setNewContent] = useState("");
   const [newTag, setNewTag] = useState<PostTag>("GENERAL");
   const [submitting, setSubmitting] = useState(false);
+
+  // Mention state
+  const { mentions, mentionedUserIds, addMention, clearMentions } = useMentions();
+  const newPostTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Block state
   const [blockDialog, setBlockDialog] = useState<{
@@ -647,7 +698,11 @@ export default function CommunityPage() {
       setNewTitle("");
       setNewContent("");
       setNewTag("GENERAL");
+      clearMentions();
       setShowNewPost(false);
+      if (newPostTextareaRef.current) {
+        newPostTextareaRef.current.value = "";
+      }
       fetchPosts();
     } catch (e) {
       toast.error((e as Error).message || "Failed to create post");
@@ -956,13 +1011,51 @@ export default function CommunityPage() {
               />
             </div>
             <div>
-              <textarea
-                className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 min-h-[120px] resize-y"
-                placeholder="What's on your mind?"
-                value={newContent}
-                onChange={(e) => setNewContent(e.target.value)}
-                maxLength={5000}
+              <MentionAutocomplete
+                ref={newPostTextareaRef}
+                onMention={addMention}
+                placeholder="What's on your mind? Type @ to mention someone..."
               />
+              
+              {/* Mentioned users display */}
+              {mentions.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Mentioned users ({mentions.length}):
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {mentions.map((user) => (
+                      <div
+                        key={user.id}
+                        className="inline-flex items-center gap-2 px-3 py-1 bg-primary/10 border border-primary/20 rounded-full"
+                      >
+                        <span className="text-sm font-medium text-primary">
+                          @{user.username}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const textArea = newPostTextareaRef.current;
+                            if (textArea) {
+                              const text = textArea.value;
+                              const mention = `@${user.username}`;
+                              const index = text.lastIndexOf(mention);
+                              if (index !== -1) {
+                                const newText =
+                                  text.slice(0, index) + text.slice(index + mention.length);
+                                setNewContent(newText);
+                              }
+                            }
+                          }}
+                          className="text-primary/60 hover:text-primary"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-sm text-muted-foreground">Tag:</span>

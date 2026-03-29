@@ -16,6 +16,7 @@ import { CreatePostDto } from './dto/create-post.dto';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { ToggleReactionDto } from './dto/toggle-reaction.dto';
 import { BlockUserDto } from './dto/block-user.dto';
+import { SearchMentionDto } from './dto/search-mention.dto';
 import { PostTag } from '@prisma/client';
 
 interface AuthenticatedRequest {
@@ -142,5 +143,19 @@ export class CommunityController {
   @Get('blocked')
   async getBlockedUsers(@Req() req: AuthenticatedRequest) {
     return this.community.getBlockedUsers(req.user.userId);
+  }
+
+  // ─── USER MENTIONS ──────────────────────────────────────────────────
+
+  @Post('mentions/search')
+  async searchMentions(
+    @Req() req: AuthenticatedRequest,
+    @Body() dto: SearchMentionDto,
+  ) {
+    return this.community.searchMentions(
+      req.user.userId,
+      dto.query,
+      10, // default limit
+    );
   }
 }
