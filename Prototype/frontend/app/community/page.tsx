@@ -20,6 +20,7 @@ import {
   ChevronUp,
   Users,
   X,
+  Bookmark,
 } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import { AppShell } from "@/components/layout";
@@ -58,6 +59,9 @@ import {
   blockUser,
   unblockUser,
   getBlockedUsers,
+  savePost,
+  getSavedPosts,
+  isPostSaved,
 } from "@/lib/communityService";
 import type {
   CommunityPost,
@@ -289,9 +293,10 @@ interface PostCardProps {
   onDelete: (postId: number) => void;
   onReaction: (postId: number, type: ReactionType) => void;
   onBlock: (userId: number, username: string) => void;
+  onSave?: (postId: number, isSaved: boolean) => void;
 }
 
-function PostCard({ post, currentUserId, onDelete, onReaction, onBlock }: PostCardProps) {
+function PostCard({ post, currentUserId, onDelete, onReaction, onBlock, onSave }: PostCardProps) {
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState<PostComment[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
@@ -301,6 +306,8 @@ function PostCard({ post, currentUserId, onDelete, onReaction, onBlock }: PostCa
   const [replyContent, setReplyContent] = useState("");
   const [submittingReply, setSubmittingReply] = useState(false);
   const [showReactions, setShowReactions] = useState(false);
+  const [isSaved, setIsSaved] = useState(post.isSaved ?? false);
+  const [savingPost, setSavingPost] = useState(false);
 
   // Mention state for comments
   const { mentions: commentMentions, addMention: addCommentMention, clearMentions: clearCommentMentions } = useMentions();
@@ -371,6 +378,21 @@ function PostCard({ post, currentUserId, onDelete, onReaction, onBlock }: PostCa
       loadComments();
     } catch (e) {
       toast.error((e as Error).message || "Failed to delete comment");
+    }
+  };
+
+  const handleSavePost = async () => {
+    setSavingPost(true);
+    try {
+      await savePost(post.id);
+      const newIsSaved = !isSaved;
+      setIsSaved(newIsSaved);
+      onSave?.(post.id, newIsSaved);
+      toast.success(newIsSaved ? "Post saved" : "Post removed from saved");
+    } catch (e) {
+      toast.error((e as Error).message || "Failed to save post");
+    } finally {
+      setSavingPost(false);
     }
   };
 
@@ -530,6 +552,25 @@ function PostCard({ post, currentUserId, onDelete, onReaction, onBlock }: PostCa
               <ChevronDown className="h-3 w-3" />
             )}
           </Button>
+
+          {/* Save post button */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className={cn(
+              "h-8 px-2 text-xs gap-1",
+              isSaved
+                ? "text-primary"
+                : "text-muted-foreground"
+            )}
+            onClick={handleSavePost}
+            disabled={savingPost}
+          >
+            <Bookmark className={cn("h-4 w-4", isSaved && "fill-current")} />
+            {post.saveCount > 0 && (
+              <span className="tabular-nums">{post.saveCount}</span>
+            )}
+          </Button>
         </div>
 
         {/* Comments section */}
@@ -628,6 +669,12 @@ export default function CommunityPage() {
   const [total, setTotal] = useState(0);
   const [filterTag, setFilterTag] = useState<PostTag | undefined>(undefined);
 
+  // Saved posts state
+  const [savedPosts, setSavedPosts] = useState<CommunityPost[]>([]);
+  const [loadingSaved, setLoadingSaved] = useState(false);
+  const [savedPage, setSavedPage] = useState(1);
+  const [savedTotal, setSavedTotal] = useState(0);
+
   // New post state
   const [showNewPost, setShowNewPost] = useState(false);
   const [newTitle, setNewTitle] = useState("");
@@ -682,10 +729,24 @@ export default function CommunityPage() {
     }
   }, []);
 
+  const fetchSavedPosts = useCallback(async () => {
+    setLoadingSaved(true);
+    try {
+      const data = await getSavedPosts(savedPage, 20);
+      setSavedPosts(data.posts);
+      setSavedTotal(data.total);
+    } catch (e) {
+      toast.error((e as Error).message || "Failed to load saved posts");
+    } finally {
+      setLoadingSaved(false);
+    }
+  }, [savedPage]);
+
   useEffect(() => {
     if (activeTab === "feed") fetchPosts();
     if (activeTab === "blocked") fetchBlocked();
-  }, [activeTab, fetchPosts, fetchBlocked]);
+    if (activeTab === "saved") fetchSavedPosts();
+  }, [activeTab, fetchPosts, fetchBlocked, fetchSavedPosts]);
 
   // ─── Handlers ──────────────────────────────────────────────────
 
@@ -790,6 +851,25 @@ export default function CommunityPage() {
     setBlockDialog({ open: true, userId, username });
   };
 
+  const handleSavePostUpdate = (postId: number, isSaved: boolean) => {
+    setPosts((prev) =>
+      prev.map((p) =>
+        p.id === postId
+          ? {
+              ...p,
+              isSaved,
+              saveCount: isSaved ? p.saveCount + 1 : Math.max(0, p.saveCount - 1),
+            }
+          : p,
+      ),
+    );
+    setSavedPosts((prev) =>
+      isSaved
+        ? prev
+        : prev.filter((p) => p.id !== postId),
+    );
+  };
+
   const confirmBlock = async () => {
     try {
       await blockUser(blockDialog.userId);
@@ -829,6 +909,7 @@ export default function CommunityPage() {
       <Tabs
         tabs={[
           { id: "feed", label: "Feed" },
+          { id: "saved", label: "Saved Posts" },
           { id: "blocked", label: "Blocked Users" },
         ]}
         activeTab={activeTab}
@@ -899,6 +980,7 @@ export default function CommunityPage() {
                   onDelete={handleDeletePost}
                   onReaction={handleReaction}
                   onBlock={handleBlockUser}
+                  onSave={handleSavePostUpdate}
                 />
               ))}
             </div>
@@ -922,6 +1004,52 @@ export default function CommunityPage() {
                   size="sm"
                   disabled={page >= totalPages}
                   onClick={() => setPage((p) => p + 1)}
+                >
+                  Next
+                </Button>
+              </div>
+            )}
+          </PageState>
+        </div>
+      )}
+
+      {/* ─── Saved Posts Tab ────────────────────────────────────── */}
+      {activeTab === "saved" && (
+        <div className="mt-4 space-y-4">
+          <PageState state={loadingSaved ? "loading" : savedPosts.length === 0 ? "empty" : "ready"}>
+            <div className="space-y-4">
+              {savedPosts.map((post) => (
+                <PostCard
+                  key={post.id}
+                  post={{ ...post, isSaved: true }}
+                  currentUserId={user!.id}
+                  onDelete={handleDeletePost}
+                  onReaction={handleReaction}
+                  onBlock={handleBlockUser}
+                  onSave={handleSavePostUpdate}
+                />
+              ))}
+            </div>
+
+            {/* Pagination */}
+            {savedTotal > 20 && (
+              <div className="flex justify-center gap-2 mt-6">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={savedPage === 1}
+                  onClick={() => setSavedPage((p) => p - 1)}
+                >
+                  Previous
+                </Button>
+                <span className="text-sm text-muted-foreground flex items-center px-4">
+                  Page {savedPage} of {Math.ceil(savedTotal / 20)}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={savedPage >= Math.ceil(savedTotal / 20)}
+                  onClick={() => setSavedPage((p) => p + 1)}
                 >
                   Next
                 </Button>

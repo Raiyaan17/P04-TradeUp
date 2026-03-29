@@ -73,7 +73,8 @@ export class CommunityService {
         include: {
           author: { select: AUTHOR_SELECT },
           reactions: { select: { id: true, userId: true, type: true } },
-          _count: { select: { comments: true } },
+          savedBy: { where: { userId }, select: { id: true } },
+          _count: { select: { comments: true, savedBy: true } },
         },
         orderBy: { createdAt: 'desc' },
         skip,
@@ -82,7 +83,7 @@ export class CommunityService {
       this.prisma.post.count({ where }),
     ]);
 
-    // Enrich each post with the caller's own reaction (if any)
+    // Enrich each post with the caller's own reaction (if any) and saved status
     const enriched = posts.map((post) => {
       const myReaction =
         post.reactions.find((r) => r.userId === userId)?.type ?? null;
@@ -105,6 +106,8 @@ export class CommunityService {
         reactionCounts,
         totalReactions: post.reactions.length,
         myReaction,
+        isSaved: post.savedBy.length > 0,
+        saveCount: post._count.savedBy,
       };
     });
 
@@ -117,7 +120,8 @@ export class CommunityService {
       include: {
         author: { select: AUTHOR_SELECT },
         reactions: { select: { id: true, userId: true, type: true } },
-        _count: { select: { comments: true } },
+        savedBy: { where: { userId }, select: { id: true } },
+        _count: { select: { comments: true, savedBy: true } },
       },
     });
 
@@ -149,6 +153,8 @@ export class CommunityService {
       reactionCounts,
       totalReactions: post.reactions.length,
       myReaction,
+      isSaved: post.savedBy.length > 0,
+      saveCount: post._count.savedBy,
     };
   }
 
@@ -426,5 +432,91 @@ export class CommunityService {
       profileImageUrl: user.profileImageUrl,
       isFriend: friendIds.has(user.id),
     }));
+  }
+
+  // ─── SAVED POSTS ────────────────────────────────────────────────────
+
+  async savePost(userId: number, postId: number) {
+
+    const post = await this.prisma.post.findUnique({ where: { id: postId } });
+    if (!post) {
+      throw new NotFoundException('Post not found');
+    }
+
+  
+    const existing = await this.prisma.savedPost.findUnique({
+      where: { userId_postId: { userId, postId } },
+    });
+
+    if (existing) {
+      return this.prisma.savedPost.delete({
+        where: { userId_postId: { userId, postId } },
+      });
+    }
+    return this.prisma.savedPost.create({
+      data: { userId, postId },
+    });
+  }
+
+  async getSavedPosts(
+    userId: number,
+    page: number = 1,
+    limit: number = 20,
+  ) {
+    const skip = (page - 1) * limit;
+
+    const [savedPosts, total] = await Promise.all([
+      this.prisma.savedPost.findMany({
+        where: { userId },
+        include: {
+          post: {
+            include: {
+              author: { select: AUTHOR_SELECT },
+              reactions: { select: { id: true, userId: true, type: true } },
+              _count: { select: { comments: true, savedBy: true } },
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.savedPost.count({ where: { userId } }),
+    ]);
+
+    const enriched = savedPosts.map(({ post }) => {
+      const myReaction =
+        post.reactions.find((r) => r.userId === userId)?.type ?? null;
+
+      const reactionCounts: Record<string, number> = {};
+      for (const r of post.reactions) {
+        reactionCounts[r.type] = (reactionCounts[r.type] ?? 0) + 1;
+      }
+
+      return {
+        id: post.id,
+        title: post.title,
+        content: post.content,
+        tag: post.tag,
+        createdAt: post.createdAt,
+        updatedAt: post.updatedAt,
+        author: post.author,
+        commentCount: post._count.comments,
+        reactionCounts,
+        totalReactions: post.reactions.length,
+        myReaction,
+        isSaved: true,
+        saveCount: post._count.savedBy,
+      };
+    });
+
+    return { posts: enriched, total, page, limit };
+  }
+
+  async isPostSaved(userId: number, postId: number): Promise<boolean> {
+    const saved = await this.prisma.savedPost.findUnique({
+      where: { userId_postId: { userId, postId } },
+    });
+    return !!saved;
   }
 }

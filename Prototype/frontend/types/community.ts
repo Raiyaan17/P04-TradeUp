@@ -31,6 +31,8 @@ export interface CommunityPost {
   reactionCounts: Record<string, number>;
   totalReactions: number;
   myReaction: ReactionType | null;
+  isSaved: boolean;
+  saveCount: number;
 }
 
 export interface PostsResponse {

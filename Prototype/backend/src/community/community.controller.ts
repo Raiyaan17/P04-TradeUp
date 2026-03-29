@@ -158,4 +158,37 @@ export class CommunityController {
       10, // default limit
     );
   }
+
+  // ─── SAVED POSTS ────────────────────────────────────────────────────
+
+  @Post('posts/:id/save')
+  async savePost(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseIntPipe) postId: number,
+  ) {
+    return this.community.savePost(req.user.userId, postId);
+  }
+
+  @Get('saved-posts')
+  async getSavedPosts(
+    @Req() req: AuthenticatedRequest,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const pageNum = page ? parseInt(page, 10) : 1;
+    const limitNum = limit ? parseInt(limit, 10) : 20;
+    return this.community.getSavedPosts(req.user.userId, pageNum, limitNum);
+  }
+
+  @Get('posts/:id/is-saved')
+  async isPostSaved(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseIntPipe) postId: number,
+  ) {
+    const isSaved = await this.community.isPostSaved(
+      req.user.userId,
+      postId,
+    );
+    return { isSaved };
+  }
 }

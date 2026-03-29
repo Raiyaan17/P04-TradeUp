@@ -198,3 +198,55 @@ export const getBlockedUsers = async (): Promise<BlockedUserEntry[]> => {
   }
   return response.json() as Promise<BlockedUserEntry[]>;
 };
+
+// ─── SAVED POSTS ─────────────────────────────────────────────────
+
+export const savePost = async (postId: number): Promise<void> => {
+  const response = await fetch(
+    `${API_BASE_URL}/community/posts/${postId}/save`,
+    {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    },
+  );
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(
+      (error as { message?: string }).message || 'Failed to save post',
+    );
+  }
+};
+
+export const getSavedPosts = async (
+  page: number = 1,
+  limit: number = 20,
+): Promise<PostsResponse> => {
+  const params = new URLSearchParams({
+    page: String(page),
+    limit: String(limit),
+  });
+
+  const response = await fetch(
+    `${API_BASE_URL}/community/saved-posts?${params.toString()}`,
+    { method: 'GET', headers: getAuthHeaders() },
+  );
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch saved posts');
+  }
+  return response.json() as Promise<PostsResponse>;
+};
+
+export const isPostSaved = async (postId: number): Promise<boolean> => {
+  const response = await fetch(
+    `${API_BASE_URL}/community/posts/${postId}/is-saved`,
+    { method: 'GET', headers: getAuthHeaders() },
+  );
+
+  if (!response.ok) {
+    throw new Error('Failed to check if post is saved');
+  }
+  const result = await response.json() as { isSaved: boolean };
+  return result.isSaved;
+};
