@@ -1255,6 +1255,8 @@ export default function CommunityPage() {
                 ref={newPostTextareaRef}
                 onMention={addMention}
                 placeholder="What's on your mind? Type @ to mention someone..."
+                value={newContent}
+                onChange={setNewContent}
               />
               
               {/* Mentioned users display */}

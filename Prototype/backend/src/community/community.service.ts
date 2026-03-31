@@ -540,7 +540,7 @@ export class CommunityService {
           const fileName = `community/${Date.now()}-${Math.random().toString(36).substring(7)}-${originalFileName}`;
 
           const { data, error } = await supabase.storage
-            .from('tradeup-images')
+            .from('TradeUp-profile-images')
             .upload(fileName, fileBuffer, {
               contentType: mimeType,
             });
@@ -549,12 +549,22 @@ export class CommunityService {
             console.warn('Supabase upload error, falling back to local storage:', error);
           } else {
             console.log('Supabase upload successful');
-            const { data: urlData } = supabase.storage
-              .from('tradeup-images')
-              .getPublicUrl(data.path);
+            // Generate signed URL for private bucket (valid for 1 year)
+            const { data: signedData } = await supabase.storage
+              .from('TradeUp-profile-images')
+              .createSignedUrl(data.path, 60 * 60 * 24 * 365);
             
-            console.log('Public URL:', urlData.publicUrl);
-            return urlData.publicUrl;
+            if (signedData?.signedUrl) {
+              console.log('Signed URL generated:', signedData.signedUrl);
+              return signedData.signedUrl;
+            } else {
+              // Fallback to public URL if signed URL fails
+              const { data: urlData } = supabase.storage
+                .from('TradeUp-profile-images')
+                .getPublicUrl(data.path);
+              console.log('Using public URL as fallback:', urlData.publicUrl);
+              return urlData.publicUrl;
+            }
           }
         } catch (supabaseError) {
           console.warn('Supabase error, falling back to local storage:', supabaseError);
