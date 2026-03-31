@@ -1,0 +1,39 @@
+[31m[Nest] 17600  - [39m04/01/2026, 2:22:29 AM [31m  ERROR[39m [38;5;3m[ChatbotService] [39m[31mGemini API call failed:[39m
+[31m[Nest] 17600  - [39m04/01/2026, 2:22:29 AM [31m  ERROR[39m [38;5;3m[ChatbotService] [39mError: Gemini API error 503: Internal Server Error
+    at ChatbotService.callGemini [90m(D:\spring 26\sproj\P04-TradeUp\Prototype\backend\[39msrc\chatbot\chatbot.service.ts:455:13[90m)[39m
+    at ChatbotService.getChatResponse [90m(D:\spring 26\sproj\P04-TradeUp\Prototype\backend\[39msrc\chatbot\chatbot.service.ts:123:15[90m)[39m
+    at Object.<anonymous> [90m(D:\spring 26\sproj\P04-TradeUp\Prototype\backend\[39mtest\chatbot_tests.spec.ts:153:28[90m)[39m
+[31m[Nest] 17600  - [39m04/01/2026, 2:22:29 AM [31m  ERROR[39m [38;5;3m[ChatbotService] [39m[31mGemini API call failed:[39m
+[31m[Nest] 17600  - [39m04/01/2026, 2:22:29 AM [31m  ERROR[39m [38;5;3m[ChatbotService] [39mError: Gemini API error 503: Internal Server Error
+    at ChatbotService.callGemini [90m(D:\spring 26\sproj\P04-TradeUp\Prototype\backend\[39msrc\chatbot\chatbot.service.ts:455:13[90m)[39m
+    at ChatbotService.getChatResponse [90m(D:\spring 26\sproj\P04-TradeUp\Prototype\backend\[39msrc\chatbot\chatbot.service.ts:123:15[90m)[39m
+    at Object.<anonymous> [90m(D:\spring 26\sproj\P04-TradeUp\Prototype\backend\[39mtest\chatbot_tests.spec.ts:158:27[90m)[39m
+PASS test/chatbot_tests.spec.ts
+FAIL test/app.e2e-spec.ts
+  ● Test suite failed to run
+
+    Cannot find module './auth.service.js' from '../src/auth/auth.module.ts'
+
+    Require stack:
+      D:/spring 26/sproj/P04-TradeUp/Prototype/backend/src/auth/auth.module.ts
+      D:/spring 26/sproj/P04-TradeUp/Prototype/backend/src/app.module.ts
+      app.e2e-spec.ts
+
+    [0m [90m 2 |[39m [36mimport[39m { [33mJwtModule[39m } [36mfrom[39m [32m'@nestjs/jwt'[39m[33m;[39m
+     [90m 3 |[39m [36mimport[39m { [33mPassportModule[39m } [36mfrom[39m [32m'@nestjs/passport'[39m[33m;[39m
+    [31m[1m>[22m[39m[90m 4 |[39m [36mimport[39m { [33mAuthService[39m } [36mfrom[39m [32m'./auth.service.js'[39m[33m;[39m
+     [90m   |[39m [31m[1m^[22m[39m
+     [90m 5 |[39m [36mimport[39m { [33mAuthController[39m } [36mfrom[39m [32m'./auth.controller.js'[39m[33m;[39m
+     [90m 6 |[39m [36mimport[39m { [33mUsersModule[39m } [36mfrom[39m [32m'../users/users.module.js'[39m[33m;[39m
+     [90m 7 |[39m [36mimport[39m { [33mJwtStrategy[39m } [36mfrom[39m [32m'./jwt.strategy'[39m[33m;[39m[0m
+
+      at Resolver._throwModNotFoundError (../node_modules/jest-resolve/build/index.js:863:11)
+      at Object.<anonymous> (../src/auth/auth.module.ts:4:1)
+      at Object.<anonymous> (../src/app.module.ts:7:1)
+      at Object.<anonymous> (app.e2e-spec.ts:5:1)
+
+Test Suites: 1 failed, 1 passed, 2 total
+Tests:       5 passed, 5 total
+Snapshots:   0 total
+Time:        1.533 s
+Ran all test suites.

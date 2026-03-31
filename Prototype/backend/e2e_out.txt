@@ -1,0 +1,49 @@
+[31m[Nest] 33188  - [39m04/01/2026, 2:21:45 AM [31m  ERROR[39m [38;5;3m[ChatbotService] [39m[31mGemini API call failed:[39m
+[31m[Nest] 33188  - [39m04/01/2026, 2:21:45 AM [31m  ERROR[39m [38;5;3m[ChatbotService] [39mError: Gemini API error 503: Internal Server Error
+    at ChatbotService.callGemini [90m(D:\spring 26\sproj\P04-TradeUp\Prototype\backend\[39msrc\chatbot\chatbot.service.ts:455:13[90m)[39m
+    at ChatbotService.getChatResponse [90m(D:\spring 26\sproj\P04-TradeUp\Prototype\backend\[39msrc\chatbot\chatbot.service.ts:123:15[90m)[39m
+    at Object.<anonymous> [90m(D:\spring 26\sproj\P04-TradeUp\Prototype\backend\[39mtest\chatbot_tests.spec.ts:153:28[90m)[39m
+[31m[Nest] 33188  - [39m04/01/2026, 2:21:45 AM [31m  ERROR[39m [38;5;3m[ChatbotService] [39m[31mGemini API call failed:[39m
+[31m[Nest] 33188  - [39m04/01/2026, 2:21:45 AM [31m  ERROR[39m [38;5;3m[ChatbotService] [39mError: Gemini API error 503: Internal Server Error
+    at ChatbotService.callGemini [90m(D:\spring 26\sproj\P04-TradeUp\Prototype\backend\[39msrc\chatbot\chatbot.service.ts:455:13[90m)[39m
+    at ChatbotService.getChatResponse [90m(D:\spring 26\sproj\P04-TradeUp\Prototype\backend\[39msrc\chatbot\chatbot.service.ts:123:15[90m)[39m
+    at Object.<anonymous> [90m(D:\spring 26\sproj\P04-TradeUp\Prototype\backend\[39mtest\chatbot_tests.spec.ts:158:27[90m)[39m
+PASS test/chatbot_tests.spec.ts
+FAIL test/community-minimal.e2e-spec.ts
+  ● Test suite failed to run
+
+    Your test suite must contain at least one test.
+
+      at onResult (../node_modules/@jest/core/build/index.js:1057:18)
+      at ../node_modules/@jest/core/build/index.js:1127:165
+      at ../node_modules/emittery/index.js:363:13
+          at Array.map (<anonymous>)
+      at Emittery.emit (../node_modules/emittery/index.js:361:23)
+
+FAIL test/app.e2e-spec.ts
+  ● Test suite failed to run
+
+    Cannot find module './prisma.service.js' from '../src/prisma/prisma.module.ts'
+
+    Require stack:
+      D:/spring 26/sproj/P04-TradeUp/Prototype/backend/src/prisma/prisma.module.ts
+      D:/spring 26/sproj/P04-TradeUp/Prototype/backend/src/app.module.ts
+      app.e2e-spec.ts
+
+    [0m [90m 1 |[39m [36mimport[39m { [33mGlobal[39m[33m,[39m [33mModule[39m } [36mfrom[39m [32m'@nestjs/common'[39m[33m;[39m
+    [31m[1m>[22m[39m[90m 2 |[39m [36mimport[39m { [33mPrismaService[39m } [36mfrom[39m [32m'./prisma.service.js'[39m[33m;[39m
+     [90m   |[39m [31m[1m^[22m[39m
+     [90m 3 |[39m
+     [90m 4 |[39m [33m@[39m[33mGlobal[39m()
+     [90m 5 |[39m [33m@[39m[33mModule[39m({[0m
+
+      at Resolver._throwModNotFoundError (../node_modules/jest-resolve/build/index.js:863:11)
+      at Object.<anonymous> (../src/prisma/prisma.module.ts:2:1)
+      at Object.<anonymous> (../src/app.module.ts:5:1)
+      at Object.<anonymous> (app.e2e-spec.ts:5:1)
+
+Test Suites: 2 failed, 1 passed, 3 total
+Tests:       5 passed, 5 total
+Snapshots:   0 total
+Time:        1.294 s
+Ran all test suites.

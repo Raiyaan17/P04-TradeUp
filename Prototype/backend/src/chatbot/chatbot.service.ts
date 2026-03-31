@@ -112,10 +112,14 @@ export class ChatbotService implements OnModuleInit {
     const systemPrompt = this.buildSystemPrompt(contextSnapshot);
 
     // 5. Format history into Gemini multi-turn format
-    const conversationHistory = history.map((m) => ({
+    // Gemini requires: starts with 'user', strictly alternates user/model
+    let conversationHistory = history.map((m) => ({
       role: m.role === 'user' ? 'user' : 'model',
       parts: [{ text: m.content }],
     }));
+
+    // Sanitize: ensure history starts with 'user' and alternates properly
+    conversationHistory = this.sanitizeHistory(conversationHistory);
 
     // 6. Call Gemini — with fallback on failure
     let reply: string;
@@ -145,6 +149,39 @@ export class ChatbotService implements OnModuleInit {
     }
 
     return reply;
+  }
+
+  /**
+   * Sanitize conversation history for Gemini API.
+   * Gemini requires: first message must be 'user', roles must strictly alternate.
+   */
+  private sanitizeHistory(
+    history: { role: string; parts: { text: string }[] }[],
+  ): { role: string; parts: { text: string }[] }[] {
+    if (history.length === 0) return [];
+
+    const sanitized: { role: string; parts: { text: string }[] }[] = [];
+
+    for (const msg of history) {
+      const lastRole = sanitized.length > 0 ? sanitized[sanitized.length - 1].role : null;
+
+      // Skip if same role as previous (Gemini doesn't allow consecutive same-role)
+      if (msg.role === lastRole) continue;
+
+      sanitized.push(msg);
+    }
+
+    // Gemini requires first turn to be 'user' — strip leading 'model' turns
+    while (sanitized.length > 0 && sanitized[0].role !== 'user') {
+      sanitized.shift();
+    }
+
+    // Gemini requires last turn before new user message to be 'model' — strip trailing 'user'
+    while (sanitized.length > 0 && sanitized[sanitized.length - 1].role === 'user') {
+      sanitized.pop();
+    }
+
+    return sanitized;
   }
 
   /**
@@ -426,14 +463,16 @@ ${contextSnapshot}
     conversationHistory: { role: string; parts: { text: string }[] }[],
     newMessage: string,
   ): Promise<string> {
+    if (!this.apiKey) {
+      throw new Error('GEMINI_API_KEY is not configured');
+    }
+
     const url = `${this.apiUrl}?key=${this.apiKey}`;
 
     const body = {
-      // system_instruction keeps the system prompt separate from conversation
       system_instruction: {
         parts: [{ text: systemPrompt }],
       },
-      // contents = full conversation history + the new user message at the end
       contents: [
         ...conversationHistory,
         { role: 'user', parts: [{ text: newMessage }] },
@@ -444,21 +483,47 @@ ${contextSnapshot}
       },
     };
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
+    this.logger.log(`Calling Gemini API with ${conversationHistory.length} history messages`);
 
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Gemini API error ${response.status}: ${errText}`);
+    // Add timeout to prevent hanging
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        this.logger.error(`Gemini API returned ${response.status}: ${errText.substring(0, 500)}`);
+        throw new Error(`Gemini API error ${response.status}: ${errText.substring(0, 200)}`);
+      }
+
+      const data = await response.json();
+
+      // Check for blocked responses
+      if (data.candidates?.[0]?.finishReason === 'SAFETY') {
+        return "I can't provide a response to that particular request. Could you try rephrasing your question?";
+      }
+
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!text) {
+        this.logger.warn('Gemini returned empty response:', JSON.stringify(data).substring(0, 500));
+        return "I couldn't generate a response. Please try again.";
+      }
+
+      return text;
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        throw new Error('Gemini API request timed out after 15 seconds');
+      }
+      throw err;
+    } finally {
+      clearTimeout(timeout);
     }
-
-    const data = await response.json();
-    return (
-      data.candidates?.[0]?.content?.parts?.[0]?.text ||
-      "I couldn't generate a response. Please try again."
-    );
   }
 }

@@ -1,0 +1,58 @@
+[31m[Nest] 23104  - [39m04/01/2026, 2:23:00 AM [31m  ERROR[39m [38;5;3m[ChatbotService] [39m[31mGemini API call failed:[39m
+[31m[Nest] 23104  - [39m04/01/2026, 2:23:00 AM [31m  ERROR[39m [38;5;3m[ChatbotService] [39mError: Gemini API error 503: Internal Server Error
+    at ChatbotService.callGemini [90m(D:\spring 26\sproj\P04-TradeUp\Prototype\backend\[39msrc\chatbot\chatbot.service.ts:455:13[90m)[39m
+    at ChatbotService.getChatResponse [90m(D:\spring 26\sproj\P04-TradeUp\Prototype\backend\[39msrc\chatbot\chatbot.service.ts:123:15[90m)[39m
+    at Object.<anonymous> [90m(D:\spring 26\sproj\P04-TradeUp\Prototype\backend\[39mtest\chatbot_tests.spec.ts:153:28[90m)[39m
+[31m[Nest] 23104  - [39m04/01/2026, 2:23:00 AM [31m  ERROR[39m [38;5;3m[ChatbotService] [39m[31mGemini API call failed:[39m
+[31m[Nest] 23104  - [39m04/01/2026, 2:23:00 AM [31m  ERROR[39m [38;5;3m[ChatbotService] [39mError: Gemini API error 503: Internal Server Error
+    at ChatbotService.callGemini [90m(D:\spring 26\sproj\P04-TradeUp\Prototype\backend\[39msrc\chatbot\chatbot.service.ts:455:13[90m)[39m
+    at ChatbotService.getChatResponse [90m(D:\spring 26\sproj\P04-TradeUp\Prototype\backend\[39msrc\chatbot\chatbot.service.ts:123:15[90m)[39m
+    at Object.<anonymous> [90m(D:\spring 26\sproj\P04-TradeUp\Prototype\backend\[39mtest\chatbot_tests.spec.ts:158:27[90m)[39m
+PASS test/chatbot_tests.spec.ts
+[31m[Nest] 23104  - [39m04/01/2026, 2:23:03 AM [31m  ERROR[39m [38;5;3m[ChatbotService] [39m[31mFailed to load market baseline:[39m
+[31m[Nest] 23104  - [39m04/01/2026, 2:23:03 AM [31m  ERROR[39m [38;5;3m[ChatbotService] [39mPrismaClientKnownRequestError: 
+Invalid `this.prisma.tournament.findMany()` invocation in
+D:\spring 26\sproj\P04-TradeUp\Prototype\backend\src\chatbot\chatbot.service.ts:236:56
+
+  233 async trainBaselineModel() {
+  234   this.logger.log('Loading market baseline from simulation data...');
+  235   try {
+→ 236     const tournaments = await this.prisma.tournament.findMany(
+The table `public.Tournament` does not exist in the current database.
+    at ei.handleRequestError [90m(D:\spring 26\sproj\P04-TradeUp\Prototype\backend\[39mnode_modules\[4m@prisma\client[24m\src\runtime\RequestHandler.ts:228:13[90m)[39m
+    at ei.handleAndLogRequestError [90m(D:\spring 26\sproj\P04-TradeUp\Prototype\backend\[39mnode_modules\[4m@prisma\client[24m\src\runtime\RequestHandler.ts:174:12[90m)[39m
+    at ei.request [90m(D:\spring 26\sproj\P04-TradeUp\Prototype\backend\[39mnode_modules\[4m@prisma\client[24m\src\runtime\RequestHandler.ts:143:12[90m)[39m
+    at a [90m(D:\spring 26\sproj\P04-TradeUp\Prototype\backend\[39mnode_modules\[4m@prisma\client[24m\src\runtime\getPrismaClient.ts:833:24[90m)[39m
+    at ChatbotService.trainBaselineModel [90m(D:\spring 26\sproj\P04-TradeUp\Prototype\backend\[39msrc\chatbot\chatbot.service.ts:236:27[90m)[39m
+    at ChatbotService.onModuleInit [90m(D:\spring 26\sproj\P04-TradeUp\Prototype\backend\[39msrc\chatbot\chatbot.service.ts:35:5[90m)[39m
+    at async Promise.all (index 0)
+    at callModuleInitHook [90m(D:\spring 26\sproj\P04-TradeUp\Prototype\backend\[39mnode_modules\[4m@nestjs\core[24m\hooks\on-module-init.hook.js:43:5[90m)[39m
+    at Proxy.callInitHook [90m(D:\spring 26\sproj\P04-TradeUp\Prototype\backend\[39mnode_modules\[4m@nestjs\core[24m\nest-application-context.js:242:13[90m)[39m
+    at Proxy.init [90m(D:\spring 26\sproj\P04-TradeUp\Prototype\backend\[39mnode_modules\[4m@nestjs\core[24m\nest-application.js:103:9[90m)[39m
+    at Object.<anonymous> [90m(D:\spring 26\sproj\P04-TradeUp\Prototype\backend\[39mtest\app.e2e-spec.ts:16:5[90m)[39m {
+  code: [32m'P2021'[39m,
+  meta: {
+    modelName: [32m'Tournament'[39m,
+    table: [32m'public.Tournament'[39m
+  },
+  clientVersion: [32m'6.18.0'[39m
+}
+PASS test/app.e2e-spec.ts
+  ● Console
+
+    console.log
+      TournamentGateway Initialized
+
+      at TournamentGateway.afterInit (../src/ws/tournament.gateway.ts:24:13)
+          at ModulesContainer.forEach (<anonymous>)
+
+
+Test Suites: 2 passed, 2 total
+Tests:       6 passed, 6 total
+Snapshots:   0 total
+Time:        3.987 s
+Ran all test suites.
+Jest did not exit one second after the test run has completed.
+
+'This usually means that there are asynchronous operations that weren't stopped in your tests. Consider running Jest with `--detectOpenHandles` to troubleshoot this issue.
+Terminate batch job (Y/N)? 
