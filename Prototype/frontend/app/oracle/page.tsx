@@ -74,13 +74,14 @@ export default function OraclePage() {
   }, [user]);
 
   const checkTournament = async () => {
+    if (!user) return;
     try {
       setLoading(true);
       // Try to fetch tournament
-      const res = await http.get("/oracle/tournament/active", { noAuth: true });
-      if (res && res.data) {
-        setTournament(res.data);
-        joinTournament(res.data.id);
+      const res: any = await http.get("/oracle/tournament/active");
+      if (res && res.id) {
+        setTournament(res);
+        joinTournament(res.id);
       }
     } catch (e) {
       console.log("No active tournament");
@@ -92,7 +93,7 @@ export default function OraclePage() {
   const startTournament = async () => {
     try {
       setLoading(true);
-      const res = await http.post("/oracle/tournament/start", { startingCash });
+      const res: any = await http.post("/oracle/tournament/start", { startingCash });
       setTournament(res);
       joinTournament(res.id);
     } catch {
@@ -117,7 +118,7 @@ export default function OraclePage() {
     // Assuming backend is same domain but on the default port or from environment
     const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "http://localhost:3001";
     
-    const socket = io.connect(\`\${WS_URL}/tournament\`, {
+    const socket = io.connect(`${WS_URL}/tournament`, {
       withCredentials: true,
     });
 
@@ -207,14 +208,25 @@ export default function OraclePage() {
 
   const handleTrade = async (action: "buy" | "sell") => {
     try {
-      await http.post(\`/oracle/tournament/\${action}\`, {
+      await http.post(`/oracle/tournament/${action}`, {
         tournamentId: tournament.id,
         stockSymbol: selectedStock,
         quantity: tradeQuantity,
       });
-      toast.success(\`Successfully \${action === 'buy' ? 'bought' : 'sold'} \${tradeQuantity} \${selectedStock}\`);
+      toast.success(`Successfully ${action === 'buy' ? 'bought' : 'sold'} ${tradeQuantity} ${selectedStock}`);
     } catch (e: any) {
       toast.error(e.message || "Trade failed");
+    }
+  };
+
+  const handleEndTournament = async () => {
+    try {
+      await http.post("/oracle/tournament/end", { tournamentId: tournament.id });
+      toast.success("Tournament Ended");
+      setTournament(null);
+      window.location.reload();
+    } catch (e: any) {
+      toast.error(e.message || "Failed to end tournament");
     }
   };
 
@@ -276,12 +288,16 @@ export default function OraclePage() {
                 </CardTitle>
                 <CardDescription>Minute {tickMinute} / 60</CardDescription>
               </div>
-              <div className="flex gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 {STOCKS.map((s, idx) => (
                    <Badge key={s} variant="outline" style={{ borderColor: COLORS[idx], color: COLORS[idx] }}>
                      {s} {currentPrices[s] ? formatDecimal(currentPrices[s]) : "---"}
                    </Badge>
                 ))}
+                <div className="w-px h-6 bg-border mx-2" />
+                <Button variant="destructive" size="sm" onClick={handleEndTournament}>
+                  End Tournament
+                </Button>
               </div>
             </CardHeader>
             <CardContent>
@@ -294,8 +310,8 @@ export default function OraclePage() {
               <CardTitle>Trading Terminal</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex flex-wrap gap-4 items-end">
-                <div className="flex-1 space-y-2">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                <div className="space-y-2">
                   <label className="text-sm font-semibold">Select Asset</label>
                   <select 
                     value={selectedStock}
@@ -307,7 +323,7 @@ export default function OraclePage() {
                     ))}
                   </select>
                 </div>
-                <div className="flex-1 space-y-2">
+                <div className="space-y-2">
                   <label className="text-sm font-semibold">Quantity</label>
                   <input 
                     type="number" 
@@ -316,9 +332,9 @@ export default function OraclePage() {
                     className="w-full bg-background border px-3 py-2 rounded outline-none"
                   />
                 </div>
-                <div className="flex-1 flex gap-2">
-                  <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => handleTrade("buy")}>BUY</Button>
-                  <Button className="w-full bg-red-600 hover:bg-red-700 text-white" onClick={() => handleTrade("sell")}>SELL</Button>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Button className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => handleTrade("buy")}>BUY</Button>
+                  <Button className="flex-1 bg-red-600 hover:bg-red-700 text-white" onClick={() => handleTrade("sell")}>SELL</Button>
                 </div>
               </div>
             </CardContent>

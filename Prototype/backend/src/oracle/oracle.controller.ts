@@ -57,4 +57,12 @@ export class OracleController {
       quantity,
     );
   }
+
+  @Post('end')
+  async endTournament(
+    @Req() req: any,
+    @Body('tournamentId') tournamentId: string,
+  ) {
+    return this.oracleService.endTournament(req.user.userId, tournamentId);
+  }
 }

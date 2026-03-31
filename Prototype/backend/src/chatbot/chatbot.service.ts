@@ -233,23 +233,24 @@ export class ChatbotService implements OnModuleInit {
   async trainBaselineModel() {
     this.logger.log('Loading market baseline from simulation data...');
     try {
-      const scenarios = await this.prisma.simulationScenario.findMany({
+      const tournaments = await this.prisma.tournament.findMany({
         take: 15,
         orderBy: { createdAt: 'desc' },
       });
 
-      if (scenarios.length === 0) {
+      if (tournaments.length === 0) {
         this.marketBaseline = 'No historical simulation data available.';
         return;
       }
 
-      const summaries = scenarios.map((s) => {
+      const summaries = tournaments.map((s) => {
         const trajectory = s.trajectoryJson as any[];
-        const startPrice = trajectory[0]?.cumulativePrice || s.basePrice;
-        const endPrice = trajectory[trajectory.length - 1]?.cumulativePrice || s.basePrice;
-        const change = ((endPrice - startPrice) / startPrice) * 100;
-        return `• ${s.stockSymbol} (${s.presetType}): ${s.basePrice} → ${endPrice.toFixed(2)} (${change.toFixed(2)}%)`;
-      });
+        if (!trajectory || trajectory.length === 0) return '';
+        const startPSX = trajectory[0]?.PSX || 62000;
+        const endPSX = trajectory[trajectory.length - 1]?.PSX || 62000;
+        const change = ((endPSX - startPSX) / startPSX) * 100;
+        return `• PSX Tournament trend: ${startPSX.toFixed(2)} → ${endPSX.toFixed(2)} (${change.toFixed(2)}%)`;
+      }).filter(s => s !== '');
 
       this.marketBaseline = `SIMULATION HISTORY (PSX Patterns):\n${summaries.join('\n')}`;
       this.logger.log('Market baseline loaded.');

@@ -80,6 +80,25 @@ export class OracleService implements OnModuleDestroy {
     return tournament;
   }
 
+  async endTournament(userId: number, tournamentId: string) {
+    const tournament = await this.prisma.tournament.findUnique({ where: { id: tournamentId } });
+    if (!tournament || tournament.status !== TournamentStatus.ACTIVE) {
+      throw new NotFoundException('Tournament not active');
+    }
+
+    this.logger.log(`Manual tournament end requested by user ${userId}`);
+
+    const updated = await this.prisma.tournament.update({
+      where: { id: tournamentId },
+      data: { status: TournamentStatus.COMPLETED, endedAt: new Date() },
+    });
+
+    // We halt the global engine. In a multi-lobby system, we'd halt specific engine.
+    this.stopTickEngine();
+
+    return updated;
+  }
+
   async joinTournament(userId: number, tournamentId: string) {
     const tournament = await this.prisma.tournament.findUnique({ where: { id: tournamentId } });
     if (!tournament || tournament.status !== TournamentStatus.ACTIVE) {
