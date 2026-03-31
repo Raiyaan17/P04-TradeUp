@@ -30,6 +30,7 @@ model User {
   blockedByUsers      UserBlock[]     @relation("BlockedUser")
   savedPosts          SavedPost[]
   chatSessions        ChatSession[]
+  tournamentParticipants TournamentParticipant[]
 }
 
 model Friendship {
@@ -113,25 +114,64 @@ enum FriendshipStatus {
   DECLINED
 }
 
-enum PresetType {
-  STEADY_CLIMB
-  FLASH_CRASH
-  IMF_ROLLERCOASTER
-  REALISTIC_OUTLOOK
+enum TournamentStatus {
+  PENDING
+  ACTIVE
+  COMPLETED
 }
 
-model SimulationScenario {
-  id             String     @id @default(uuid())
-  presetType     PresetType
-  stockSymbol    String
-  createdAt      DateTime   @default(now())
-  expiresAt      DateTime?
-  trajectoryJson Json
-  newsJson       Json
-  basePrice      Float
+model Tournament {
+  id               String                  @id @default(uuid())
+  status           TournamentStatus        @default(PENDING)
+  startingCash     Decimal
+  createdAt        DateTime                @default(now())
+  startedAt        DateTime?
+  endedAt          DateTime?
+  trajectoryJson   Json
+  newsJson         Json
+  participants     TournamentParticipant[]
 
-  @@index([presetType, stockSymbol])
-  @@index([expiresAt])
+  @@index([status])
+}
+
+model TournamentParticipant {
+  id             Int                     @id @default(autoincrement())
+  tournamentId   String
+  userId         Int
+  currentBalance Decimal
+  currentScore   Decimal                 @default(0)
+  joinedAt       DateTime                @default(now())
+  tournament     Tournament              @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  user           User                    @relation(fields: [userId], references: [id])
+  portfolio      TournamentPortfolio[]
+  transactions   TournamentTransaction[]
+
+  @@unique([tournamentId, userId])
+}
+
+model TournamentPortfolio {
+  id             Int                    @id @default(autoincrement())
+  participantId  Int
+  stockSymbol    String
+  quantity       Int                    @default(0)
+  avgPrice       Decimal                @default(0)
+  participant    TournamentParticipant  @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@unique([participantId, stockSymbol])
+}
+
+model TournamentTransaction {
+  id             Int                    @id @default(autoincrement())
+  participantId  Int
+  stockSymbol    String
+  type           TransactionType
+  quantity       Int
+  price          Decimal
+  total          Decimal
+  createdAt      DateTime               @default(now())
+  participant    TournamentParticipant  @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@index([participantId])
 }
 
 // ─── Community Models ───────────────────────────────────────────────

@@ -1,229 +1,295 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException, OnModuleDestroy } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { OracleAgentService } from './oracle-agent.service';
-import { PresetType, SimulationScenario } from '@prisma/client';
+import { OracleAgentService, TournamentDataPoint, TournamentNewsItem } from './oracle-agent.service';
+import { TournamentStatus, TransactionType } from '@prisma/client';
 
-interface TrajectoryPoint {
-  day: number;
-  priceModifier: number;
-  cumulativePrice: number;
+export interface LeaderboardEntry {
+  userId: number;
+  username: string;
+  pnl: number;
+  rank: number;
 }
-
-interface NewsItem {
-  day: number;
-  headline: string;
-  sentiment: 'positive' | 'negative' | 'neutral';
-}
-
-interface SimulationData {
-  id: string;
-  presetType: PresetType;
-  stockSymbol: string;
-  trajectory: TrajectoryPoint[];
-  news: NewsItem[];
-  basePrice: number;
-  createdAt: Date;
-  expiresAt: Date | null;
-}
-
-interface AnalysisResult {
-  summary: string;
-  strengths: string[];
-  weaknesses: string[];
-  recommendations: string[];
-  score: number;
-}
-
-const VALID_STOCK_SYMBOLS = ['HBL', 'UBL', 'MCB', 'HUBC', 'FFC'];
-const PRO_MODE_EXPIRY_HOURS = 24;
 
 @Injectable()
-export class OracleService {
+export class OracleService implements OnModuleDestroy {
   private readonly logger = new Logger(OracleService.name);
+  
+  // In-memory state for the active tournament
+  private tickInterval: NodeJS.Timeout | null = null;
+  private currentTickIndex = 0;
+  private trajectoryPoints: TournamentDataPoint[] = [];
+  private newsItems: TournamentNewsItem[] = [];
+  
+  // Ideally, use an EventEmitter or emit via a dedicated Gateway.
+  // We'll expose getters for WebSockets to pull, or a callback mechanism.
+  private tickCallback?: (tickData: TournamentDataPoint, news: TournamentNewsItem[], leaderboard: LeaderboardEntry[]) => void;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly agentService: OracleAgentService,
   ) {}
 
-  async getScenario(
-    presetType: PresetType,
-    stockSymbol: string,
-  ): Promise<SimulationData> {
-    if (!VALID_STOCK_SYMBOLS.includes(stockSymbol)) {
-      throw new NotFoundException(
-        `Stock symbol ${stockSymbol} is not available for simulation`,
-      );
-    }
-
-    const cachedScenario = await this.findValidScenario(
-      presetType,
-      stockSymbol,
-    );
-    if (cachedScenario) {
-      this.logger.log(
-        `Returning cached scenario for ${stockSymbol} (${presetType})`,
-      );
-      return this.mapToSimulationData(cachedScenario);
-    }
-
-    this.logger.log(
-      `Generating new scenario for ${stockSymbol} (${presetType})`,
-    );
-    return this.generateAndCacheScenario(presetType, stockSymbol);
+  onModuleDestroy() {
+    this.stopTickEngine();
   }
 
-  async analyzePerformance(
-    scenarioId: string,
-    decisions: Array<{
-      day: number;
-      action: 'buy' | 'sell' | 'hold';
-      quantity: number;
-      price: number;
-    }>,
-    finalPortfolio: { cash: number; shares: number; currentPrice: number },
-  ): Promise<AnalysisResult> {
-    const scenario = await this.prisma.simulationScenario.findUnique({
-      where: { id: scenarioId },
-    });
+  setTickCallback(cb: (tick: TournamentDataPoint, news: TournamentNewsItem[], leaderboard: LeaderboardEntry[]) => void) {
+    this.tickCallback = cb;
+  }
 
-    if (!scenario) {
-      throw new NotFoundException(`Scenario with ID ${scenarioId} not found`);
-    }
-
-    const trajectory = scenario.trajectoryJson as unknown as TrajectoryPoint[];
-    const news = scenario.newsJson as unknown as NewsItem[];
-
-    return this.agentService.analyzePerformance(decisions, finalPortfolio, {
-      trajectory,
-      news,
-      basePrice: scenario.basePrice,
+  async getActiveTournament() {
+    return this.prisma.tournament.findFirst({
+      where: { status: TournamentStatus.ACTIVE },
+      include: {
+        participants: {
+          include: { user: true, portfolio: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
     });
   }
 
-  getAvailablePresets(): Array<{
-    type: PresetType;
-    name: string;
-    description: string;
-    isPro: boolean;
-  }> {
-    return [
-      {
-        type: PresetType.STEADY_CLIMB,
-        name: 'The Steady Climb',
-        description:
-          'A gradual upward trend with 15-25% growth over 30 days. Perfect for beginners.',
-        isPro: false,
-      },
-      {
-        type: PresetType.FLASH_CRASH,
-        name: 'The Flash Crash',
-        description:
-          'Experience a sudden 40-60% drop followed by recovery. Test your crisis management.',
-        isPro: false,
-      },
-      {
-        type: PresetType.IMF_ROLLERCOASTER,
-        name: 'The IMF Rollercoaster',
-        description:
-          'High volatility with sharp ups and downs (-20% to +30%). For thrill-seekers.',
-        isPro: false,
-      },
-      {
-        type: PresetType.REALISTIC_OUTLOOK,
-        name: 'The 30-Day Oracle',
-        description:
-          'AI-powered realistic scenario based on current market news and conditions.',
-        isPro: true,
-      },
-    ];
-  }
+  async startTournament(userId: number, startingCash: number) {
+    const active = await this.getActiveTournament();
+    if (active) throw new BadRequestException('A tournament is already active.');
 
-  getAvailableSymbols(): string[] {
-    return VALID_STOCK_SYMBOLS;
-  }
+    this.logger.log(`Generating new 1-hour tournament data...`);
+    // In a real app, we check if there's a cached one < 24h old.
+    // For now, always generate to ensure fresh AI data.
+    const generatedData = await this.agentService.generateTournamentData();
 
-  private async findValidScenario(
-    presetType: PresetType,
-    stockSymbol: string,
-  ): Promise<SimulationScenario | null> {
-    const scenario = await this.prisma.simulationScenario.findFirst({
-      where: {
-        presetType,
-        stockSymbol,
-        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
-
-    return scenario;
-  }
-
-  private async generateAndCacheScenario(
-    presetType: PresetType,
-    stockSymbol: string,
-  ): Promise<SimulationData> {
-    const basePrice = this.getStockBasePrice(stockSymbol);
-
-    const newsContext =
-      presetType === PresetType.REALISTIC_OUTLOOK
-        ? this.fetchNewsContext(stockSymbol)
-        : undefined;
-
-    const generatedData = await this.agentService.generateScenario(
-      presetType,
-      stockSymbol,
-      basePrice,
-      newsContext,
-    );
-
-    const expiresAt =
-      presetType === PresetType.REALISTIC_OUTLOOK
-        ? new Date(Date.now() + PRO_MODE_EXPIRY_HOURS * 60 * 60 * 1000)
-        : null;
-
-    const savedScenario = await this.prisma.simulationScenario.create({
+    const tournament = await this.prisma.tournament.create({
       data: {
-        presetType,
-        stockSymbol,
-        trajectoryJson: generatedData.trajectory as unknown as never,
-        newsJson: generatedData.news as unknown as never,
-        basePrice,
-        expiresAt,
+        status: TournamentStatus.ACTIVE,
+        startingCash,
+        startedAt: new Date(),
+        trajectoryJson: generatedData.trajectory as any,
+        newsJson: generatedData.news as any,
       },
     });
 
-    return this.mapToSimulationData(savedScenario);
+    this.trajectoryPoints = generatedData.trajectory;
+    this.newsItems = generatedData.news;
+    this.currentTickIndex = 0;
+
+    // Join the first player
+    await this.joinTournament(userId, tournament.id);
+
+    this.startTickEngine(tournament.id);
+
+    return tournament;
   }
 
-  private getStockBasePrice(stockSymbol: string): number {
-    const stockPrices: Record<string, number> = {
-      HBL: 125.5,
-      UBL: 142.3,
-      MCB: 178.9,
-      HUBC: 89.75,
-      FFC: 95.4,
-    };
+  async joinTournament(userId: number, tournamentId: string) {
+    const tournament = await this.prisma.tournament.findUnique({ where: { id: tournamentId } });
+    if (!tournament || tournament.status !== TournamentStatus.ACTIVE) {
+      throw new NotFoundException('Tournament not found or not active');
+    }
 
-    return stockPrices[stockSymbol] || 100.0;
+    const existing = await this.prisma.tournamentParticipant.findUnique({
+      where: { tournamentId_userId: { tournamentId, userId } },
+    });
+    if (existing) return existing;
+
+    return this.prisma.tournamentParticipant.create({
+      data: {
+        tournamentId,
+        userId,
+        currentBalance: tournament.startingCash,
+      },
+    });
   }
 
-  private fetchNewsContext(stockSymbol: string): string {
-    return `Recent market news for ${stockSymbol}: Economic indicators show mixed signals with inflation concerns and foreign investment flows.`;
+  async buyStock(userId: number, tournamentId: string, stockSymbol: string, quantity: number) {
+    const participant = await this.prisma.tournamentParticipant.findUnique({
+      where: { tournamentId_userId: { tournamentId, userId } },
+      include: { portfolio: true },
+    });
+    if (!participant) throw new NotFoundException('Not in tournament');
+
+    const currentPrice = this.getCurrentStockPrice(stockSymbol);
+    const totalCost = currentPrice * quantity;
+
+    if (Number(participant.currentBalance) < totalCost) {
+      throw new BadRequestException('Insufficient tournament balance');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      // Deduct balance
+      await tx.tournamentParticipant.update({
+        where: { id: participant.id },
+        data: { currentBalance: Number(participant.currentBalance) - totalCost },
+      });
+
+      // Update portfolio
+      const holding = await tx.tournamentPortfolio.findUnique({
+        where: { participantId_stockSymbol: { participantId: participant.id, stockSymbol } },
+      });
+
+      if (holding) {
+        // Average up price calculation
+        const oldTotal = Number(holding.avgPrice) * holding.quantity;
+        const newTotal = oldTotal + totalCost;
+        const newQuantity = holding.quantity + quantity;
+        const newAvg = newTotal / newQuantity;
+
+        await tx.tournamentPortfolio.update({
+          where: { id: holding.id },
+          data: { quantity: newQuantity, avgPrice: newAvg },
+        });
+      } else {
+        await tx.tournamentPortfolio.create({
+          data: { participantId: participant.id, stockSymbol, quantity, avgPrice: currentPrice },
+        });
+      }
+
+      // Log transaction
+      await tx.tournamentTransaction.create({
+        data: {
+          participantId: participant.id,
+          stockSymbol,
+          type: TransactionType.BUY,
+          quantity,
+          price: currentPrice,
+          total: totalCost,
+        },
+      });
+    });
+
+    return this.recalculateScore(participant.id);
   }
 
-  private mapToSimulationData(scenario: SimulationScenario): SimulationData {
-    return {
-      id: scenario.id,
-      presetType: scenario.presetType,
-      stockSymbol: scenario.stockSymbol,
-      trajectory: scenario.trajectoryJson as unknown as TrajectoryPoint[],
-      news: scenario.newsJson as unknown as NewsItem[],
-      basePrice: scenario.basePrice,
-      createdAt: scenario.createdAt,
-      expiresAt: scenario.expiresAt,
-    };
+  async sellStock(userId: number, tournamentId: string, stockSymbol: string, quantity: number) {
+    const participant = await this.prisma.tournamentParticipant.findUnique({
+      where: { tournamentId_userId: { tournamentId, userId } },
+    });
+    if (!participant) throw new NotFoundException('Not in tournament');
+
+    const holding = await this.prisma.tournamentPortfolio.findUnique({
+      where: { participantId_stockSymbol: { participantId: participant.id, stockSymbol } },
+    });
+
+    if (!holding || holding.quantity < quantity) {
+      throw new BadRequestException('Insufficient stock quantity to sell');
+    }
+
+    const currentPrice = this.getCurrentStockPrice(stockSymbol);
+    const totalRevenue = currentPrice * quantity;
+
+    await this.prisma.$transaction(async (tx) => {
+      // Add balance
+      await tx.tournamentParticipant.update({
+        where: { id: participant.id },
+        data: { currentBalance: Number(participant.currentBalance) + totalRevenue },
+      });
+
+      const newQuantity = holding.quantity - quantity;
+      if (newQuantity === 0) {
+        await tx.tournamentPortfolio.delete({ where: { id: holding.id } });
+      } else {
+        await tx.tournamentPortfolio.update({
+          where: { id: holding.id },
+          data: { quantity: newQuantity },
+        });
+      }
+
+      await tx.tournamentTransaction.create({
+        data: {
+          participantId: participant.id,
+          stockSymbol,
+          type: TransactionType.SELL,
+          quantity,
+          price: currentPrice,
+          total: totalRevenue,
+        },
+      });
+    });
+
+    return this.recalculateScore(participant.id);
+  }
+
+  private getCurrentStockPrice(symbol: string): number {
+    const currentTick = this.trajectoryPoints[this.currentTickIndex];
+    if (!currentTick) throw new BadRequestException('Tournament over');
+    return currentTick[symbol as keyof TournamentDataPoint] as number;
+  }
+
+  private async recalculateScore(participantId: number) {
+    const participant = await this.prisma.tournamentParticipant.findUnique({
+      where: { id: participantId },
+      include: { portfolio: true, tournament: true },
+    });
+    if (!participant) return;
+
+    let portfolioValue = 0;
+    for (const holding of participant.portfolio) {
+      const price = this.getCurrentStockPrice(holding.stockSymbol);
+      portfolioValue += price * holding.quantity;
+    }
+
+    const totalAssets = Number(participant.currentBalance) + portfolioValue;
+    const pnl = totalAssets - Number(participant.tournament.startingCash);
+
+    await this.prisma.tournamentParticipant.update({
+      where: { id: participant.id },
+      data: { currentScore: pnl },
+    });
+  }
+
+  private startTickEngine(tournamentId: string) {
+    this.stopTickEngine();
+
+    // Broadcast a new tick every 5 seconds
+    this.tickInterval = setInterval(async () => {
+      if (this.currentTickIndex >= this.trajectoryPoints.length) {
+        this.stopTickEngine();
+        await this.prisma.tournament.update({
+          where: { id: tournamentId },
+          data: { status: TournamentStatus.COMPLETED, endedAt: new Date() },
+        });
+        return;
+      }
+
+      const tick = this.trajectoryPoints[this.currentTickIndex];
+      const tickNews = this.newsItems.filter(n => n.minute === tick.minute);
+
+      // Recalculate everyone's score
+      const participants = await this.prisma.tournamentParticipant.findMany({
+        where: { tournamentId },
+        include: { user: true },
+      });
+
+      for (const p of participants) {
+        await this.recalculateScore(p.id);
+      }
+
+      // Build leaderboard
+      const updatedParticipants = await this.prisma.tournamentParticipant.findMany({
+        where: { tournamentId },
+        include: { user: true },
+        orderBy: { currentScore: 'desc' },
+      });
+
+      const leaderboard: LeaderboardEntry[] = updatedParticipants.map((p, index) => ({
+        userId: p.userId,
+        username: p.user.username,
+        pnl: Number(p.currentScore),
+        rank: index + 1,
+      }));
+
+      // Fire callback to alert the Gateway
+      if (this.tickCallback) {
+        this.tickCallback(tick, tickNews, leaderboard);
+      }
+
+      this.currentTickIndex++;
+    }, 5000);
+  }
+
+  private stopTickEngine() {
+    if (this.tickInterval) {
+      clearInterval(this.tickInterval);
+      this.tickInterval = null;
+    }
   }
 }
