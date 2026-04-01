@@ -8,29 +8,29 @@ datasource db {
 }
 
 model User {
-  id                  Int             @id @default(autoincrement())
-  email               String          @unique
-  username            String          @unique
-  passwordHash        String
-  role                Role            @default(TRADER)
-  gender              Gender?
-  createdAt           DateTime        @default(now())
-  balance             Decimal         @default(-1)
-  name                String?
-  profileImageUrl     String?
-  portfolio           Portfolio[]
-  transactions        Transaction[]
-  watchlist           WatchlistItem[]
-  sentFriendships     Friendship[]    @relation("SentFriendships")
-  receivedFriendships Friendship[]    @relation("ReceivedFriendships")
-  posts               Post[]
-  comments            Comment[]
-  reactions           Reaction[]
-  blockedUsers        UserBlock[]     @relation("BlockedByUser")
-  blockedByUsers      UserBlock[]     @relation("BlockedUser")
-  savedPosts          SavedPost[]
-  chatSessions        ChatSession[]
+  id                     Int                     @id @default(autoincrement())
+  email                  String                  @unique
+  passwordHash           String
+  role                   Role                    @default(TRADER)
+  createdAt              DateTime                @default(now())
+  name                   String?
+  profileImageUrl        String?
+  balance                Decimal                 @default(-1)
+  gender                 Gender?
+  username               String                  @unique
+  chatSessions           ChatSession[]
+  comments               Comment[]
+  receivedFriendships    Friendship[]            @relation("ReceivedFriendships")
+  sentFriendships        Friendship[]            @relation("SentFriendships")
+  portfolio              Portfolio[]
+  posts                  Post[]
+  reactions              Reaction[]
+  savedPosts             SavedPost[]
   tournamentParticipants TournamentParticipant[]
+  transactions           Transaction[]
+  blockedByUsers         UserBlock[]             @relation("BlockedUser")
+  blockedUsers           UserBlock[]             @relation("BlockedByUser")
+  watchlist              WatchlistItem[]
 }
 
 model Friendship {
@@ -39,8 +39,8 @@ model Friendship {
   receiverId Int
   status     FriendshipStatus @default(PENDING)
   createdAt  DateTime         @default(now())
-  sender     User             @relation("SentFriendships", fields: [senderId], references: [id])
   receiver   User             @relation("ReceivedFriendships", fields: [receiverId], references: [id])
+  sender     User             @relation("SentFriendships", fields: [senderId], references: [id])
 
   @@unique([senderId, receiverId])
 }
@@ -93,6 +93,157 @@ model Transaction {
   user      User            @relation(fields: [userId], references: [id])
 }
 
+model Tournament {
+  id             String                  @id @default(uuid())
+  status         TournamentStatus        @default(PENDING)
+  startingCash   Decimal
+  createdAt      DateTime                @default(now())
+  startedAt      DateTime?
+  endedAt        DateTime?
+  trajectoryJson Json
+  newsJson       Json
+  participants   TournamentParticipant[]
+
+  @@index([status])
+}
+
+model TournamentParticipant {
+  id             Int                     @id @default(autoincrement())
+  tournamentId   String
+  userId         Int
+  currentBalance Decimal
+  currentScore   Decimal                 @default(0)
+  joinedAt       DateTime                @default(now())
+  tournament     Tournament              @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  user           User                    @relation(fields: [userId], references: [id])
+  portfolio      TournamentPortfolio[]
+  transactions   TournamentTransaction[]
+
+  @@unique([tournamentId, userId])
+}
+
+model TournamentPortfolio {
+  id            Int                   @id @default(autoincrement())
+  participantId Int
+  stockSymbol   String
+  quantity      Int                   @default(0)
+  avgPrice      Decimal               @default(0)
+  participant   TournamentParticipant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@unique([participantId, stockSymbol])
+}
+
+model TournamentTransaction {
+  id            Int                   @id @default(autoincrement())
+  participantId Int
+  stockSymbol   String
+  type          TransactionType
+  quantity      Int
+  price         Decimal
+  total         Decimal
+  createdAt     DateTime              @default(now())
+  participant   TournamentParticipant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@index([participantId])
+}
+
+model Post {
+  id        Int         @id @default(autoincrement())
+  authorId  Int
+  title     String
+  content   String
+  tag       PostTag     @default(GENERAL)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  imageUrl  String?
+  comments  Comment[]
+  author    User        @relation(fields: [authorId], references: [id])
+  reactions Reaction[]
+  savedBy   SavedPost[]
+
+  @@index([authorId])
+  @@index([createdAt])
+}
+
+model Comment {
+  id        Int       @id @default(autoincrement())
+  postId    Int
+  authorId  Int
+  parentId  Int?
+  content   String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  imageUrl  String?
+  author    User      @relation(fields: [authorId], references: [id])
+  parent    Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   Comment[] @relation("CommentReplies")
+  post      Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@index([authorId])
+  @@index([parentId])
+}
+
+model Reaction {
+  id        Int          @id @default(autoincrement())
+  postId    Int
+  userId    Int
+  type      ReactionType
+  createdAt DateTime     @default(now())
+  post      Post         @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User         @relation(fields: [userId], references: [id])
+
+  @@unique([postId, userId])
+  @@index([postId])
+}
+
+model UserBlock {
+  id        Int      @id @default(autoincrement())
+  blockerId Int
+  blockedId Int
+  createdAt DateTime @default(now())
+  blocked   User     @relation("BlockedUser", fields: [blockedId], references: [id])
+  blocker   User     @relation("BlockedByUser", fields: [blockerId], references: [id])
+
+  @@unique([blockerId, blockedId])
+  @@index([blockerId])
+}
+
+model SavedPost {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  postId    Int
+  createdAt DateTime @default(now())
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+  @@index([userId])
+  @@index([postId])
+}
+
+model ChatSession {
+  id           Int           @id @default(autoincrement())
+  userId       Int
+  createdAt    DateTime      @default(now())
+  lastActiveAt DateTime      @default(now())
+  messages     ChatMessage[]
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model ChatMessage {
+  id        Int         @id @default(autoincrement())
+  sessionId Int
+  role      String
+  content   String
+  createdAt DateTime    @default(now())
+  session   ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+}
+
 enum Role {
   TRADER
   ADMIN
@@ -120,137 +271,6 @@ enum TournamentStatus {
   COMPLETED
 }
 
-model Tournament {
-  id               String                  @id @default(uuid())
-  status           TournamentStatus        @default(PENDING)
-  startingCash     Decimal
-  createdAt        DateTime                @default(now())
-  startedAt        DateTime?
-  endedAt          DateTime?
-  trajectoryJson   Json
-  newsJson         Json
-  participants     TournamentParticipant[]
-
-  @@index([status])
-}
-
-model TournamentParticipant {
-  id             Int                     @id @default(autoincrement())
-  tournamentId   String
-  userId         Int
-  currentBalance Decimal
-  currentScore   Decimal                 @default(0)
-  joinedAt       DateTime                @default(now())
-  tournament     Tournament              @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
-  user           User                    @relation(fields: [userId], references: [id])
-  portfolio      TournamentPortfolio[]
-  transactions   TournamentTransaction[]
-
-  @@unique([tournamentId, userId])
-}
-
-model TournamentPortfolio {
-  id             Int                    @id @default(autoincrement())
-  participantId  Int
-  stockSymbol    String
-  quantity       Int                    @default(0)
-  avgPrice       Decimal                @default(0)
-  participant    TournamentParticipant  @relation(fields: [participantId], references: [id], onDelete: Cascade)
-
-  @@unique([participantId, stockSymbol])
-}
-
-model TournamentTransaction {
-  id             Int                    @id @default(autoincrement())
-  participantId  Int
-  stockSymbol    String
-  type           TransactionType
-  quantity       Int
-  price          Decimal
-  total          Decimal
-  createdAt      DateTime               @default(now())
-  participant    TournamentParticipant  @relation(fields: [participantId], references: [id], onDelete: Cascade)
-
-  @@index([participantId])
-}
-
-// ─── Community Models ───────────────────────────────────────────────
-
-model Post {
-  id        Int        @id @default(autoincrement())
-  authorId  Int
-  title     String
-  content   String
-  imageUrl  String?
-  tag       PostTag    @default(GENERAL)
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-  author    User       @relation(fields: [authorId], references: [id])
-  comments  Comment[]
-  reactions Reaction[]
-  savedBy   SavedPost[]
-
-  @@index([authorId])
-  @@index([createdAt])
-}
-
-model Comment {
-  id        Int       @id @default(autoincrement())
-  postId    Int
-  authorId  Int
-  parentId  Int?
-  content   String
-  imageUrl  String?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  post      Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
-  author    User      @relation(fields: [authorId], references: [id])
-  parent    Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
-  replies   Comment[] @relation("CommentReplies")
-
-  @@index([postId])
-  @@index([authorId])
-  @@index([parentId])
-}
-
-model Reaction {
-  id        Int          @id @default(autoincrement())
-  postId    Int
-  userId    Int
-  type      ReactionType
-  createdAt DateTime     @default(now())
-  post      Post         @relation(fields: [postId], references: [id], onDelete: Cascade)
-  user      User         @relation(fields: [userId], references: [id])
-
-  @@unique([postId, userId])
-  @@index([postId])
-}
-
-model UserBlock {
-  id        Int       @id @default(autoincrement())
-  blockerId Int
-  blockedId Int
-  createdAt DateTime  @default(now())
-  blocker   User      @relation("BlockedByUser", fields: [blockerId], references: [id])
-  blocked   User      @relation("BlockedUser", fields: [blockedId], references: [id])
-
-  @@unique([blockerId, blockedId])
-  @@index([blockerId])
-}
-
-model SavedPost {
-  id        Int       @id @default(autoincrement())
-  userId    Int
-  postId    Int
-  createdAt DateTime  @default(now())
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  post      Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, postId])
-  @@index([userId])
-  @@index([postId])
-}
-
 enum PostTag {
   GENERAL
   STOCKS
@@ -267,28 +287,3 @@ enum ReactionType {
   BEARISH
   BULLISH
 }
-
-// ─── Chatbot Models ───────────────────────────────────────────────
-
-model ChatSession {
-  id           Int           @id @default(autoincrement())
-  userId       Int
-  createdAt    DateTime      @default(now())
-  lastActiveAt DateTime      @default(now())
-  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  messages     ChatMessage[]
-
-  @@index([userId])
-}
-
-model ChatMessage {
-  id        Int         @id @default(autoincrement())
-  sessionId Int
-  role      String
-  content   String
-  createdAt DateTime    @default(now())
-  session   ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-
-  @@index([sessionId])
-}
-

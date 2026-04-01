@@ -237,6 +237,109 @@ export class TradesService {
 
     const totalAccountValue = user.balance.add(totalPortfolioValue);
 
+    // --- Portfolio Health Monitor ---
+    const healthSignals: Array<{
+      type: 'concentration' | 'liquidity' | 'lossTolerance';
+      status: 'good' | 'warning' | 'critical';
+      message: string;
+      value: number;
+      relatedSymbol?: string;
+    }> = [];
+
+    // 1. Concentration Risk
+    if (portfolioWithPnl.length > 0 && !totalAccountValue.isZero()) {
+      let maxConcentration = 0;
+      let maxConcentrationSymbol = '';
+      for (const item of portfolioWithPnl) {
+        const concentration = item.currentValue
+          .div(totalAccountValue)
+          .mul(100)
+          .toNumber();
+        if (concentration > maxConcentration) {
+          maxConcentration = concentration;
+          maxConcentrationSymbol = item.symbol;
+        }
+      }
+      const concentrationStatus =
+        maxConcentration > 60
+          ? 'critical'
+          : maxConcentration > 40
+            ? 'warning'
+            : 'good';
+      const concentrationMessages: Record<string, string> = {
+        critical: `${maxConcentrationSymbol} makes up ${maxConcentration.toFixed(1)}% of your account. Extreme overexposure to a single asset.`,
+        warning: `${maxConcentrationSymbol} makes up ${maxConcentration.toFixed(1)}% of your account. Consider diversifying.`,
+        good: `No single asset exceeds 40% of your portfolio. Well diversified.`,
+      };
+      healthSignals.push({
+        type: 'concentration',
+        status: concentrationStatus,
+        message: concentrationMessages[concentrationStatus],
+        value: maxConcentration,
+        relatedSymbol: maxConcentrationSymbol,
+      });
+    }
+
+    // 2. Liquidity Risk
+    if (!totalAccountValue.isZero()) {
+      const cashPercent = user.balance
+        .div(totalAccountValue)
+        .mul(100)
+        .toNumber();
+      const liquidityStatus =
+        cashPercent < 2 ? 'critical' : cashPercent < 5 ? 'warning' : 'good';
+      const liquidityMessages: Record<string, string> = {
+        critical: `Cash is only ${cashPercent.toFixed(1)}% of your account. You have almost no buying power for opportunities.`,
+        warning: `Cash is ${cashPercent.toFixed(1)}% of your account. Consider keeping a larger buffer.`,
+        good: `Cash buffer at ${cashPercent.toFixed(1)}%. Healthy liquidity.`,
+      };
+      healthSignals.push({
+        type: 'liquidity',
+        status: liquidityStatus,
+        message: liquidityMessages[liquidityStatus],
+        value: cashPercent,
+      });
+    }
+
+    // 3. Loss Tolerance Risk
+    if (portfolioWithPnl.length > 0) {
+      let worstPnlPercent = 0;
+      let worstPnlSymbol = '';
+      for (const item of portfolioWithPnl) {
+        const pnl = item.pnlPercentage.toNumber();
+        if (pnl < worstPnlPercent) {
+          worstPnlPercent = pnl;
+          worstPnlSymbol = item.symbol;
+        }
+      }
+      const lossStatus =
+        worstPnlPercent < -30
+          ? 'critical'
+          : worstPnlPercent < -15
+            ? 'warning'
+            : 'good';
+      const lossMessages: Record<string, string> = {
+        critical: `${worstPnlSymbol} is down ${worstPnlPercent.toFixed(1)}%. Severe drawdown — consider cutting losses.`,
+        warning: `${worstPnlSymbol} is down ${worstPnlPercent.toFixed(1)}%. Monitor closely for further downside.`,
+        good: `No positions have significant unrealized losses.`,
+      };
+      healthSignals.push({
+        type: 'lossTolerance',
+        status: lossStatus,
+        message: lossMessages[lossStatus],
+        value: worstPnlPercent,
+        relatedSymbol: worstPnlSymbol || undefined,
+      });
+    }
+
+    // Aggregate health status: worst signal wins
+    let healthStatus: 'good' | 'warning' | 'critical' = 'good';
+    if (healthSignals.some((s) => s.status === 'critical')) {
+      healthStatus = 'critical';
+    } else if (healthSignals.some((s) => s.status === 'warning')) {
+      healthStatus = 'warning';
+    }
+
     return {
       balance: user.balance,
       totalInvested: totalInvested,
@@ -245,6 +348,8 @@ export class TradesService {
       totalPnlPercentage: totalPnlPercentage,
       totalAccountValue: totalAccountValue,
       portfolio: portfolioWithPnl,
+      healthStatus,
+      healthSignals,
     };
   }
 
