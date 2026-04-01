@@ -1,12 +1,25 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
-import { TrendingUp, TrendingDown, DollarSign, Briefcase, PiggyBank, Wallet } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { TrendingUp, TrendingDown, Minus, DollarSign, Briefcase, PiggyBank, Wallet, AlertTriangle, MoreHorizontal, ExternalLink } from 'lucide-react';
 import { AppShell } from '@/components/layout';
 import { PageHeader, EmptyState } from '@/components/common';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { HealthBadge, type HealthStatus } from '@/components/portfolio/HealthBadge';
+import { HealthInsightsPanel, type HealthSignal } from '@/components/portfolio/HealthInsightsPanel';
+import { PortfolioVisualizer } from '@/components/portfolio/PortfolioVisualizer';
 import { Input } from '@/components/ui/input';
 import {
   Table,
@@ -25,7 +38,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { http, ApiException } from '@/lib/http';
-import { formatUSD, formatPercent } from '@/lib/format';
+import { formatUSD, formatPercent, getPnLClass } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
 interface PortfolioItem {
@@ -49,9 +62,12 @@ interface PortfolioData {
   totalPnlPercentage: string;
   totalAccountValue: string;
   portfolio: PortfolioItem[];
+  healthStatus: HealthStatus;
+  healthSignals: HealthSignal[];
 }
 
 export default function Portfolio() {
+  const router = useRouter();
   const [portfolioData, setPortfolioData] = useState<PortfolioData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -61,6 +77,7 @@ export default function Portfolio() {
   const [selectedStock, setSelectedStock] = useState<PortfolioItem | null>(null);
   const [sellQuantity, setSellQuantity] = useState('');
   const [isSelling, setIsSelling] = useState(false);
+  const healthPanelRef = useRef<HTMLDivElement>(null);
 
   const fetchPortfolio = useCallback(async () => {
     try {
@@ -118,7 +135,24 @@ export default function Portfolio() {
     }
   };
 
-  const totalPnlIsPositive = portfolioData ? parseFloat(portfolioData.totalUnrealizedPnl) >= 0 : true;
+  const totalPnlValue = portfolioData ? parseFloat(portfolioData.totalUnrealizedPnl) : 0;
+  const totalPnlIsPositive = totalPnlValue > 0;
+  const totalPnlIsNegative = totalPnlValue < 0;
+  const totalPnlIsZero = totalPnlValue === 0;
+
+  // Build a set of symbols flagged by health signals for table annotation
+  const healthSignals = portfolioData?.healthSignals ?? [];
+  const healthStatus = portfolioData?.healthStatus ?? 'good';
+  const flaggedSymbols = new Set<string>();
+  for (const signal of healthSignals) {
+    if (signal.relatedSymbol && signal.status !== 'good') {
+      flaggedSymbols.add(signal.relatedSymbol);
+    }
+  }
+
+  const scrollToHealthPanel = () => {
+    healthPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   if (loading) {
     return (
@@ -158,77 +192,90 @@ export default function Portfolio() {
       <PageHeader
         title="Portfolio"
         description="Track your investments and performance"
+        actions={
+          <HealthBadge
+            status={healthStatus}
+            onClick={scrollToHealthPanel}
+          />
+        }
       />
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Cash Balance</CardTitle>
-            <Wallet className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatUSD(portfolioData.balance)}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Invested</CardTitle>
-            <PiggyBank className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatUSD(portfolioData.totalInvested)}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Portfolio Value</CardTitle>
-            <Briefcase className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatUSD(portfolioData.totalPortfolioValue)}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Account Value</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatUSD(portfolioData.totalAccountValue)}</div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* P&L Card */}
+      {/* Summary Stats — Compact Bar */}
       <Card className="mb-6">
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground mb-1">Total Unrealized P&L</p>
-              <p className={cn("text-3xl font-bold", totalPnlIsPositive ? 'text-emerald-400' : 'text-rose-400')}>
+        <CardContent className="py-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
+                <Wallet className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Cash Balance</p>
+                <p className="text-sm font-semibold tabular-nums">{formatUSD(portfolioData.balance)}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
+                <PiggyBank className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Total Invested</p>
+                <p className="text-sm font-semibold tabular-nums">{formatUSD(portfolioData.totalInvested)}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
+                <Briefcase className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Portfolio Value</p>
+                <p className="text-sm font-semibold tabular-nums">{formatUSD(portfolioData.totalPortfolioValue)}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Total Account Value</p>
+                <p className="text-sm font-semibold tabular-nums">{formatUSD(portfolioData.totalAccountValue)}</p>
+              </div>
+            </div>
+          </div>
+          {/* P&L integrated row */}
+          <div className="flex items-center justify-between mt-4 pt-4 border-t border-border/50">
+            <div className="flex items-center gap-2">
+              <p className="text-xs text-muted-foreground">Unrealized P&L</p>
+              <p className={cn('text-sm font-bold tabular-nums', getPnLClass(portfolioData.totalUnrealizedPnl))}>
                 {formatUSD(portfolioData.totalUnrealizedPnl)}
               </p>
             </div>
-            <div className="text-right">
-              <p className="text-sm font-medium text-muted-foreground mb-1">Return</p>
-              <div className="flex items-center gap-2">
-                {totalPnlIsPositive ? (
-                  <TrendingUp className="h-6 w-6 text-emerald-400" />
-                ) : (
-                  <TrendingDown className="h-6 w-6 text-rose-400" />
-                )}
-                <p className={cn("text-3xl font-bold", totalPnlIsPositive ? 'text-emerald-400' : 'text-rose-400')}>
-                  {formatPercent(portfolioData.totalPnlPercentage)}
-                </p>
-              </div>
+            <div className="flex items-center gap-1.5">
+              {totalPnlIsPositive && <TrendingUp className="h-3.5 w-3.5 text-emerald-400" />}
+              {totalPnlIsNegative && <TrendingDown className="h-3.5 w-3.5 text-rose-400" />}
+              {totalPnlIsZero && <Minus className="h-3.5 w-3.5 text-muted-foreground" />}
+              <p className={cn('text-sm font-bold tabular-nums', getPnLClass(portfolioData.totalPnlPercentage))}>
+                {formatPercent(portfolioData.totalPnlPercentage)}
+              </p>
             </div>
           </div>
         </CardContent>
       </Card>
+
+      {/* Health Insights Panel */}
+      <div ref={healthPanelRef}>
+        <HealthInsightsPanel
+          status={healthStatus}
+          signals={healthSignals}
+          id="health-insights"
+        />
+      </div>
+
+      {/* Portfolio Visualizer */}
+      <PortfolioVisualizer
+        balance={portfolioData.balance}
+        totalAccountValue={portfolioData.totalAccountValue}
+        portfolio={portfolioData.portfolio}
+      />
 
       {/* Holdings Table */}
       <Card>
@@ -242,42 +289,75 @@ export default function Portfolio() {
                 <TableRow>
                   <TableHead>Symbol</TableHead>
                   <TableHead>Name</TableHead>
-                  <TableHead className="text-right">Quantity</TableHead>
-                  <TableHead className="text-right">Avg. Price</TableHead>
+                  <TableHead className="text-right">Qty</TableHead>
+                  <TableHead className="text-right" title="Your breakeven cost basis">Avg. Price</TableHead>
                   <TableHead className="text-right">Current Price</TableHead>
-                  <TableHead className="text-right">Invested</TableHead>
-                  <TableHead className="text-right">Current Value</TableHead>
-                  <TableHead className="text-right">P&L</TableHead>
+                  <TableHead className="text-right" title="Unrealized Profit & Loss">P&L</TableHead>
                   <TableHead className="text-right">P&L %</TableHead>
-                  <TableHead className="text-center">Actions</TableHead>
+                  <TableHead className="text-center w-[80px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {portfolioData.portfolio.map((item) => {
-                  const pnlIsPositive = parseFloat(item.unrealizedPnl) >= 0;
+                  const isPositive = parseFloat(item.unrealizedPnl) > 0;
+                  const isNegative = parseFloat(item.unrealizedPnl) < 0;
+                  const badgeClass = isPositive 
+                    ? 'bg-emerald-500/15 text-emerald-400' 
+                    : isNegative 
+                      ? 'bg-rose-500/15 text-rose-400' 
+                      : 'bg-muted text-muted-foreground';
+
                   return (
-                    <TableRow key={item.symbol}>
-                      <TableCell className="font-semibold">{item.symbol}</TableCell>
-                      <TableCell className="text-muted-foreground">{item.name || '-'}</TableCell>
+                    <TableRow 
+                      key={item.symbol}
+                      className="cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => router.push(`/charts?symbol=${item.symbol}`)}
+                    >
+                      <TableCell className="font-semibold">
+                        <span className="inline-flex items-center gap-1.5">
+                          {item.symbol}
+                          {flaggedSymbols.has(item.symbol) && (
+                            <span title="This position has a health alert">
+                              <AlertTriangle className="h-3.5 w-3.5 text-amber-400" />
+                            </span>
+                          )}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground hidden sm:table-cell">{item.name || '-'}</TableCell>
                       <TableCell className="text-right tabular-nums">{item.quantity}</TableCell>
                       <TableCell className="text-right tabular-nums">{formatUSD(item.avgPrice)}</TableCell>
                       <TableCell className="text-right tabular-nums">{formatUSD(item.currentPrice)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{formatUSD(item.invested)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{formatUSD(item.currentValue)}</TableCell>
-                      <TableCell className={cn("text-right tabular-nums font-semibold", pnlIsPositive ? 'text-emerald-400' : 'text-rose-400')}>
+                      <TableCell className={cn('text-right tabular-nums font-semibold', getPnLClass(item.unrealizedPnl))}>
                         {formatUSD(item.unrealizedPnl)}
                       </TableCell>
-                      <TableCell className={cn("text-right tabular-nums font-semibold", pnlIsPositive ? 'text-emerald-400' : 'text-rose-400')}>
-                        {formatPercent(item.pnlPercentage)}
+                      <TableCell className="text-right">
+                        <Badge variant="outline" className={cn('tabular-nums font-medium border-transparent shrink-0', badgeClass)}>
+                          {formatPercent(item.pnlPercentage)}
+                        </Badge>
                       </TableCell>
-                      <TableCell className="text-center">
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => openSellDialog(item)}
-                        >
-                          Sell
-                        </Button>
+                      <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                              <span className="sr-only">Open menu</span>
+                              <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                            <DropdownMenuItem onClick={() => router.push(`/charts?symbol=${item.symbol}`)}>
+                              <ExternalLink className="mr-2 h-4 w-4" />
+                              Trade {item.symbol}
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem 
+                              onClick={() => openSellDialog(item)}
+                              className="text-rose-400 focus:text-rose-300 focus:bg-rose-500/10"
+                            >
+                              Quick Sell
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   );

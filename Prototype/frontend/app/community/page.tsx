@@ -1253,6 +1253,8 @@ export default function CommunityPage() {
             <div>
               <MentionAutocomplete
                 ref={newPostTextareaRef}
+                value={newContent}
+                onChange={setNewContent}
                 onMention={addMention}
                 placeholder="What's on your mind? Type @ to mention someone..."
                 value={newContent}
