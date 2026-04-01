@@ -11,7 +11,7 @@ spec:
     spec:
       containers:
       - name: db-migrate
-        image: gcr.io/project-8ca874ae-688d-414c-91b/github.com/um3rz/tradeup/backend:latest
+        image: us-central1-docker.pkg.dev/project-8ca874ae-688d-414c-91b/tradeup/backend:latest
         command: ["npx", "prisma", "migrate", "deploy"]
         env:
           - name: DATABASE_URL

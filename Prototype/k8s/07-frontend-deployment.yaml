@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: gcr.io/project-8ca874ae-688d-414c-91b/github.com/um3rz/tradeup/frontend:latest
+          image: us-central1-docker.pkg.dev/project-8ca874ae-688d-414c-91b/tradeup/frontend:latest
           ports:
             - containerPort: 3000
           env:

@@ -1,8 +1,8 @@
 steps:
   - name: 'gcr.io/cloud-builders/docker'
     dir: 'Prototype/frontend'
-    args: ['build', '-t', 'gcr.io/project-8ca874ae-688d-414c-91b/github.com/um3rz/tradeup/frontend:latest', '.']
+    args: ['build', '-t', 'us-central1-docker.pkg.dev/project-8ca874ae-688d-414c-91b/tradeup/frontend:latest', '.']
 images:
-  - 'gcr.io/project-8ca874ae-688d-414c-91b/github.com/um3rz/tradeup/frontend:latest'
+  - 'us-central1-docker.pkg.dev/project-8ca874ae-688d-414c-91b/tradeup/frontend:latest'
 options:
   logging: CLOUD_LOGGING_ONLY
