@@ -1,0 +1,23 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: tradeup-db-migration
+  namespace: tradeup
+  annotations:
+    # This is useful if you use tools like Helm, otherwise just apply randomly or during CI
+    "helm.sh/hook": pre-install,pre-upgrade
+spec:
+  template:
+    spec:
+      containers:
+      - name: db-migrate
+        image: gcr.io/project-8ca874ae-688d-414c-91b/github.com/um3rz/tradeup/backend:latest
+        command: ["npx", "prisma", "migrate", "deploy"]
+        env:
+          - name: DATABASE_URL
+            valueFrom:
+              secretKeyRef:
+                name: tradeup-secrets
+                key: DATABASE_URL
+      restartPolicy: Never
+  backoffLimit: 2 # Retry twice before failing

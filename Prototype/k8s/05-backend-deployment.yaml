@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tradeup-backend
+  namespace: tradeup
+spec:
+  replicas: 1 # Scale later when Redis adapter is added
+  selector:
+    matchLabels:
+      app: tradeup-backend
+  template:
+    metadata:
+      labels:
+        app: tradeup-backend
+    spec:
+      containers:
+        - name: backend
+          image: gcr.io/project-8ca874ae-688d-414c-91b/github.com/um3rz/tradeup/backend:latest
+          ports:
+            - containerPort: 3001
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: tradeup-secrets
+                  key: DATABASE_URL
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: tradeup-secrets
+                  key: JWT_SECRET
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"

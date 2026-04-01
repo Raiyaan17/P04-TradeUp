@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tradeup-frontend
+  namespace: tradeup
+spec:
+  replicas: 2 # Frontend is stateless, can scale safely
+  selector:
+    matchLabels:
+      app: tradeup-frontend
+  template:
+    metadata:
+      labels:
+        app: tradeup-frontend
+    spec:
+      containers:
+        - name: frontend
+          image: gcr.io/project-8ca874ae-688d-414c-91b/github.com/um3rz/tradeup/frontend:latest
+          ports:
+            - containerPort: 3000
+          env:
+            - name: NEXT_PUBLIC_API_URL
+              value: "https://api.yourdomain.com" # REPLACE with actual URL
+            - name: NEXT_PUBLIC_WS_URL
+              value: "https://api.yourdomain.com" # REPLACE with actual URL
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "250m"
+              memory: "256Mi"
