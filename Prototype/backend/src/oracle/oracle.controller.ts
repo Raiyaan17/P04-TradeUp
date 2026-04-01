@@ -12,12 +12,18 @@ export class OracleController {
     return this.oracleService.getActiveTournament();
   }
 
+  @Get('portfolio')
+  async getPortfolio(@Req() req: any) {
+    return this.oracleService.getPortfolio(req.user.userId);
+  }
+
   @Post('start')
   async startTournament(
     @Req() req: any,
     @Body('startingCash') startingCash: number,
+    @Body('speed') speed?: 'normal' | 'fast',
   ) {
-    return this.oracleService.startTournament(req.user.userId, startingCash);
+    return this.oracleService.startTournament(req.user.userId, startingCash, speed || 'normal');
   }
 
   @Post('join')
