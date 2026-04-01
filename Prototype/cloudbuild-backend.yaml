@@ -1,6 +1,7 @@
 steps:
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'gcr.io/project-8ca874ae-688d-414c-91b/github.com/um3rz/tradeup/backend:latest', './backend']
+    dir: 'Prototype/backend'
+    args: ['build', '-t', 'gcr.io/project-8ca874ae-688d-414c-91b/github.com/um3rz/tradeup/backend:latest', '.']
 images:
   - 'gcr.io/project-8ca874ae-688d-414c-91b/github.com/um3rz/tradeup/backend:latest'
 options:

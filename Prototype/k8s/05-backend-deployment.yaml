@@ -29,6 +29,36 @@ spec:
                 secretKeyRef:
                   name: tradeup-secrets
                   key: JWT_SECRET
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: tradeup-secrets
+                  key: POSTGRES_PASSWORD
+            - name: SUPABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: tradeup-secrets
+                  key: SUPABASE_URL
+            - name: SUPABASE_SERVICE_ROLE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: tradeup-secrets
+                  key: SUPABASE_SERVICE_ROLE_KEY
+            - name: NEWS_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: tradeup-secrets
+                  key: NEWS_API_KEY
+            - name: STOCK_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: tradeup-secrets
+                  key: STOCK_API_KEY
+            - name: GEMINI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: tradeup-secrets
+                  key: GEMINI_API_KEY
           resources:
             requests:
               cpu: "250m"
