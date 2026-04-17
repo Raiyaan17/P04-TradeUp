@@ -3,7 +3,9 @@
  * Handles auth headers, error normalization, and base URL configuration.
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
+const isServer = typeof window === 'undefined';
+const isLocalhost = !isServer && window.location.hostname === 'localhost';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || (isServer ? (process.env.BACKEND_URL || 'http://localhost:3001/api') : (isLocalhost ? 'http://localhost:3001/api' : '/api'));
 
 export interface ApiError {
   message: string;

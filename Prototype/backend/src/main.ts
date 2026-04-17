@@ -37,6 +37,7 @@ async function bootstrap() {
     'https://p04-trade-up1.vercel.app',
   ]);
 
+  app.setGlobalPrefix('api');
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   app.useGlobalFilters(new CorsExceptionFilter());
   await app.listen(process.env.PORT ? Number(process.env.PORT) : 3001);

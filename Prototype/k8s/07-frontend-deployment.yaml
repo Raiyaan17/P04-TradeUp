@@ -23,6 +23,8 @@ spec:
               value: "https://api.yourdomain.com" # REPLACE with actual URL
             - name: NEXT_PUBLIC_WS_URL
               value: "https://api.yourdomain.com" # REPLACE with actual URL
+            - name: BACKEND_URL
+              value: "http://tradeup-backend-svc:80"
           resources:
             requests:
               cpu: "100m"
