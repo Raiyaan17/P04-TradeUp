@@ -14,7 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { LogOut, Settings, User } from "lucide-react";
+import { LogOut, Settings, User, Menu, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getFriendRequests } from "@/lib/friendsService";
 
@@ -33,6 +33,7 @@ export function TopBar() {
   const router = useRouter();
   const pathname = usePathname();
   const [hasRequests, setHasRequests] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const handleSignOut = async () => {
     if (typeof window !== "undefined") {
@@ -106,8 +107,10 @@ export function TopBar() {
             ))}
           </nav>
 
-          {/* User Menu */}
-          <DropdownMenu>
+          {/* Right side Actions */}
+          <div className="flex items-center gap-2">
+            {/* User Menu */}
+            <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                 <Avatar className="h-10 w-10">
@@ -157,8 +160,42 @@ export function TopBar() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+
+          {/* Mobile Menu Button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="md:hidden"
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            aria-label="Toggle Menu"
+          >
+            {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+          </Button>
+        </div>
         </div>
       </div>
+
+      {/* Mobile Navigation */}
+      {isMobileMenuOpen && (
+        <div className="md:hidden border-t border-border bg-background px-4 py-4 shadow-lg flex flex-col gap-2">
+          {NAV_LINKS.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              onClick={() => setIsMobileMenuOpen(false)}
+              className={cn(
+                "px-4 py-3 text-base font-medium rounded-md transition-colors",
+                "hover:bg-accent hover:text-accent-foreground",
+                pathname === link.href
+                  ? "bg-accent text-accent-foreground"
+                  : "text-muted-foreground"
+              )}
+            >
+              {link.label}
+            </Link>
+          ))}
+        </div>
+      )}
     </header>
   );
 }

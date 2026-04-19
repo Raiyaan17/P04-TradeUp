@@ -229,7 +229,7 @@ export default function DashboardPage() {
       await http.post("/users/fund-wallet", { amount });
       await refreshUser?.();
       setShowWalletPopup(false);
-      toast.success(`$${amount} added to your wallet`);
+      toast.success(`Rs ${amount} added to your wallet`);
     } catch (error) {
       console.error("Error funding wallet:", error);
       toast.error("Failed to fund wallet");
