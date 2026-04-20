@@ -1,18 +1,8 @@
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: deployment-1
-spec:
-  replicas: 1
-  template:
-    spec:
-      containers:
-      - name: backend-container
-        image: us-central1-docker.pkg.dev/project-8ca874ae-688d-414c-91b/tradeup/backend:latest
-        ports:
-        - containerPort: 3000 
-        
-        # This tells the container to grab all variables from your ConfigMap!
-        envFrom:
-        - configMapRef:
-            name: deployment-1-config-idh8
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    dir: 'Prototype/backend'
+    args: ['build', '-t', 'us-central1-docker.pkg.dev/project-8ca874ae-688d-414c-91b/tradeup/backend:latest', '.']
+images:
+  - 'us-central1-docker.pkg.dev/project-8ca874ae-688d-414c-91b/tradeup/backend:latest'
+options:
+  logging: CLOUD_LOGGING_ONLY
