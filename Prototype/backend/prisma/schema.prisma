@@ -88,9 +88,11 @@ model Transaction {
   quantity  Int
   price     Decimal
   total     Decimal
-  createdAt DateTime        @default(now())
-  stock     Stock           @relation(fields: [stockId], references: [id])
-  user      User            @relation(fields: [userId], references: [id])
+  createdAt  DateTime        @default(now())
+  sellReason SellReason?
+  sellNote   String?
+  stock      Stock           @relation(fields: [stockId], references: [id])
+  user       User            @relation(fields: [userId], references: [id])
 }
 
 model Tournament {
@@ -286,4 +288,10 @@ enum ReactionType {
   FIRE
   BEARISH
   BULLISH
+}
+
+enum SellReason {
+  TARGET_HIT
+  PANIC_EMOTION
+  NEEDED_CASH
 }

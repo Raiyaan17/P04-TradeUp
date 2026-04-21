@@ -39,11 +39,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    # For development: mount source for hot reload (optional)
-    # For development: mount source for hot reload (optional)
-    volumes:
-      - .:/app
-      - /app/node_modules
-
+    # Removed development volume mount to allow the production build dist/ folder to serve correctly
 volumes:
   tradeup_db:

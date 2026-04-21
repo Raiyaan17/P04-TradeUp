@@ -206,7 +206,6 @@ export default function OraclePage() {
   const joinTournament = async (id: string) => {
     try {
       await http.post("/oracle/tournament/join", { tournamentId: id });
-      connectWS();
       toast.success("Joined Tournament!");
     } catch {
       toast.error("Failed to join");

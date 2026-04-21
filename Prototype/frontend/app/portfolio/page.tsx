@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
-import { TrendingUp, TrendingDown, Minus, DollarSign, Briefcase, PiggyBank, Wallet, AlertTriangle, MoreHorizontal, ExternalLink } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, DollarSign, Briefcase, PiggyBank, Wallet, AlertTriangle, MoreHorizontal, ExternalLink, ArrowUpDown, Target, HeartCrack, Banknote, FileText } from 'lucide-react';
 import { AppShell } from '@/components/layout';
 import { PageHeader, EmptyState } from '@/components/common';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,6 +20,8 @@ import {
 import { HealthBadge, type HealthStatus } from '@/components/portfolio/HealthBadge';
 import { HealthInsightsPanel, type HealthSignal } from '@/components/portfolio/HealthInsightsPanel';
 import { PortfolioVisualizer } from '@/components/portfolio/PortfolioVisualizer';
+import { SellJournalInput, type SellReasonType } from '@/components/portfolio/SellJournalInput';
+import { Tabs } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import {
   Table,
@@ -54,6 +56,26 @@ interface PortfolioItem {
   createdAt: string;
 }
 
+interface TransactionItem {
+  id: number;
+  symbol: string;
+  name: string | null;
+  type: 'BUY' | 'SELL';
+  quantity: number;
+  price: string;
+  total: string;
+  createdAt: string;
+  sellReason?: string;
+  sellNote?: string;
+}
+
+interface TransactionsResponse {
+  transactions: TransactionItem[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 interface PortfolioData {
   balance: string;
   totalInvested: string;
@@ -77,7 +99,15 @@ export default function Portfolio() {
   const [selectedStock, setSelectedStock] = useState<PortfolioItem | null>(null);
   const [sellQuantity, setSellQuantity] = useState('');
   const [isSelling, setIsSelling] = useState(false);
+  const [sellReason, setSellReason] = useState<SellReasonType | null>(null);
+  const [sellNote, setSellNote] = useState('');
   const healthPanelRef = useRef<HTMLDivElement>(null);
+
+  // Tab + Transaction history state
+  const [activeTab, setActiveTab] = useState('holdings');
+  const [transactions, setTransactions] = useState<TransactionItem[]>([]);
+  const [transactionsTotal, setTransactionsTotal] = useState(0);
+  const [transactionsLoading, setTransactionsLoading] = useState(false);
 
   const fetchPortfolio = useCallback(async () => {
     try {
@@ -96,9 +126,30 @@ export default function Portfolio() {
     fetchPortfolio();
   }, [fetchPortfolio]);
 
+  const fetchTransactions = useCallback(async () => {
+    try {
+      setTransactionsLoading(true);
+      const data = await http.get<TransactionsResponse>('/trades/transactions?limit=50');
+      setTransactions(data.transactions);
+      setTransactionsTotal(data.total);
+    } catch (err) {
+      console.error('Failed to fetch transactions:', err);
+    } finally {
+      setTransactionsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'history' && transactions.length === 0) {
+      fetchTransactions();
+    }
+  }, [activeTab, transactions.length, fetchTransactions]);
+
   const openSellDialog = (item: PortfolioItem) => {
     setSelectedStock(item);
     setSellQuantity('');
+    setSellReason(null);
+    setSellNote('');
     setSellDialogOpen(true);
   };
 
@@ -120,13 +171,19 @@ export default function Portfolio() {
     try {
       await http.post('/trades/sell', {
         symbol: selectedStock.symbol,
-        quantity
+        quantity,
+        ...(sellReason ? { sellReason } : {}),
+        ...(sellNote.trim() ? { sellNote: sellNote.trim() } : {}),
       });
 
       toast.success(`Successfully sold ${quantity} shares of ${selectedStock.symbol}`);
       setSellDialogOpen(false);
+      setSellReason(null);
+      setSellNote('');
       setLoading(true);
       fetchPortfolio();
+      // Refresh transaction history if tab is active
+      if (activeTab === 'history') fetchTransactions();
     } catch (err) {
       const message = err instanceof ApiException ? err.message : 'Failed to sell stock.';
       toast.error(message);
@@ -277,13 +334,20 @@ export default function Portfolio() {
         portfolio={portfolioData.portfolio}
       />
 
-      {/* Holdings Table */}
+      {/* Holdings / Trade History Tabs */}
       <Card>
-        <CardHeader>
-          <CardTitle>Holdings</CardTitle>
+        <CardHeader className="pb-3">
+          <Tabs
+            tabs={[
+              { id: 'holdings', label: 'Holdings', badge: portfolioData.portfolio.length },
+              { id: 'history', label: 'Trade History' },
+            ]}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+          />
         </CardHeader>
         <CardContent>
-          {portfolioData.portfolio.length > 0 ? (
+          {activeTab === 'holdings' && portfolioData.portfolio.length > 0 && (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -364,7 +428,8 @@ export default function Portfolio() {
                 })}
               </TableBody>
             </Table>
-          ) : (
+          )}
+          {activeTab === 'holdings' && portfolioData.portfolio.length === 0 && (
             <EmptyState
               variant="portfolio"
               action={{
@@ -372,6 +437,105 @@ export default function Portfolio() {
                 onClick: () => window.location.href = '/buy'
               }}
             />
+          )}
+
+          {/* Trade History Tab */}
+          {activeTab === 'history' && (
+            <div>
+              {transactionsLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                </div>
+              ) : transactions.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                  <ArrowUpDown className="h-8 w-8 mb-3 text-muted-foreground/50" />
+                  <p className="font-medium">No transactions yet</p>
+                  <p className="text-sm">Your trade history will appear here</p>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  {transactions.map((tx) => {
+                    const isBuy = tx.type === 'BUY';
+                    const reasonLabels: Record<string, { label: string; icon: React.ReactNode; className: string }> = {
+                      TARGET_HIT: { label: 'Target Hit', icon: <Target className="h-3 w-3" />, className: 'bg-emerald-500/15 text-emerald-400' },
+                      PANIC_EMOTION: { label: 'Panic / Emotion', icon: <HeartCrack className="h-3 w-3" />, className: 'bg-amber-500/15 text-amber-400' },
+                      NEEDED_CASH: { label: 'Needed Cash', icon: <Banknote className="h-3 w-3" />, className: 'bg-blue-500/15 text-blue-400' },
+                    };
+                    const reason = tx.sellReason ? reasonLabels[tx.sellReason] : null;
+
+                    return (
+                      <div
+                        key={tx.id}
+                        className="group flex items-start gap-3 p-3 rounded-lg border border-border/50 hover:border-border transition-colors"
+                      >
+                        {/* Icon */}
+                        <div className={cn(
+                          'flex h-8 w-8 shrink-0 items-center justify-center rounded-full mt-0.5',
+                          isBuy ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-rose-400'
+                        )}>
+                          {isBuy ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                        </div>
+
+                        {/* Content */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-sm">{tx.symbol}</span>
+                              <Badge
+                                variant="outline"
+                                className={cn(
+                                  'text-[10px] px-1.5 py-0 border-transparent font-medium',
+                                  isBuy ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'
+                                )}
+                              >
+                                {tx.type}
+                              </Badge>
+                            </div>
+                            <span className="text-xs text-muted-foreground tabular-nums">
+                              {new Date(tx.createdAt).toLocaleDateString('en-US', {
+                                month: 'short', day: 'numeric', year: 'numeric'
+                              })}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                            <span>{tx.quantity} shares</span>
+                            <span>@ {formatUSD(tx.price)}</span>
+                            <span className="font-medium text-foreground/70">= {formatUSD(tx.total)}</span>
+                          </div>
+
+                          {/* Journal annotation */}
+                          {(reason || tx.sellNote) && (
+                            <div className="mt-2 flex flex-col gap-1.5">
+                              {reason && (
+                                <span className={cn('inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full w-fit', reason.className)}>
+                                  {reason.icon}
+                                  {reason.label}
+                                </span>
+                              )}
+                              {tx.sellNote && (
+                                <p className="text-xs text-muted-foreground/80 italic flex items-start gap-1.5">
+                                  <FileText className="h-3 w-3 mt-0.5 shrink-0 text-muted-foreground/50" />
+                                  {tx.sellNote}
+                                </p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {transactionsTotal > transactions.length && (
+                    <Button
+                      variant="ghost"
+                      className="w-full text-muted-foreground"
+                      onClick={fetchTransactions}
+                    >
+                      Load more
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
           )}
         </CardContent>
       </Card>
@@ -385,7 +549,7 @@ export default function Portfolio() {
               You own {selectedStock?.quantity} shares. Enter how many you want to sell.
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
+          <div className="py-4 space-y-3">
             <Input
               type="number"
               placeholder="Enter quantity"
@@ -399,6 +563,12 @@ export default function Portfolio() {
                 Estimated proceeds: {formatUSD(Number(sellQuantity) * parseFloat(selectedStock.currentPrice))}
               </p>
             )}
+            <SellJournalInput
+              sellReason={sellReason}
+              onReasonChange={setSellReason}
+              sellNote={sellNote}
+              onNoteChange={setSellNote}
+            />
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setSellDialogOpen(false)}>

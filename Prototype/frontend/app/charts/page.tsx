@@ -14,6 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { http, ApiException } from "@/lib/http";
 import { formatDecimal, formatPercent, formatVolume } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { SellJournalInput, type SellReasonType } from "@/components/portfolio/SellJournalInput";
 import { parseKlines, Candle, calculateSMA, calculateLatestSMA } from "@/lib/chartUtils";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
@@ -105,7 +106,7 @@ export default function Charts() {
   const [timeframe, setTimeframe] = useState<string>('1d'); // Default to 1d as in mockup
   const [historicalData, setHistoricalData] = useState<CandleData[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState<boolean>(false);
-  const [hasReceivedTick, setHasReceivedTick] = useState<boolean>(false);
+  const hasReceivedTickRef = useRef<boolean>(false);
 
   // Company Profile states
   const [companyData, setCompanyData] = useState<CompanyProfile | null>(null);
@@ -133,6 +134,10 @@ export default function Charts() {
   // Submission states
   const [isSubmittingBuy, setIsSubmittingBuy] = useState<boolean>(false);
   const [isSubmittingSell, setIsSubmittingSell] = useState<boolean>(false);
+
+  // Sell journal state
+  const [sellReason, setSellReason] = useState<SellReasonType | null>(null);
+  const [sellNote, setSellNote] = useState('');
 
   // Portfolio data
   const [portfolioData, setPortfolioData] = useState<PortfolioData | null>(null);
@@ -451,7 +456,7 @@ export default function Charts() {
           tick: mappedTick,
           timestamp: res.tick.timestamp ? res.tick.timestamp * 1000 : Date.now()
         });
-        setHasReceivedTick(true);
+        hasReceivedTickRef.current = true;
       }
     } catch (error) {
       console.error('Failed to fetch initial tick:', error);
@@ -490,7 +495,7 @@ export default function Charts() {
     });
 
     socket.on("tickUpdate", (data: TickData) => {
-      setHasReceivedTick(true);
+      hasReceivedTickRef.current = true;
       setTickData(data);
       setMarketStatus(prev => ({
         ...prev,
@@ -621,10 +626,14 @@ export default function Charts() {
       await http.post("/trades/sell", {
         symbol: stock,
         quantity: sellQuantity,
+        ...(sellReason ? { sellReason } : {}),
+        ...(sellNote.trim() ? { sellNote: sellNote.trim() } : {}),
       });
       toast.success(`Successfully sold ${sellQuantity} shares of ${stock}!`);
-      setSellQuantity(1); // Reset after successful sell
-      fetchPortfolio(); // Refresh holdings
+      setSellQuantity(1);
+      setSellReason(null);
+      setSellNote('');
+      fetchPortfolio();
     } catch (err) {
       const message = err instanceof ApiException ? err.message : "Failed to place sell order. Please try again.";
       toast.error(message);
@@ -649,7 +658,7 @@ export default function Charts() {
 
     setCurrentCandle(null);
     setTickData(null);
-    setHasReceivedTick(false);
+    hasReceivedTickRef.current = false;
 
     // Initial fetch
     fetchHistoricalData(stock, timeframe, abortController.signal);
@@ -665,7 +674,7 @@ export default function Charts() {
       setMarketStatus(prev => {
         const timeSinceLastUpdate = prev.lastUpdateTime ? Date.now() - prev.lastUpdateTime : 0;
         const shouldMarkClosed = prev.isConnected &&
-          hasReceivedTick &&
+          hasReceivedTickRef.current &&
           prev.lastUpdateTime !== null &&
           timeSinceLastUpdate > MARKET_CLOSED_TIMEOUT;
 
@@ -686,7 +695,7 @@ export default function Charts() {
         clearInterval(marketCheckIntervalRef.current);
       }
     };
-  }, [stock, timeframe, connectWebSocket, fetchHistoricalData, fetchCompanyData, fetchInitialTick, hasReceivedTick]);
+  }, [stock, timeframe, connectWebSocket, fetchHistoricalData, fetchCompanyData, fetchInitialTick]);
 
 
 
@@ -714,7 +723,7 @@ export default function Charts() {
   const getStatusText = () => {
     if (isLoadingHistory) return "Loading data...";
     if (!marketStatus.isConnected) return "Connecting...";
-    if (!hasReceivedTick) return "Connected - waiting for data...";
+    if (!hasReceivedTickRef.current) return "Connected - waiting for data...";
     if (marketStatus.isMarketClosed) return "Market Closed";
     if (tickData) return "Live - Market Open";
     return "Waiting...";
@@ -926,6 +935,14 @@ export default function Charts() {
                   <Plus className="h-3 w-3" />
                 </Button>
               </div>
+
+              <SellJournalInput
+                sellReason={sellReason}
+                onReasonChange={setSellReason}
+                sellNote={sellNote}
+                onNoteChange={setSellNote}
+                compact
+              />
 
               <Button
                 className="w-full h-8 bg-rose-500 hover:bg-rose-600 text-white font-medium shadow-none transition-colors"
