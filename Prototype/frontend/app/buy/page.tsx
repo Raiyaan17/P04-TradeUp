@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { http, ApiException } from "@/lib/http";
 import { formatDecimal, getPnLClass } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { SellJournalInput, type SellReasonType } from "@/components/portfolio/SellJournalInput";
 
 interface Tick {
     price: number;
@@ -33,6 +34,8 @@ export default function TradeTestPage() {
     const [error, setError] = useState<string | null>(null);
     const [executingAction, setExecutingAction] = useState<'buy' | 'sell' | null>(null);
     const isSubmitting = executingAction !== null;
+    const [sellReason, setSellReason] = useState<SellReasonType | null>(null);
+    const [sellNote, setSellNote] = useState('');
 
     const fetchAllStocks = useCallback(async (): Promise<void> => {
         try {
@@ -54,10 +57,10 @@ export default function TradeTestPage() {
     }, [fetchAllStocks]);
 
     const handleStockSelect = (stock: StockData): void => {
-        // If selecting the same stock, preserve quantity or reset if you prefer.
-        // We'll reset for clarity in a fresh trade scenario.
         if (selectedStock?.symbol !== stock.symbol) {
             setQuantity(0);
+            setSellReason(null);
+            setSellNote('');
         }
         setSelectedStock(stock);
     };
@@ -80,12 +83,15 @@ export default function TradeTestPage() {
             const response = await http.post<{ transaction: { price: number; total: number } }>(endpoint, {
                 symbol: selectedStock.symbol,
                 quantity: quantity,
+                ...(action === 'sell' && sellReason ? { sellReason } : {}),
+                ...(action === 'sell' && sellNote.trim() ? { sellNote: sellNote.trim() } : {}),
             });
 
             toast.success(`Successfully ${action === 'buy' ? 'bought' : 'sold'} ${quantity} shares of ${selectedStock.symbol} at PKR ${formatDecimal(response.transaction.price)}!`);
-            // Optional: clear selection after successful trade
             setQuantity(0);
             setSelectedStock(null);
+            setSellReason(null);
+            setSellNote('');
         } catch (err) {
             const message = err instanceof ApiException ? err.message : `Failed to place ${action} order. Please try again.`;
             toast.error(message);
@@ -286,6 +292,14 @@ export default function TradeTestPage() {
                                             </p>
                                         </div>
                                     </div>
+
+                                    {/* Sell Journal Section */}
+                                    <SellJournalInput
+                                        sellReason={sellReason}
+                                        onReasonChange={setSellReason}
+                                        sellNote={sellNote}
+                                        onNoteChange={setSellNote}
+                                    />
 
                                 </CardContent>
                             </Card>
