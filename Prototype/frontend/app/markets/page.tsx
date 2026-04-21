@@ -61,7 +61,8 @@ interface TickUpdateMessage {
     timestamp: number;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
+const isLocalhost = typeof window !== 'undefined' && window.location.hostname === 'localhost';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || (isLocalhost ? 'http://localhost:3001/api' : '/api');
 
 // --- Field Extractors ---
 function getPrice(tick: Tick | null | undefined): number {

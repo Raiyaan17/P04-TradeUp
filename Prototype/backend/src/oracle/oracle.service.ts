@@ -23,6 +23,7 @@ export class OracleService implements OnModuleDestroy {
   // Ideally, use an EventEmitter or emit via a dedicated Gateway.
   // We'll expose getters for WebSockets to pull, or a callback mechanism.
   private tickCallback?: (tickData: TournamentDataPoint, news: TournamentNewsItem[], leaderboard: LeaderboardEntry[]) => void;
+  private endCallback?: (leaderboard: LeaderboardEntry[]) => void;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -37,6 +38,10 @@ export class OracleService implements OnModuleDestroy {
     this.tickCallback = cb;
   }
 
+  setEndCallback(cb: (leaderboard: LeaderboardEntry[]) => void) {
+    this.endCallback = cb;
+  }
+
   async getActiveTournament() {
     return this.prisma.tournament.findFirst({
       where: { status: TournamentStatus.ACTIVE },
@@ -49,7 +54,50 @@ export class OracleService implements OnModuleDestroy {
     });
   }
 
-  async startTournament(userId: number, startingCash: number) {
+  async getPortfolio(userId: number) {
+    const active = await this.getActiveTournament();
+    if (!active) return { balance: 0, holdings: [] };
+    
+    const participant = await this.prisma.tournamentParticipant.findUnique({
+      where: { tournamentId_userId: { tournamentId: active.id, userId } },
+      include: { portfolio: true },
+    });
+    
+    if (!participant) return { balance: 0, holdings: [] };
+    
+    return {
+      balance: Number(participant.currentBalance),
+      holdings: participant.portfolio.map(h => ({
+        stockSymbol: h.stockSymbol,
+        quantity: h.quantity,
+        avgPrice: Number(h.avgPrice),
+      })),
+    };
+  }
+
+  async getCurrentTickData(tournamentId: string) {
+    if (!this.tickInterval || this.currentTickIndex === 0 || this.trajectoryPoints.length === 0) {
+      return null;
+    }
+    const idx = Math.min(this.currentTickIndex - 1, this.trajectoryPoints.length - 1);
+    const tick = this.trajectoryPoints[idx];
+    const tickNews = this.newsItems.filter(n => n.minute === tick.minute);
+
+    const participants = await this.prisma.tournamentParticipant.findMany({
+      where: { tournamentId },
+      include: { user: true },
+      orderBy: { currentScore: 'desc' },
+    });
+    const leaderboard = participants.map((p, index) => ({
+      userId: p.userId,
+      username: p.user.username,
+      pnl: Number(p.currentScore),
+      rank: index + 1,
+    }));
+    return { tick, news: tickNews, leaderboard };
+  }
+
+  async startTournament(userId: number, startingCash: number, speed: 'normal' | 'fast' = 'normal') {
     const active = await this.getActiveTournament();
     if (active) throw new BadRequestException('A tournament is already active.');
 
@@ -75,7 +123,7 @@ export class OracleService implements OnModuleDestroy {
     // Join the first player
     await this.joinTournament(userId, tournament.id);
 
-    this.startTickEngine(tournament.id);
+    this.startTickEngine(tournament.id, speed);
 
     return tournament;
   }
@@ -110,13 +158,23 @@ export class OracleService implements OnModuleDestroy {
     });
     if (existing) return existing;
 
-    return this.prisma.tournamentParticipant.create({
+    const newParticipant = await this.prisma.tournamentParticipant.create({
       data: {
         tournamentId,
         userId,
         currentBalance: tournament.startingCash,
+        currentScore: 0,
       },
     });
+
+    // Optionally broadcast immediate leaderboard update to all clients
+    // so players instantly see newly arrived competitors
+    const currentData = await this.getCurrentTickData(tournamentId);
+    if (currentData && this.tickCallback) {
+      this.tickCallback(currentData.tick, currentData.news, currentData.leaderboard);
+    }
+
+    return newParticipant;
   }
 
   async buyStock(userId: number, tournamentId: string, stockSymbol: string, quantity: number) {
@@ -255,54 +313,98 @@ export class OracleService implements OnModuleDestroy {
     });
   }
 
-  private startTickEngine(tournamentId: string) {
+  private startTickEngine(tournamentId: string, speed: 'normal' | 'fast' = 'normal') {
     this.stopTickEngine();
 
-    // Broadcast a new tick every 5 seconds
-    this.tickInterval = setInterval(async () => {
-      if (this.currentTickIndex >= this.trajectoryPoints.length) {
-        this.stopTickEngine();
-        await this.prisma.tournament.update({
-          where: { id: tournamentId },
-          data: { status: TournamentStatus.COMPLETED, endedAt: new Date() },
+    const intervalMs = speed === 'fast' ? 5000 : 60000;
+
+    const tickFn = async () => {
+      try {
+        if (this.currentTickIndex >= this.trajectoryPoints.length) {
+          this.stopTickEngine();
+          await this.prisma.tournament.update({
+            where: { id: tournamentId },
+            data: { status: TournamentStatus.COMPLETED, endedAt: new Date() },
+          });
+
+          // Build final leaderboard
+          const finalParticipants = await this.prisma.tournamentParticipant.findMany({
+            where: { tournamentId },
+            include: { user: true },
+            orderBy: { currentScore: 'desc' },
+          });
+          const finalLeaderboard = finalParticipants.map((p, index) => ({
+            userId: p.userId,
+            username: p.user.username,
+            pnl: Number(p.currentScore) || 0,
+            rank: index + 1,
+          }));
+
+          if (this.endCallback) {
+            this.endCallback(finalLeaderboard);
+          }
+
+          return;
+        }
+
+        const rawTick = this.trajectoryPoints[this.currentTickIndex];
+        // Enforce uppercase keys just in case Gemini returned lowercase JSON
+        const tick: any = {};
+        if (rawTick) {
+          Object.keys(rawTick).forEach(key => {
+            tick[key.toUpperCase()] = (rawTick as any)[key];
+          });
+          tick.minute = rawTick.minute;
+        }
+        // Save the cleaned tick back so getCurrentStockPrice finds uppercase keys safely
+        this.trajectoryPoints[this.currentTickIndex] = tick as TournamentDataPoint;
+
+        const tickNews = this.newsItems.filter(n => n.minute === tick.minute);
+
+        // Recalculate everyone's score
+        const participants = await this.prisma.tournamentParticipant.findMany({
+          where: { tournamentId },
+          include: { user: true },
         });
-        return;
+
+        for (const p of participants) {
+          await this.recalculateScore(p.id);
+        }
+
+        // Build leaderboard
+        const updatedParticipants = await this.prisma.tournamentParticipant.findMany({
+          where: { tournamentId },
+          include: { user: true },
+          orderBy: { currentScore: 'desc' },
+        });
+
+        const leaderboard: LeaderboardEntry[] = updatedParticipants.map((p, index) => ({
+          userId: p.userId,
+          username: p.user.username,
+          pnl: Number(p.currentScore) || 0,
+          rank: index + 1,
+        }));
+
+        // Fire callback to alert the Gateway
+        if (this.tickCallback) {
+          this.tickCallback(tick, tickNews, leaderboard);
+        }
+
+        this.currentTickIndex++;
+      } catch (err) {
+        this.logger.error(`Tick Engine Error at minute ${this.currentTickIndex}:`, err);
+        this.stopTickEngine();
       }
+    };
 
-      const tick = this.trajectoryPoints[this.currentTickIndex];
-      const tickNews = this.newsItems.filter(n => n.minute === tick.minute);
-
-      // Recalculate everyone's score
-      const participants = await this.prisma.tournamentParticipant.findMany({
-        where: { tournamentId },
-        include: { user: true },
-      });
-
-      for (const p of participants) {
-        await this.recalculateScore(p.id);
+    // Wait 2.5s to allow clients to establish WebSocket connection before first tick
+    setTimeout(() => {
+      // Check if we didn't stop it in the meantime
+      if (this.currentTickIndex === 0) {
+        tickFn();
+        this.tickInterval = setInterval(tickFn, intervalMs);
       }
-
-      // Build leaderboard
-      const updatedParticipants = await this.prisma.tournamentParticipant.findMany({
-        where: { tournamentId },
-        include: { user: true },
-        orderBy: { currentScore: 'desc' },
-      });
-
-      const leaderboard: LeaderboardEntry[] = updatedParticipants.map((p, index) => ({
-        userId: p.userId,
-        username: p.user.username,
-        pnl: Number(p.currentScore),
-        rank: index + 1,
-      }));
-
-      // Fire callback to alert the Gateway
-      if (this.tickCallback) {
-        this.tickCallback(tick, tickNews, leaderboard);
-      }
-
-      this.currentTickIndex++;
-    }, 5000);
+    }, 2500);
   }
 
   private stopTickEngine() {

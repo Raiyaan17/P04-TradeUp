@@ -17,8 +17,6 @@ export function formatCurrency(
   } = {}
 ): string {
   const {
-    currency = 'PKR',
-    locale = 'en-PK',
     minimumFractionDigits = 2,
     maximumFractionDigits = 2,
     compact = false,
@@ -31,31 +29,25 @@ export function formatCurrency(
   }
 
   try {
-    return new Intl.NumberFormat(locale, {
-      style: 'currency',
-      currency,
+    const formattedNum = new Intl.NumberFormat('en-US', {
       minimumFractionDigits,
       maximumFractionDigits,
       notation: compact ? 'compact' : 'standard',
     }).format(num);
+    return `Rs ${formattedNum}`;
   } catch {
-    // Fallback for unsupported currencies
-    return `${currency} ${num.toFixed(maximumFractionDigits)}`;
+    return `Rs ${num.toFixed(maximumFractionDigits)}`;
   }
 }
 
 /**
- * Format a number as USD currency
+ * Format a number as USD currency (Now updated to return Rs as requested)
  */
 export function formatUSD(
   value: number | string | null | undefined,
   options: { compact?: boolean } = {}
 ): string {
-  return formatCurrency(value, {
-    currency: 'USD',
-    locale: 'en-US',
-    ...options,
-  });
+  return formatCurrency(value, options);
 }
 
 /**

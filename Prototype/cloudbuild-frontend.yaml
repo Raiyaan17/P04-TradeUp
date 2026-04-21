@@ -1,7 +1,15 @@
 steps:
   - name: 'gcr.io/cloud-builders/docker'
     dir: 'Prototype/frontend'
-    args: ['build', '-t', 'us-central1-docker.pkg.dev/project-8ca874ae-688d-414c-91b/tradeup/frontend:latest', '.']
+    args: 
+      - 'build'
+      - '--build-arg'
+      - 'NEXT_PUBLIC_API_URL=http://136.119.205.38'
+      - '--build-arg'
+      - 'NEXT_PUBLIC_WS_URL=http://136.119.205.38'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/project-8ca874ae-688d-414c-91b/tradeup/frontend:latest'
+      - '.'
 images:
   - 'us-central1-docker.pkg.dev/project-8ca874ae-688d-414c-91b/tradeup/frontend:latest'
 options:

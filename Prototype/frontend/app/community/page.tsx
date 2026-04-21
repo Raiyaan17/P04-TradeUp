@@ -1257,8 +1257,6 @@ export default function CommunityPage() {
                 onChange={setNewContent}
                 onMention={addMention}
                 placeholder="What's on your mind? Type @ to mention someone..."
-                value={newContent}
-                onChange={setNewContent}
               />
               
               {/* Mentioned users display */}
