@@ -13,7 +13,7 @@ import {
   UploadedFile,
   Logger,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { CommunityService } from './community.service';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { CreatePostDto } from './dto/create-post.dto';
@@ -37,6 +37,7 @@ interface AuthenticatedRequest {
   };
 }
 
+@ApiTags('Community')
 @Controller('community')
 @UseGuards(JwtAuthGuard)
 export class CommunityController {
@@ -208,19 +209,24 @@ export class CommunityController {
 
   @Post('upload-image')
   @UseGuards(JwtAuthGuard)
-  @UseInterceptors(FileInterceptor('file'))
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Upload community image' })
   async uploadImage(
-    @Req() req: AuthenticatedRequest,
-    @UploadedFile() file: UploadedFileType,
+    @Req() req: AuthenticatedRequest & { isMultipart: () => boolean, file: () => Promise<any> },
   ) {
+    if (!req.isMultipart || !req.isMultipart()) {
+      throw new Error('Request is not multipart');
+    }
+    const file = await req.file();
     if (!file) {
       throw new Error('No file uploaded');
     }
     try {
+      const buffer = await file.toBuffer();
       const imageUrl = await this.community.uploadImage(
         req.user.userId,
-        file.buffer,
-        file.originalname,
+        buffer,
+        file.filename,
         file.mimetype,
       );
       return { imageUrl };

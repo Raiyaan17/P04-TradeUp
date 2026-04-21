@@ -136,6 +136,7 @@ export default function OraclePage() {
   const [speed, setSpeed] = useState<"normal" | "fast">("normal");
 
   // Game Data
+  const [activeTournaments, setActiveTournaments] = useState<any[]>([]);
   const [tournament, setTournament] = useState<any>(null);
   const [portfolio, setPortfolio] = useState<{ balance: number, holdings: any[] }>({ balance: 0, holdings: [] });
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
@@ -176,14 +177,27 @@ export default function OraclePage() {
     if (!user) return;
     try {
       setLoading(true);
-      const res: any = await http.get("/oracle/tournament/active");
-      if (res && res.id) {
-        setTournament(res);
-        joinTournament(res.id);
-        fetchPortfolio();
+      const res: any = await http.get("/oracle/tournament/list");
+      if (Array.isArray(res)) {
+        setActiveTournaments(res);
       }
     } catch (e) {
-      console.log("No active tournament");
+      console.log("Failed to fetch tournaments");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleJoinGame = async (t: any) => {
+    try {
+      setLoading(true);
+      await http.post("/oracle/tournament/join", { tournamentId: t.id });
+      setTournament(t);
+      connectWS();
+      fetchPortfolio();
+      toast.success("Joined Tournament!");
+    } catch (e) {
+      toast.error("Failed to join");
     } finally {
       setLoading(false);
     }
@@ -194,22 +208,13 @@ export default function OraclePage() {
       setLoading(true);
       const res: any = await http.post("/oracle/tournament/start", { startingCash, speed });
       setTournament(res);
-      joinTournament(res.id);
+      connectWS();
       fetchPortfolio();
+      toast.success("Joined Tournament!");
     } catch {
       toast.error("Failed to start tournament");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const joinTournament = async (id: string) => {
-    try {
-      await http.post("/oracle/tournament/join", { tournamentId: id });
-      connectWS();
-      toast.success("Joined Tournament!");
-    } catch {
-      toast.error("Failed to join");
     }
   };
 
@@ -315,43 +320,104 @@ export default function OraclePage() {
     return (
       <AppShell>
         <PageHeader title="Tournament Oracle" description="Global 1-Hour Real-Time Market Competition" />
-        <Card className="max-w-md mx-auto mt-12 bg-card/60 backdrop-blur shadow-2xl border-primary/20">
-          <CardHeader>
-            <CardTitle>Start New Tournament</CardTitle>
-            <CardDescription>No active tournament found. You can start one!</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div>
-              <label className="text-sm font-semibold mb-2 block">Starting Cash (PKR)</label>
-              <input 
-                type="number" 
-                value={startingCash} 
-                onChange={e => setStartingCash(Number(e.target.value))}
-                className="w-full bg-background border px-3 py-2 rounded focus:ring-2 ring-primary outline-none" 
-              />
-            </div>
-            <div>
-              <label className="text-sm font-semibold mb-2 block">Simulation Speed</label>
-              <div className="flex bg-muted rounded-md p-1">
-                 <button 
-                   onClick={() => setSpeed("normal")} 
-                   className={cn("flex-1 py-1.5 text-sm rounded transition", speed === "normal" ? "bg-background shadow font-semibold" : "opacity-70")}
-                 >
-                    Normal (60 mins)
-                 </button>
-                 <button 
-                   onClick={() => setSpeed("fast")} 
-                   className={cn("flex-1 py-1.5 text-sm rounded transition", speed === "fast" ? "bg-background shadow font-semibold text-primary" : "opacity-70")}
-                 >
-                    Fast (5 mins)
-                 </button>
+        
+        <div className="max-w-4xl mx-auto mt-8 space-y-12">
+          
+          <div className="space-y-4">
+            <h2 className="text-2xl font-bold flex items-center gap-2">
+              <Radio className="w-6 h-6 text-primary animate-pulse" /> Ongoing Games
+            </h2>
+            {activeTournaments.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                 {activeTournaments.map(t => {
+                   const isParticipant = t.participants?.some((p: any) => p.userId === user?.id);
+                   return (
+                     <Card key={t.id} className="bg-card shadow-lg border-primary/20 hover:border-primary/50 transition-colors">
+                       <CardHeader>
+                         <CardTitle className="text-xl flex justify-between items-center">
+                           Global Tournament
+                           <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20">Active</Badge>
+                         </CardTitle>
+                         <CardDescription>Join in progress!</CardDescription>
+                       </CardHeader>
+                       <CardContent className="space-y-4">
+                          <div className="flex justify-between text-sm">
+                             <span className="text-muted-foreground">Players:</span>
+                             <span className="font-bold">{t.participants?.length || 0}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                             <span className="text-muted-foreground">Starting Cash:</span>
+                             <span className="font-bold">{formatDecimal(t.startingCash)} PKR</span>
+                          </div>
+                          <Button 
+                            className={cn("w-full font-bold", isParticipant ? "bg-primary" : "bg-emerald-600 hover:bg-emerald-700")} 
+                            onClick={() => handleJoinGame(t)}
+                          >
+                             <Play className="mr-2 w-4 h-4 fill-current" /> {isParticipant ? "Enter Game" : "Join Game"}
+                          </Button>
+                       </CardContent>
+                     </Card>
+                   );
+                 })}
               </div>
-            </div>
-            <Button size="lg" className="w-full font-semibold" onClick={startTournament}>
-              <Play className="mr-2 w-5 h-5 fill-current" /> Initialize Global Tournament
-            </Button>
-          </CardContent>
-        </Card>
+            ) : (
+               <Card className="bg-muted/30 border-dashed">
+                 <CardContent className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                    <Activity className="w-12 h-12 mb-4 opacity-20" />
+                    <p>No ongoing games found.</p>
+                 </CardContent>
+               </Card>
+            )}
+          </div>
+
+          <div className="relative">
+             <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-muted" />
+             </div>
+             <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-4 text-muted-foreground font-semibold">Or</span>
+             </div>
+          </div>
+
+          <Card className="max-w-md mx-auto bg-card/60 backdrop-blur shadow-2xl border-primary/20">
+            <CardHeader>
+              <CardTitle>Start New Tournament</CardTitle>
+              <CardDescription>Initialize your own global trading simulation.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div>
+                <label className="text-sm font-semibold mb-2 block">Starting Cash (PKR)</label>
+                <input 
+                  type="number" 
+                  value={startingCash} 
+                  onChange={e => setStartingCash(Number(e.target.value))}
+                  className="w-full bg-background border px-3 py-2 rounded focus:ring-2 ring-primary outline-none" 
+                />
+              </div>
+              <div>
+                <label className="text-sm font-semibold mb-2 block">Simulation Speed</label>
+                <div className="flex bg-muted rounded-md p-1">
+                   <button 
+                     onClick={() => setSpeed("normal")} 
+                     className={cn("flex-1 py-1.5 text-sm rounded transition", speed === "normal" ? "bg-background shadow font-semibold" : "opacity-70")}
+                   >
+                      Normal (60 mins)
+                   </button>
+                   <button 
+                     onClick={() => setSpeed("fast")} 
+                     className={cn("flex-1 py-1.5 text-sm rounded transition", speed === "fast" ? "bg-background shadow font-semibold text-primary" : "opacity-70")}
+                   >
+                      Fast (5 mins)
+                   </button>
+                </div>
+              </div>
+              <Button size="lg" className="w-full font-semibold" onClick={startTournament}>
+                <Play className="mr-2 w-5 h-5 fill-current" /> Initialize Global Tournament
+              </Button>
+            </CardContent>
+          </Card>
+
+        </div>
       </AppShell>
     );
   }

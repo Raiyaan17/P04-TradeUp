@@ -4,7 +4,7 @@ metadata:
   name: tradeup-frontend
   namespace: tradeup
 spec:
-  replicas: 2 # Frontend is stateless, can scale safely
+  replicas: 2 
   selector:
     matchLabels:
       app: tradeup-frontend

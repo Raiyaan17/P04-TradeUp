@@ -54,6 +54,18 @@ export class OracleService implements OnModuleDestroy {
     });
   }
 
+  async getActiveTournaments() {
+    return this.prisma.tournament.findMany({
+      where: { status: TournamentStatus.ACTIVE },
+      include: {
+        participants: {
+          include: { user: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   async getPortfolio(userId: number) {
     const active = await this.getActiveTournament();
     if (!active) return { balance: 0, holdings: [] };
