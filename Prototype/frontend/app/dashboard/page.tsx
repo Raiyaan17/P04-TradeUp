@@ -6,6 +6,7 @@ import { Plus, Minus, Check, RefreshCcw, ChevronUp, ChevronDown, Search, Flame, 
 import { useRouter } from "next/navigation";
 import { useUser } from "@/context/UserContext";
 import { isBalanceUnset } from "@/lib/userService";
+import { formatUSD } from "@/lib/format";
 import { AppShell } from "@/components/layout";
 import { PageHeader, EmptyState } from "@/components/common";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -265,7 +266,7 @@ export default function DashboardPage() {
       await http.post("/users/fund-wallet", { amount });
       await refreshUser?.();
       setShowWalletPopup(false);
-      toast.success(`Rs ${amount} added to your wallet`);
+      toast.success(`${formatUSD(amount)} added to your wallet`);
     } catch (error) {
       console.error("Error funding wallet:", error);
       toast.error("Failed to fund wallet");

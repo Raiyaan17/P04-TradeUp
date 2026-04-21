@@ -886,7 +886,7 @@ export default function Charts() {
               <Button
                 className="w-full h-8 bg-emerald-500 hover:bg-emerald-600 text-white font-medium shadow-none transition-colors"
                 onClick={handleBuySubmit}
-                disabled={isSubmittingBuy || !marketStatus.isConnected}
+                disabled={isSubmittingBuy}
               >
                 {isSubmittingBuy ? "Processing..." : "Execute Buy"}
               </Button>
@@ -946,13 +946,13 @@ export default function Charts() {
               </div>
 
               <Button
-                className="w-full h-8 bg-rose-500 hover:bg-rose-600 text-white font-medium shadow-none transition-colors mt-4"
+                className="w-full h-8 bg-rose-500 hover:bg-rose-600 text-white font-medium shadow-none transition-colors"
                 onClick={() => {
                   setSellReason(null);
                   setSellNote('');
                   setSellDialogOpen(true);
                 }}
-                disabled={isSubmittingSell || !marketStatus.isConnected}
+                disabled={isSubmittingSell}
               >
                 Sell
               </Button>

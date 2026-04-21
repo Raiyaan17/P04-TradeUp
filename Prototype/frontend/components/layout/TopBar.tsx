@@ -14,8 +14,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { LogOut, Settings, User, Menu, X } from "lucide-react";
+import { LogOut, Settings, User, Menu, X, Sun, Moon } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useTheme } from "next-themes";
 import { getFriendRequests } from "@/lib/friendsService";
 
 const NAV_LINKS = [
@@ -29,10 +30,14 @@ const NAV_LINKS = [
 
 export function TopBar() {
   const { user, refreshUser } = useUser();
+  const { resolvedTheme, setTheme } = useTheme();
   const router = useRouter();
   const pathname = usePathname();
   const [hasRequests, setHasRequests] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => { setMounted(true); }, []);
 
   const handleSignOut = async () => {
     if (typeof window !== "undefined") {
@@ -108,6 +113,23 @@ export function TopBar() {
 
           {/* Right side Actions */}
           <div className="flex items-center gap-2">
+            {/* Theme Toggle */}
+            {mounted && (
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Toggle theme"
+                onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+                className="h-9 w-9 rounded-full text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {resolvedTheme === 'dark' ? (
+                  <Sun className="h-4 w-4" />
+                ) : (
+                  <Moon className="h-4 w-4" />
+                )}
+              </Button>
+            )}
+
             {/* User Menu */}
             <DropdownMenu>
             <DropdownMenuTrigger asChild>

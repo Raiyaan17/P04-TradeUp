@@ -34,14 +34,14 @@ export function formatCurrency(
       maximumFractionDigits,
       notation: compact ? 'compact' : 'standard',
     }).format(num);
-    return `Rs ${formattedNum}`;
+    return `Rs. ${formattedNum}`;
   } catch {
-    return `Rs ${num.toFixed(maximumFractionDigits)}`;
+    return `Rs. ${num.toFixed(maximumFractionDigits)}`;
   }
 }
 
 /**
- * Format a number as USD currency (Now updated to return Rs as requested)
+ * Format a number as currency (Now updated to return Rs. as requested)
  */
 export function formatUSD(
   value: number | string | null | undefined,
