@@ -26,6 +26,11 @@ export class StocksController {
     return this.stocks.listFeaturedWithTicks();
   }
 
+  @Get('insights')
+  async getInsights() {
+    return this.stocks.getMarketInsights();
+  }
+
   @Get(':symbol/klines/:timeframe')
   async getKlines(
     @Param('symbol') symbol: string,

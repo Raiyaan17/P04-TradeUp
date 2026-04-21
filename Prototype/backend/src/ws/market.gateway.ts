@@ -9,6 +9,7 @@ import {
 import { Server, Socket } from 'socket.io';
 import { WebSocket } from 'ws';
 import { FEATURED_SYMBOLS, PSX_WS_URL } from '../common/constants';
+import { StocksService } from '../stocks/stocks.service';
 
 interface TickUpdateMessage {
   type: string;
@@ -36,6 +37,8 @@ export class MarketGateway implements OnModuleInit {
 
   private upstream?: WebSocket;
 
+  constructor(private readonly stocksService: StocksService) {}
+
   onModuleInit() {
     this.connectUpstream();
   }
@@ -57,18 +60,16 @@ export class MarketGateway implements OnModuleInit {
     this.upstream = ws;
 
     ws.on('open', () => {
-      for (const symbol of FEATURED_SYMBOLS) {
-        const msg = {
-          type: 'subscribe',
-          subscriptionType: 'marketData',
-          params: { marketType: 'REG', symbol },
-          requestId: `sub-${symbol}`,
-        };
-        ws.send(JSON.stringify(msg));
-      }
+      // Single global subscription to the entire REG market
+      const msg = {
+        type: 'subscribe',
+        subscriptionType: 'marketData',
+        params: { marketType: 'REG' },
+        requestId: 'sub-market-all',
+      };
+      ws.send(JSON.stringify(msg));
     });
 
-    // Fix: Type 'data' as unknown and safely narrow types instead of using 'any'
     ws.on('message', (data: unknown) => {
       try {
         let rawMessage: string;
@@ -76,20 +77,29 @@ export class MarketGateway implements OnModuleInit {
         if (Buffer.isBuffer(data)) {
           rawMessage = data.toString();
         } else if (Array.isArray(data)) {
-          // If data is Buffer[], concatenate it
           rawMessage = Buffer.concat(data as Buffer[]).toString();
         } else if (data instanceof ArrayBuffer) {
           rawMessage = Buffer.from(data).toString();
         } else {
-          // Safe fallback
           rawMessage = String(data);
         }
 
-        const msg = JSON.parse(rawMessage) as TickUpdateMessage;
+        const msg = JSON.parse(rawMessage);
+
+        // Handle PSX Heartbeat Requirements
+        if (msg?.type === 'ping') {
+          ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
+          return;
+        }
 
         if (msg?.type === 'tickUpdate' && msg?.symbol) {
-          console.log(msg);
-          this.server.to(`symbol:${msg.symbol}`).emit('tickUpdate', msg);
+          // Gatekeeper: Only process allowed KSE-100 symbols
+          if ((FEATURED_SYMBOLS as readonly string[]).includes(msg.symbol)) {
+            // Update in-memory cache directly into the service layer
+            this.stocksService.updateTickCache(msg.symbol, msg.tick || msg);
+            // Broadcast to connected frontend clients
+            this.server.to(`symbol:${msg.symbol}`).emit('tickUpdate', msg);
+          }
         }
       } catch (error) {
         console.error('Failed to parse WebSocket message:', error);
