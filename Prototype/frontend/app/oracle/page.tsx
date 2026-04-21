@@ -106,14 +106,15 @@ export default function OraclePage() {
   const joinTournament = async (id: string) => {
     try {
       await http.post("/oracle/tournament/join", { tournamentId: id });
-      connectWS();
       toast.success("Joined Tournament!");
     } catch {
       toast.error("Failed to join");
     }
   };
 
-  const connectWS = () => {
+  useEffect(() => {
+    if (!tournament) return;
+
     // Determine the base URL for the WebSocket namespace
     // Assuming backend is same domain but on the default port or from environment
     const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "http://localhost:3001";
@@ -147,7 +148,7 @@ export default function OraclePage() {
     return () => {
       socket.disconnect();
     };
-  };
+  }, [tournament]);
 
   const updateUserBalance = async (lb: LeaderboardEntry[]) => {
       // In a real app we'd fetch portfolio on tick, or the WS would send user-specific data

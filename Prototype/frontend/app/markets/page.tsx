@@ -138,12 +138,6 @@ export default function MarketsPage() {
 
         socket.on('connect', () => {
             setWsStatus('connected');
-            // Subscribe to all featured symbols we currently tracked
-            // Note: Ideally the backend has a 'subscribeAllFeatured' but we'll emit individually for now
-            // relying on the initial REST load to give us the list.
-            stocks.forEach(stock => {
-                socket.emit("subscribeSymbol", stock.symbol);
-            });
         });
 
         socket.on('disconnect', () => {
@@ -172,7 +166,17 @@ export default function MarketsPage() {
             socket.close();
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [stocks.length]); // stocks.length intentionally used — full array ref would reconnect on every tick update
+    }, []); // Only establish connection once on mount
+
+    // 2.1 Subsription Effect
+    useEffect(() => {
+        if (wsStatus === 'connected' && socketRef.current && stocks.length > 0) {
+            stocks.forEach(stock => {
+                socketRef.current!.emit("subscribeSymbol", stock.symbol);
+            });
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [stocks.length, wsStatus]);
 
     // 3. Search Filter
     useEffect(() => {

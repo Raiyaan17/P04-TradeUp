@@ -72,7 +72,7 @@ export class TradesController {
     @Body() sellStockDto: SellStockDto,
   ) {
     const userId = req.user.userId;
-    const { symbol, quantity } = sellStockDto;
-    return this.tradesService.sellStock(userId, symbol, quantity);
+    const { symbol, quantity, sellReason, sellNote } = sellStockDto;
+    return this.tradesService.sellStock(userId, symbol, quantity, sellReason, sellNote);
   }
 }
