@@ -12,6 +12,11 @@ export class OracleController {
     return this.oracleService.getActiveTournament();
   }
 
+  @Get('list')
+  async getActiveTournaments() {
+    return this.oracleService.getActiveTournaments();
+  }
+
   @Get('portfolio')
   async getPortfolio(@Req() req: any) {
     return this.oracleService.getPortfolio(req.user.userId);

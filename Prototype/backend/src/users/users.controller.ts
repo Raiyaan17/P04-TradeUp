@@ -11,7 +11,7 @@ import {
   Param,
   ParseIntPipe,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
@@ -39,27 +39,35 @@ type UploadedFileType = {
   mimetype: string;
 };
 
+@ApiTags('Users')
 @Controller('users')
 export class UsersController {
   private readonly logger = new Logger(UsersController.name);
 
   @UseGuards(JwtAuthGuard)
   @Post('profile-picture')
-  @UseInterceptors(FileInterceptor('file'))
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Upload profile picture' })
   async uploadProfilePicture(
-    @Request() req: AuthenticatedRequest,
-    @UploadedFile() file: UploadedFileType,
+    @Request() req: AuthenticatedRequest & { isMultipart: () => boolean, file: () => Promise<any> },
   ) {
+    if (!req.isMultipart || !req.isMultipart()) {
+      this.logger.error('Request is not multipart');
+      throw new UnauthorizedException('Request is not multipart');
+    }
+
+    const file = await req.file();
     if (!file) {
       this.logger.error('No file uploaded');
       throw new UnauthorizedException('No file uploaded');
     }
     try {
+      const buffer = await file.toBuffer();
       // Pass file.mimetype to service for correct contentType
       const imageUrl = await this.usersService.uploadProfilePicture(
         req.user.userId,
-        file.buffer,
-        file.originalname,
+        buffer,
+        file.filename,
         file.mimetype,
       );
       this.logger.debug(`Image uploaded successfully. URL: ${imageUrl}`);
