@@ -1,4 +1,5 @@
 steps:
+  # STEP 1: Build the image and tag it with the dynamic Git Hash ($SHORT_SHA)
   - name: 'gcr.io/cloud-builders/docker'
     dir: 'Prototype/frontend'
     args: 
@@ -8,9 +9,24 @@ steps:
       - '--build-arg'
       - 'NEXT_PUBLIC_WS_URL=http://136.119.205.38'
       - '-t'
+      - 'us-central1-docker.pkg.dev/project-8ca874ae-688d-414c-91b/tradeup/frontend:$SHORT_SHA'
+      - '-t' # We also tag it as latest just as a fallback/best practice
       - 'us-central1-docker.pkg.dev/project-8ca874ae-688d-414c-91b/tradeup/frontend:latest'
       - '.'
+
+  # STEP 2: The Magic! Automatically tell K8s to pull this new specific hash
+  - name: 'gcr.io/cloud-builders/kubectl'
+    args:
+      - 'set'
+      - 'image'
+      - 'deployment/tradeup-frontend' 
+      - 'frontend-sha256-1=us-central1-docker.pkg.dev/project-8ca874ae-688d-414c-91b/tradeup/frontend:$SHORT_SHA' # <-- REPLACE YOUR_CONTAINER_NAME with the name from Step 1
+    env:
+      - 'CLOUDSDK_COMPUTE_REGION=us-central1' 
+      - 'CLOUDSDK_CONTAINER_CLUSTER=autopilot-cluster-1'
+
 images:
+  - 'us-central1-docker.pkg.dev/project-8ca874ae-688d-414c-91b/tradeup/frontend:$SHORT_SHA'
   - 'us-central1-docker.pkg.dev/project-8ca874ae-688d-414c-91b/tradeup/frontend:latest'
 options:
   logging: CLOUD_LOGGING_ONLY
