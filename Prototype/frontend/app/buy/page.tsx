@@ -9,9 +9,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { http, ApiException } from "@/lib/http";
-import { formatDecimal, getPnLClass } from "@/lib/format";
+import { getPnLClass, formatDecimal } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { SellJournalInput, type SellReasonType } from "@/components/portfolio/SellJournalInput";
+import { SYMBOL_SECTOR_MAP, ACTIVE_SECTORS } from "@/lib/constants";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface Tick {
     price: number;
@@ -30,12 +32,14 @@ export default function TradeTestPage() {
     const [selectedStock, setSelectedStock] = useState<StockData | null>(null);
     const [quantity, setQuantity] = useState<number>(0);
     const [searchTerm, setSearchTerm] = useState<string>("");
+    const [selectedSector, setSelectedSector] = useState<string>("All Sectors");
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
     const [executingAction, setExecutingAction] = useState<'buy' | 'sell' | null>(null);
     const isSubmitting = executingAction !== null;
     const [sellReason, setSellReason] = useState<SellReasonType | null>(null);
     const [sellNote, setSellNote] = useState('');
+    const [sellDialogOpen, setSellDialogOpen] = useState(false);
 
     const fetchAllStocks = useCallback(async (): Promise<void> => {
         try {
@@ -115,10 +119,14 @@ export default function TradeTestPage() {
     const currentPrice = selectedStock ? getPrice(selectedStock.tick) : 0;
     const totalValue = currentPrice * quantity;
 
-    const filteredStocks = stocks.filter(stock =>
-        stock.symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        stock.name?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredStocks = stocks.filter(stock => {
+        const matchesSearch = stock.symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                              stock.name?.toLowerCase().includes(searchTerm.toLowerCase());
+        const stockSector = SYMBOL_SECTOR_MAP[stock.symbol];
+        const matchesSector = selectedSector === "All Sectors" || stockSector === selectedSector;
+        
+        return matchesSearch && matchesSector;
+    });
 
     return (
         <AppShell fullWidth>
@@ -127,16 +135,28 @@ export default function TradeTestPage() {
                     {/* Left Column: Asset Selection */}
                     <div className="lg:col-span-7 xl:col-span-8 flex flex-col gap-6">
                         <div>
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                            <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 mb-4">
                                 <h2 className="text-2xl font-semibold text-foreground/90">1. Select Asset</h2>
-                                <div className="relative w-full sm:w-64">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                    <Input
-                                        placeholder="Search stocks..."
-                                        className="pl-9"
-                                        value={searchTerm}
-                                        onChange={(e) => setSearchTerm(e.target.value)}
-                                    />
+                                <div className="flex flex-col sm:flex-row gap-3 w-full xl:w-auto">
+                                    <div className="relative w-full sm:w-64">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                        <Input
+                                            placeholder="Search stocks..."
+                                            className="pl-9 bg-secondary border-none"
+                                            value={searchTerm}
+                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                        />
+                                    </div>
+                                    <select
+                                        className="flex h-10 w-full sm:w-48 items-center justify-between rounded-md border-none bg-secondary px-3 py-2 text-sm ring-offset-background cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 hover:bg-secondary/80 transition-colors"
+                                        value={selectedSector}
+                                        onChange={(e) => setSelectedSector(e.target.value)}
+                                    >
+                                        <option value="All Sectors">All Sectors</option>
+                                        {ACTIVE_SECTORS.map(sector => (
+                                            <option key={sector} value={sector}>{sector}</option>
+                                        ))}
+                                    </select>
                                 </div>
                             </div>
 
@@ -170,6 +190,11 @@ export default function TradeTestPage() {
                                                         <div>
                                                             <h3 className="text-lg font-bold tracking-tight">{stock.symbol}</h3>
                                                             <p className="text-xs text-muted-foreground line-clamp-1">{stock.name || "Unknown Company"}</p>
+                                                            {SYMBOL_SECTOR_MAP[stock.symbol] && (
+                                                                <span className="inline-block mt-1.5 px-2 py-0.5 text-[10px] font-medium tracking-wider rounded-sm bg-secondary text-secondary-foreground border border-border/50 uppercase">
+                                                                    {SYMBOL_SECTOR_MAP[stock.symbol]}
+                                                                </span>
+                                                            )}
                                                         </div>
                                                         <div className={cn("p-1.5 rounded-full", isPositive ? "bg-emerald-500/10 text-emerald-500" : "bg-rose-500/10 text-rose-500")}>
                                                             {isPositive ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
@@ -276,14 +301,13 @@ export default function TradeTestPage() {
                                                 variant="destructive"
                                                 className="w-full h-14 text-lg font-semibold bg-rose-600 hover:bg-rose-700 text-white shadow-sm"
                                                 disabled={quantity <= 0 || isSubmitting}
-                                                onClick={() => handleExecuteTrade('sell')}
+                                                onClick={() => {
+                                                    setSellReason(null);
+                                                    setSellNote('');
+                                                    setSellDialogOpen(true);
+                                                }}
                                             >
-                                                {executingAction === 'sell' ? (
-                                                    <span className="flex items-center gap-2">
-                                                        <Loader2 className="animate-spin h-5 w-5" />
-                                                        Executing...
-                                                    </span>
-                                                ) : "Sell"}
+                                                Sell
                                             </Button>
                                             <p className="text-xs text-muted-foreground text-center leading-relaxed h-12">
                                                 {quantity > 0 && selectedStock ? (
@@ -293,16 +317,42 @@ export default function TradeTestPage() {
                                         </div>
                                     </div>
 
-                                    {/* Sell Journal Section */}
-                                    <SellJournalInput
-                                        sellReason={sellReason}
-                                        onReasonChange={setSellReason}
-                                        sellNote={sellNote}
-                                        onNoteChange={setSellNote}
-                                    />
-
                                 </CardContent>
                             </Card>
+
+                            {/* Sell Confirmation & Journaling Dialog */}
+                            <Dialog open={sellDialogOpen} onOpenChange={setSellDialogOpen}>
+                                <DialogContent>
+                                    <DialogHeader>
+                                        <DialogTitle>Confirm Sale</DialogTitle>
+                                        <DialogDescription>
+                                            You are about to sell {quantity} shares of {selectedStock?.symbol} for ~PKR {formatDecimal(totalValue)}.
+                                        </DialogDescription>
+                                    </DialogHeader>
+                                    <div className="py-4">
+                                        <SellJournalInput
+                                            sellReason={sellReason}
+                                            onReasonChange={setSellReason}
+                                            sellNote={sellNote}
+                                            onNoteChange={setSellNote}
+                                        />
+                                    </div>
+                                    <DialogFooter>
+                                        <Button variant="outline" onClick={() => setSellDialogOpen(false)} disabled={isSubmitting}>
+                                            Cancel
+                                        </Button>
+                                        <Button
+                                            variant="destructive"
+                                            onClick={() => {
+                                                handleExecuteTrade('sell').then(() => setSellDialogOpen(false));
+                                            }}
+                                            disabled={isSubmitting}
+                                        >
+                                            {isSubmitting ? 'Processing...' : 'Confirm Sell'}
+                                        </Button>
+                                    </DialogFooter>
+                                </DialogContent>
+                            </Dialog>
 
                         </div>
                     </div>

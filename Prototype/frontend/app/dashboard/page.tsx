@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "sonner";
-import { Plus, Minus, Check, RefreshCcw } from "lucide-react";
+import { Plus, Minus, Check, RefreshCcw, ChevronUp, ChevronDown, Search, Flame, TrendingUp, TrendingDown } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useUser } from "@/context/UserContext";
 import { isBalanceUnset } from "@/lib/userService";
 import { AppShell } from "@/components/layout";
@@ -48,6 +49,7 @@ interface StockData {
 }
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [featured, setFeatured] = useState<StockData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -57,8 +59,23 @@ export default function DashboardPage() {
   const [watchlistRows, setWatchlistRows] = useState<StockData[]>([]);
   const [saving, setSaving] = useState<Set<string>>(new Set());
   const [removing, setRemoving] = useState<Set<string>>(new Set());
+  const [activeTab, setActiveTab] = useState<"all" | "hot" | "gainers" | "losers">("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [insights, setInsights] = useState<{
+    gainers: StockData[];
+    losers: StockData[];
+    hot: StockData[];
+  }>({
+    gainers: [],
+    losers: [],
+    hot: [],
+  });
 
   const [showWalletPopup, setShowWalletPopup] = useState<boolean>(false);
+  const [sortConfig, setSortConfig] = useState<{ key: "pct" | null; direction: "asc" | "desc" | null }>({
+    key: "pct",
+    direction: null,
+  });
 
   const { user, refreshUser } = useUser() || {};
   const tokenRef = useRef<string | null>(null);
@@ -92,6 +109,21 @@ export default function DashboardPage() {
       setLoading(false);
     }
   }, []);
+
+  const fetchInsights = useCallback(async () => {
+    try {
+      const json = await http.get<{ gainers: any[]; losers: any[]; hot: any[] }>("/stocks/insights", { noAuth: true });
+      if (json) {
+        setInsights({
+          gainers: (json.gainers || []).map(x => normalizeStock(x)),
+          losers: (json.losers || []).map(x => normalizeStock(x)),
+          hot: (json.hot || []).map(x => normalizeStock(x)),
+        });
+      }
+    } catch (e) {
+      console.error("Failed to fetch insights:", e);
+    }
+  }, [normalizeStock]);
 
   const fetchWatchlist = useCallback(async () => {
     if (!tokenRef.current) {
@@ -137,8 +169,10 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchFeatured();
     fetchWatchlist();
+    fetchInsights();
 
     const idFeatured = setInterval(fetchFeatured, 10_000);
+    const idInsights = setInterval(fetchInsights, 20_000);
     const idWatch = setInterval(() => {
       if (tokenRef.current) fetchWatchlist();
     }, 30_000);
@@ -147,6 +181,7 @@ export default function DashboardPage() {
       if (document.hidden) {
         clearInterval(idFeatured);
         clearInterval(idWatch);
+        clearInterval(idInsights);
       }
     };
     document.addEventListener("visibilitychange", onVis);
@@ -154,9 +189,10 @@ export default function DashboardPage() {
     return () => {
       clearInterval(idFeatured);
       clearInterval(idWatch);
+      clearInterval(idInsights);
       document.removeEventListener("visibilitychange", onVis);
     };
-  }, [fetchFeatured, fetchWatchlist]);
+  }, [fetchFeatured, fetchWatchlist, fetchInsights]);
 
   const saveSymbol = useCallback(async (symbol: string) => {
     if (!tokenRef.current) {
@@ -236,6 +272,48 @@ export default function DashboardPage() {
     }
   };
 
+  const toggleSort = (key: "pct") => {
+    setSortConfig((prev) => {
+      if (prev.key !== key) return { key, direction: "desc" };
+      if (prev.direction === "desc") return { key, direction: "asc" };
+      if (prev.direction === "asc") return { key, direction: null };
+      return { key, direction: "desc" };
+    });
+  };
+
+  const getSortedItems = useCallback((items: StockData[]) => {
+    if (!sortConfig.key || !sortConfig.direction) return items;
+
+    return [...items].sort((a, b) => {
+      const { pct: pctA } = getChange(a.tick);
+      const { pct: pctB } = getChange(b.tick);
+
+      const aVal = isFinite(pctA) ? pctA : -Infinity;
+      const bVal = isFinite(pctB) ? pctB : -Infinity;
+
+      if (sortConfig.direction === "asc") return aVal - bVal;
+      return bVal - aVal;
+    });
+  }, [sortConfig]);
+
+  const handleRowClick = (symbol: string) => {
+    router.push(`/charts?symbol=${encodeURIComponent(symbol)}`);
+  };
+
+  const activeItems = activeTab === "all" 
+      ? featured 
+      : activeTab === "hot" 
+        ? insights.hot 
+        : activeTab === "gainers" 
+          ? insights.gainers 
+          : insights.losers;
+
+  const filteredItems = getSortedItems(activeItems).filter(s => {
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase();
+      return s.symbol.toLowerCase().includes(q) || (s.name && s.name.toLowerCase().includes(q));
+  });
+
   return (
     <AppShell requireAuth={false}>
       {/* Wallet Popup */}
@@ -276,8 +354,8 @@ export default function DashboardPage() {
       )}
 
       <PageHeader
-        title="Featured PSX Stocks"
-        description="Live stock prices from Pakistan Stock Exchange"
+        title="Market Snapshot"
+        description="Live stock activity from Pakistan Stock Exchange"
         actions={
           <div className="flex items-center gap-3">
             {lastUpdated && (
@@ -307,7 +385,7 @@ export default function DashboardPage() {
               <CardTitle>Your Watchlist</CardTitle>
               {watchlistRows.length === 0 && (
                 <span className="text-sm text-muted-foreground">
-                  No stocks yet — add from the Featured list.
+                  No stocks yet — add from the Market Snapshot list.
                 </span>
               )}
             </div>
@@ -319,16 +397,25 @@ export default function DashboardPage() {
                   <TableRow>
                     <TableHead>Symbol</TableHead>
                     <TableHead>Name</TableHead>
-                    <TableHead>Market</TableHead>
                     <TableHead className="text-right">Last</TableHead>
-                    <TableHead className="text-right">Change</TableHead>
-                    <TableHead className="text-right">%</TableHead>
+                    <TableHead 
+                      className="text-right cursor-pointer select-none hover:text-foreground transition-colors"
+                      onClick={() => toggleSort("pct")}
+                    >
+                      <div className="flex items-center justify-end gap-1">
+                        % Change
+                        {sortConfig.key === "pct" && (
+                          sortConfig.direction === "asc" ? <ChevronUp className="h-4 w-4" /> : 
+                          sortConfig.direction === "desc" ? <ChevronDown className="h-4 w-4" /> : null
+                        )}
+                      </div>
+                    </TableHead>
                     <TableHead className="text-right">Volume</TableHead>
                     <TableHead className="text-right">Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {watchlistRows.map((row, i) => {
+                  {getSortedItems(watchlistRows).map((row, i) => {
                     const s = row?.symbol ?? `w-${i}`;
                     const price = getPrice(row?.tick);
                     const { chg, pct } = getChange(row?.tick);
@@ -336,18 +423,28 @@ export default function DashboardPage() {
                     const isRemoving = removing.has(s);
 
                     return (
-                      <TableRow key={s}>
+                      <TableRow 
+                        key={s}
+                        className="cursor-pointer hover:bg-muted/50 transition-colors"
+                        onClick={() => handleRowClick(s)}
+                      >
                         <TableCell className="font-medium">{row?.symbol ?? "—"}</TableCell>
                         <TableCell className="text-muted-foreground">{row?.name ?? "—"}</TableCell>
-                        <TableCell className="text-muted-foreground">{row?.marketType ?? "REG"}</TableCell>
                         <TableCell className="text-right tabular-nums font-medium">
                           {formatDecimal(price)}
                         </TableCell>
-                        <TableCell className={cn("text-right tabular-nums", getPnLClass(chg))}>
-                          {formatSigned(chg)}
-                        </TableCell>
-                        <TableCell className={cn("text-right tabular-nums", getPnLClass(pct))}>
-                          {formatPercent(pct)}
+                        <TableCell className="text-right">
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "font-mono rounded-sm border-transparent px-2 py-0.5",
+                              pct > 0 ? "bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20" :
+                              pct < 0 ? "bg-rose-500/10 text-rose-500 hover:bg-rose-500/20" :
+                              "bg-muted text-muted-foreground"
+                            )}
+                          >
+                            {formatPercent(pct)}
+                          </Badge>
                         </TableCell>
                         <TableCell className="text-right tabular-nums">
                           {formatVolume(vol)}
@@ -356,7 +453,10 @@ export default function DashboardPage() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => removeSymbol(s)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeSymbol(s);
+                            }}
                             disabled={isRemoving}
                           >
                             {isRemoving ? (
@@ -379,34 +479,98 @@ export default function DashboardPage() {
         </Card>
       )}
 
-      {/* Featured Stocks Section */}
+      {/* Market Snapshot Section */}
       <Card>
         <CardHeader className="pb-4">
-          <div className="flex items-center justify-between">
-            <CardTitle>Featured Stocks</CardTitle>
-            {error && <Badge variant="error">{error}</Badge>}
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+            <div className="flex items-center gap-3">
+              <CardTitle>Market Snapshot</CardTitle>
+              {error && <Badge variant="error">{error}</Badge>}
+            </div>
+            <div className="flex flex-col sm:flex-row items-center gap-4 w-full xl:w-auto">
+              <div className="relative w-full sm:w-72">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="search"
+                  placeholder="Search symbols..."
+                  className="pl-8 bg-secondary border-none"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+              <div className="flex flex-wrap items-center gap-1 bg-muted/50 p-1 rounded-lg w-full sm:w-auto">
+                <button
+                onClick={() => setActiveTab("all")}
+                className={cn(
+                  "px-4 py-1.5 text-sm font-medium rounded-md transition-all",
+                  activeTab === "all" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                All
+              </button>
+              <button
+                onClick={() => setActiveTab("hot")}
+                title="Top 10 stocks with the highest total value traded (turnover) today."
+                className={cn(
+                  "px-4 py-1.5 text-sm font-medium rounded-md transition-all flex items-center gap-1.5",
+                  activeTab === "hot" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <Flame className="h-4 w-4 text-orange-500" /> Hot
+              </button>
+              <button
+                onClick={() => setActiveTab("gainers")}
+                title="Top 10 highest percentage price increases today."
+                className={cn(
+                  "px-4 py-1.5 text-sm font-medium rounded-md transition-all flex items-center gap-1.5",
+                  activeTab === "gainers" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <TrendingUp className="h-4 w-4 text-emerald-500" /> Gainers
+              </button>
+              <button
+                onClick={() => setActiveTab("losers")}
+                title="Top 10 highest percentage price decreases today."
+                className={cn(
+                  "px-4 py-1.5 text-sm font-medium rounded-md transition-all flex items-center gap-1.5",
+                  activeTab === "losers" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <TrendingDown className="h-4 w-4 text-rose-500" /> Losers
+              </button>
+            </div>
+          </div>
           </div>
         </CardHeader>
         <CardContent>
           {loading ? (
             <SkeletonTable />
-          ) : (
+          ) : filteredItems.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Symbol</TableHead>
                   <TableHead>Name</TableHead>
-                  <TableHead>Market</TableHead>
                   <TableHead className="text-right">Last</TableHead>
-                  <TableHead className="text-right">Change</TableHead>
-                  <TableHead className="text-right">%</TableHead>
+                  <TableHead 
+                    className="text-right cursor-pointer select-none hover:text-foreground transition-colors"
+                    onClick={() => toggleSort("pct")}
+                  >
+                    <div className="flex items-center justify-end gap-1">
+                      % Change
+                      {sortConfig.key === "pct" && (
+                        sortConfig.direction === "asc" ? <ChevronUp className="h-4 w-4" /> : 
+                        sortConfig.direction === "desc" ? <ChevronDown className="h-4 w-4" /> : null
+                      )}
+                    </div>
+                  </TableHead>
                   <TableHead className="text-right">Volume</TableHead>
                   <TableHead className="text-right">Watch</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {featured.map((row, i) => {
-                  const s = row?.symbol ?? `s-${i}`;
+                {filteredItems.map((row, i) => {
+                  const s = row?.symbol ?? `${activeTab}-${i}`;
                   const price = getPrice(row?.tick);
                   const { chg, pct } = getChange(row?.tick);
                   const vol = getVolume(row?.tick);
@@ -415,18 +579,28 @@ export default function DashboardPage() {
                   const canSave = !!tokenRef.current && !isSaved && !isSaving;
 
                   return (
-                    <TableRow key={s}>
+                    <TableRow 
+                      key={s}
+                      className="cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => handleRowClick(s)}
+                    >
                       <TableCell className="font-medium">{row?.symbol ?? "—"}</TableCell>
                       <TableCell className="text-muted-foreground">{row?.name ?? "—"}</TableCell>
-                      <TableCell className="text-muted-foreground">{row?.marketType ?? "REG"}</TableCell>
                       <TableCell className="text-right tabular-nums font-medium">
                         {formatDecimal(price)}
                       </TableCell>
-                      <TableCell className={cn("text-right tabular-nums", getPnLClass(chg))}>
-                        {formatSigned(chg)}
-                      </TableCell>
-                      <TableCell className={cn("text-right tabular-nums", getPnLClass(pct))}>
-                        {formatPercent(pct)}
+                      <TableCell className="text-right">
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "font-mono rounded-sm border-transparent px-2 py-0.5",
+                            pct > 0 ? "bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20" :
+                            pct < 0 ? "bg-rose-500/10 text-rose-500 hover:bg-rose-500/20" :
+                            "bg-muted text-muted-foreground"
+                          )}
+                        >
+                          {formatPercent(pct)}
+                        </Badge>
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
                         {formatVolume(vol)}
@@ -440,7 +614,10 @@ export default function DashboardPage() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => saveSymbol(s)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              saveSymbol(s);
+                            }}
                             disabled={!canSave}
                             title={tokenRef.current ? "Save to watchlist" : "Sign in to save"}
                           >
@@ -458,6 +635,11 @@ export default function DashboardPage() {
                 })}
               </TableBody>
             </Table>
+          ) : (
+            <EmptyState
+              variant="search"
+              description={`No stocks found matching "${searchQuery}"`}
+            />
           )}
         </CardContent>
       </Card>
