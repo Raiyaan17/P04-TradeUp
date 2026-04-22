@@ -5,7 +5,10 @@ import {
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
 import multipart from '@fastify/multipart';
+import fastifyStatic from '@fastify/static';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { join } from 'path';
+import { mkdirSync, existsSync } from 'fs';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 
@@ -17,8 +20,18 @@ async function bootstrap() {
     new FastifyAdapter(),
   );
 
-  // Register fastify multipart feature
-  await app.register(multipart as any);
+  // Ensure uploads directory exists and serve it as static files
+  const uploadsDir = join(process.cwd(), 'uploads');
+  if (!existsSync(uploadsDir)) mkdirSync(uploadsDir, { recursive: true });
+  await app.register(fastifyStatic as any, {
+    root: uploadsDir,
+    prefix: '/uploads/',
+  });
+
+  // Register fastify multipart feature (10 MB limit)
+  await app.register(multipart as any, {
+    limits: { fileSize: 10 * 1024 * 1024 },
+  });
 
   // Configure Swagger Documentation
   const config = new DocumentBuilder()

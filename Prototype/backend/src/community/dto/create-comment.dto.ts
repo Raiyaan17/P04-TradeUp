@@ -16,7 +16,7 @@ export class CreateCommentDto {
   @MaxLength(2000)
   content!: string;
 
-  @IsUrl()
+  @IsUrl({ require_tld: false })
   @IsOptional()
   imageUrl?: string;
 
