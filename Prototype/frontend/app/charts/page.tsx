@@ -10,6 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { http, ApiException } from "@/lib/http";
 import { formatDecimal, formatPercent, formatVolume } from "@/lib/format";
@@ -102,7 +103,7 @@ export default function Charts() {
   const socketRef = useRef<Socket | null>(null);
 
   const [currentCandle, setCurrentCandle] = useState<CandleData | null>(null);
-  const [stock, setStock] = useState<string>('HBL');
+  const [stock, setStock] = useState<string>('');
   const [timeframe, setTimeframe] = useState<string>('1d'); // Default to 1d as in mockup
   const [historicalData, setHistoricalData] = useState<CandleData[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState<boolean>(false);
@@ -138,6 +139,7 @@ export default function Charts() {
   // Sell journal state
   const [sellReason, setSellReason] = useState<SellReasonType | null>(null);
   const [sellNote, setSellNote] = useState('');
+  const [sellDialogOpen, setSellDialogOpen] = useState(false);
 
   // Portfolio data
   const [portfolioData, setPortfolioData] = useState<PortfolioData | null>(null);
@@ -406,13 +408,15 @@ export default function Charts() {
     }
   }, []);
 
-  const fetchCompanyData = useCallback(async (symbol: string) => {
+  const fetchCompanyData = useCallback(async (symbol: string, signal?: AbortSignal) => {
     setIsLoadingCompany(true);
     try {
       const [companyRes, fundRes] = await Promise.all([
-        http.get<{ data: CompanyProfile }>(`/stocks/${encodeURIComponent(symbol)}/company`, { noAuth: true }),
-        http.get<{ data: Fundamentals }>(`/stocks/${encodeURIComponent(symbol)}/fundamentals`, { noAuth: true })
+        http.get<{ data: CompanyProfile }>(`/stocks/${encodeURIComponent(symbol)}/company`, { noAuth: true, signal }),
+        http.get<{ data: Fundamentals }>(`/stocks/${encodeURIComponent(symbol)}/fundamentals`, { noAuth: true, signal })
       ]);
+
+      if (signal?.aborted) return;
 
       if (companyRes?.data) setCompanyData(companyRes.data);
       else setCompanyData(null);
@@ -633,6 +637,7 @@ export default function Charts() {
       setSellQuantity(1);
       setSellReason(null);
       setSellNote('');
+      setSellDialogOpen(false);
       fetchPortfolio();
     } catch (err) {
       const message = err instanceof ApiException ? err.message : "Failed to place sell order. Please try again.";
@@ -656,13 +661,17 @@ export default function Charts() {
   useEffect(() => {
     const abortController = new AbortController();
 
+    if (!stock) return;
+
     setCurrentCandle(null);
     setTickData(null);
+    setCompanyData(null);
+    setFundamentalsData(null);
     hasReceivedTickRef.current = false;
 
     // Initial fetch
     fetchHistoricalData(stock, timeframe, abortController.signal);
-    fetchCompanyData(stock);
+    fetchCompanyData(stock, abortController.signal);
     fetchInitialTick(stock);
     connectWebSocket(stock);
 
@@ -877,7 +886,7 @@ export default function Charts() {
               <Button
                 className="w-full h-8 bg-emerald-500 hover:bg-emerald-600 text-white font-medium shadow-none transition-colors"
                 onClick={handleBuySubmit}
-                disabled={isSubmittingBuy || !marketStatus.isConnected}
+                disabled={isSubmittingBuy}
               >
                 {isSubmittingBuy ? "Processing..." : "Execute Buy"}
               </Button>
@@ -936,23 +945,52 @@ export default function Charts() {
                 </Button>
               </div>
 
-              <SellJournalInput
-                sellReason={sellReason}
-                onReasonChange={setSellReason}
-                sellNote={sellNote}
-                onNoteChange={setSellNote}
-                compact
-              />
-
               <Button
                 className="w-full h-8 bg-rose-500 hover:bg-rose-600 text-white font-medium shadow-none transition-colors"
-                onClick={handleSellSubmit}
-                disabled={isSubmittingSell || !marketStatus.isConnected}
+                onClick={() => {
+                  setSellReason(null);
+                  setSellNote('');
+                  setSellDialogOpen(true);
+                }}
+                disabled={isSubmittingSell}
               >
-                {isSubmittingSell ? "Processing..." : "Execute Sell"}
+                Sell
               </Button>
             </CardContent>
           </Card>
+
+          {/* Sell Confirmation & Journaling Dialog */}
+          <Dialog open={sellDialogOpen} onOpenChange={setSellDialogOpen}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Confirm Sale</DialogTitle>
+                <DialogDescription>
+                  You are about to sell {sellQuantity} shares of {stock} at market price.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="py-4">
+                <SellJournalInput
+                  sellReason={sellReason}
+                  onReasonChange={setSellReason}
+                  sellNote={sellNote}
+                  onNoteChange={setSellNote}
+                  compact
+                />
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setSellDialogOpen(false)} disabled={isSubmittingSell}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={handleSellSubmit}
+                  disabled={isSubmittingSell}
+                >
+                  {isSubmittingSell ? "Processing..." : "Confirm Sell"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
 
         {/* Main Content Area */}

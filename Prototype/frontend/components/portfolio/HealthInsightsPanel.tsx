@@ -27,6 +27,7 @@ interface HealthInsightsPanelProps {
   status: HealthStatus;
   signals: HealthSignal[];
   id?: string;
+  embedded?: boolean;
 }
 
 const signalMeta: Record<
@@ -83,9 +84,10 @@ export function HealthInsightsPanel({
   status,
   signals,
   id,
+  embedded = false,
 }: HealthInsightsPanelProps) {
   const hasIssues = status !== 'good';
-  const [expanded, setExpanded] = useState(hasIssues);
+  const [expanded, setExpanded] = useState(embedded || hasIssues);
   const [educationOpen, setEducationOpen] = useState(false);
   const [expandedHints, setExpandedHints] = useState<Set<string>>(new Set());
   const colors = statusColor[status];
@@ -106,6 +108,109 @@ export function HealthInsightsPanel({
   const activeSignals = hasIssues
     ? signals.filter((s) => s.status !== 'good')
     : signals;
+
+  const signalsList = (
+    <>
+      {hasIssues ? (
+        <div className="space-y-3">
+          {activeSignals.map((signal) => {
+            const meta = signalMeta[signal.type];
+            const sigColors = statusColor[signal.status];
+            const Icon = meta.icon;
+            const hintExpanded = expandedHints.has(signal.type);
+
+            return (
+              <div
+                key={signal.type}
+                className="rounded-lg bg-card/60 border border-border/50 px-4 py-3"
+              >
+                <div className="flex items-start gap-3">
+                  <div
+                    className={cn(
+                      'mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg',
+                      sigColors.bg,
+                    )}
+                  >
+                    <Icon
+                      className={cn('h-4 w-4', sigColors.text)}
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-foreground">
+                      {meta.label}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                      {signal.message}
+                    </p>
+                    {/* Tier 1: "Why this matters" toggle */}
+                    <button
+                      type="button"
+                      onClick={() => toggleHint(signal.type)}
+                      className="mt-1.5 flex items-center gap-1 text-xs text-primary/70 hover:text-primary transition-colors cursor-pointer"
+                    >
+                      <Info className="h-3 w-3" />
+                      {hintExpanded
+                        ? 'Hide explanation'
+                        : 'Why does this matter?'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Expandable educational hint */}
+                <div
+                  className={cn(
+                    'grid transition-all duration-200',
+                    hintExpanded
+                      ? 'grid-rows-[1fr] opacity-100 mt-2'
+                      : 'grid-rows-[0fr] opacity-0',
+                  )}
+                >
+                  <div className="overflow-hidden">
+                    <div className="rounded-md bg-primary/5 border border-primary/10 px-3 py-2.5 ml-11">
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        {meta.hint}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 text-sm text-emerald-400/80">
+          <ShieldCheck className="h-4 w-4" />
+          Your portfolio is well-balanced. No critical risks detected.
+        </div>
+      )}
+    </>
+  );
+
+  // Embedded mode: render raw content without Card wrapper (for use inside Sheet)
+  if (embedded) {
+    return (
+      <>
+        <div className="px-6 pb-6 space-y-4">
+          {/* Education trigger */}
+          <button
+            type="button"
+            onClick={() => setEducationOpen(true)}
+            className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors cursor-pointer"
+          >
+            <BookOpen className="h-3.5 w-3.5" />
+            Learn about these metrics
+          </button>
+
+          {signalsList}
+        </div>
+
+        <HealthEducationModal
+          open={educationOpen}
+          onOpenChange={setEducationOpen}
+        />
+      </>
+    );
+  }
 
   return (
     <>
@@ -169,78 +274,7 @@ export function HealthInsightsPanel({
             )}
           >
             <div className="overflow-hidden">
-              {hasIssues ? (
-                <div className="space-y-3">
-                  {activeSignals.map((signal) => {
-                    const meta = signalMeta[signal.type];
-                    const sigColors = statusColor[signal.status];
-                    const Icon = meta.icon;
-                    const hintExpanded = expandedHints.has(signal.type);
-
-                    return (
-                      <div
-                        key={signal.type}
-                        className="rounded-lg bg-card/60 border border-border/50 px-4 py-3"
-                      >
-                        <div className="flex items-start gap-3">
-                          <div
-                            className={cn(
-                              'mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg',
-                              sigColors.bg,
-                            )}
-                          >
-                            <Icon
-                              className={cn('h-4 w-4', sigColors.text)}
-                            />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium text-foreground">
-                              {meta.label}
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
-                              {signal.message}
-                            </p>
-                            {/* Tier 1: "Why this matters" toggle */}
-                            <button
-                              type="button"
-                              onClick={() => toggleHint(signal.type)}
-                              className="mt-1.5 flex items-center gap-1 text-xs text-primary/70 hover:text-primary transition-colors cursor-pointer"
-                            >
-                              <Info className="h-3 w-3" />
-                              {hintExpanded
-                                ? 'Hide explanation'
-                                : 'Why does this matter?'}
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Expandable educational hint */}
-                        <div
-                          className={cn(
-                            'grid transition-all duration-200',
-                            hintExpanded
-                              ? 'grid-rows-[1fr] opacity-100 mt-2'
-                              : 'grid-rows-[0fr] opacity-0',
-                          )}
-                        >
-                          <div className="overflow-hidden">
-                            <div className="rounded-md bg-primary/5 border border-primary/10 px-3 py-2.5 ml-11">
-                              <p className="text-xs text-muted-foreground leading-relaxed">
-                                {meta.hint}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 text-sm text-emerald-400/80">
-                  <ShieldCheck className="h-4 w-4" />
-                  Your portfolio is well-balanced. No critical risks detected.
-                </div>
-              )}
+              {signalsList}
             </div>
           </div>
         </CardContent>

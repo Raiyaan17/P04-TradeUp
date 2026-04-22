@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import axios from 'axios';
-import { FEATURED_SYMBOLS, PSX_API_BASE } from '../common/constants';
+import { FEATURED_SYMBOLS, PSX_API_BASE, SYMBOL_NAME_MAP } from '../common/constants';
 import { PrismaService } from '../prisma/prisma.service';
 
 interface PsxApiResponse<T> {
@@ -32,20 +32,52 @@ export interface Kline {
 @Injectable()
 export class StocksService {
   private readonly base = PSX_API_BASE;
+  private readonly tickCache = new Map<string, TickData>();
+  private readonly missingQueue = new Set<string>();
+  private isProcessingQueue = false;
+  private lastWorkerHeartbeat = 0;
+  private insightsCache: any = null;
+  private lastInsightsFetch = 0;
+  private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
   constructor(private readonly prisma: PrismaService) { }
+
+  updateTickCache(symbol: string, tick: any) {
+    // Normalize data: PSX Terminal uses changePercent/chgPct, we expect percentChange
+    const normalized: TickData = {
+      ...tick,
+      price: Number(tick.price || tick.last || 0),
+      change: Number(tick.change ?? tick.chg ?? 0),
+      percentChange: Number(
+        tick.percentChange ?? tick.changePercent ?? tick.chgPct ?? tick.pct ?? 0,
+      ),
+      volume: Number(tick.volume ?? tick.vol ?? 0),
+      value: Number(tick.value ?? tick.turnover ?? 0),
+    };
+
+    this.tickCache.set(symbol, normalized);
+  }
 
   getFeaturedSymbols() {
     return FEATURED_SYMBOLS as readonly string[];
   }
 
   async getTick(symbol: string, type = 'REG'): Promise<TickData | null> {
+    // Primary Defense: Resolve from WebSocket Cache instantly if available
+    if (this.tickCache.has(symbol)) {
+      return this.tickCache.get(symbol) || null;
+    }
+
+    // Fallback: Safe REST retrieval (cold starts, rare un-featured symbols)
     const url = `${this.base}/api/ticks/${type}/${encodeURIComponent(symbol)}`;
     try {
       const { data } = await axios.get<PsxApiResponse<TickData>>(url, {
         timeout: 5000,
       });
-      if (data?.success) return data.data;
+      if (data?.success) {
+        this.updateTickCache(symbol, data.data);
+        return data.data;
+      }
       return null;
     } catch (error) {
       console.error(
@@ -56,19 +88,83 @@ export class StocksService {
     }
   }
 
+  private async processMissingQueue() {
+    const now = Date.now();
+    // Safety check: if worker is stuck for > 5 minutes, force reset
+    if (this.isProcessingQueue) {
+      if (now - this.lastWorkerHeartbeat > 5 * 60 * 1000) {
+        console.warn('Drip-feed worker seems stuck. Force resetting flag...');
+        this.isProcessingQueue = false;
+      } else {
+        return;
+      }
+    }
+
+    this.isProcessingQueue = true;
+    this.lastWorkerHeartbeat = now;
+    console.log(`Drip-feed worker starting. Queue size: ${this.missingQueue.size}`);
+
+    try {
+      while (this.missingQueue.size > 0) {
+        this.lastWorkerHeartbeat = Date.now();
+        const symbol = this.missingQueue.values().next().value;
+        if (!symbol) break;
+
+        // Respect 100 req/min limit by sleeping for 1000ms between calls
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        // 1. Drip-feed Price Data (Tick)
+        if (!this.tickCache.has(symbol)) {
+          console.log(`Drip-feeding: Fetching ${symbol}...`);
+          await this.getTick(symbol);
+        }
+
+        // 2. Sync Metadata (Company Name from manual map)
+        try {
+          const manualName = SYMBOL_NAME_MAP[symbol as any];
+          if (manualName) {
+            const dbStock = await this.prisma.stock.findUnique({ where: { symbol } });
+            if (dbStock && dbStock.name !== manualName) {
+              console.log(`Drip-feeding: Syncing manual name for ${symbol} -> ${manualName}`);
+              await this.prisma.stock.update({
+                where: { symbol },
+                data: { name: manualName },
+              });
+            }
+          }
+        } catch (dbError) {
+          console.error(`Failed to sync manual name for ${symbol}:`, (dbError as Error).message);
+        }
+
+        this.missingQueue.delete(symbol);
+      }
+      console.log('Drip-feed worker finished processing queue.');
+    } catch (error) {
+      console.error('Drip-feed worker crashed:', error);
+    } finally {
+      this.isProcessingQueue = false;
+    }
+  }
+
   async listFeaturedWithTicks() {
     const symbols = this.getFeaturedSymbols();
 
     const results = await Promise.all(
       symbols.map(async (s) => {
-        // findOrCreateStock now guarantees a stock record with a populated name if available
         const dbStock = await this.findOrCreateStock(s);
-        const tick = await this.getTick(s);
+        
+        let tick = this.tickCache.get(s);
+        if (!tick) {
+          // Cold Start / Missing Data: Queue it to be safely fetched
+          this.missingQueue.add(s);
+          // Trigger the background processor asynchronously
+          this.processMissingQueue().catch(console.error);
+        }
 
         return {
           symbol: s,
           name: dbStock.name || s,
-          tick,
+          tick: tick || null,
         };
       }),
     );
@@ -140,31 +236,16 @@ export class StocksService {
 
     if (!stock) {
       stock = await this.prisma.stock.create({
-        data: { symbol },
+        data: { 
+          symbol,
+          name: SYMBOL_NAME_MAP[symbol as any] || null
+        },
       });
     }
 
-    // Lazy load the company name if it's missing
-    if (!stock.name) {
-      try {
-        const profile = await this.getCompanyProfile(symbol);
-        const description = profile?.businessDescription || '';
-
-        // Extract the formal company name using regex (everything before " is a ", " was ", " is incorporated ", etc)
-        const match = description.match(/^(.*?)(?:'s|’s)?\s+(?:is a|was incorporated|is incorporated|was established|was formed|is an|is the|main activity is)\s+/i);
-
-        if (match && match[1]) {
-          const extractedName = match[1].trim();
-          stock = await this.prisma.stock.update({
-            where: { id: stock.id },
-            data: { name: extractedName },
-          });
-        }
-      } catch (error) {
-        console.error(`Error lazy-loading name for ${symbol}:`, error);
-      }
-    }
-
+    // Notice: Aggressive runtime name fetching has been disabled 
+    // to protect upstream REST rate limits. Names should be seeded safely in the background.
+    
     return stock;
   }
 
@@ -200,5 +281,68 @@ export class StocksService {
       );
       return null;
     }
+  }
+
+  async getMarketInsights(): Promise<any> {
+    const now = Date.now();
+    if (this.insightsCache && now - this.lastInsightsFetch < this.CACHE_TTL) {
+      return this.insightsCache;
+    }
+
+    const featuredSymbols = this.getFeaturedSymbols() as string[];
+    const allTracked = await Promise.all(
+      featuredSymbols.map(async (s) => {
+        const tick = this.tickCache.get(s);
+        if (!tick || tick.price === undefined) return null;
+        
+        // We need the name for the UI
+        const dbStock = await this.findOrCreateStock(s);
+        return {
+          symbol: s,
+          name: dbStock.name || s,
+          tick,
+        };
+      }),
+    );
+
+    const validStocks = allTracked.filter((s): s is NonNullable<typeof s> => s !== null);
+
+    // 1. Gainers: Highest percentChange
+    const gainers = [...validStocks]
+      .sort((a, b) => {
+        const valA = Number(a.tick.percentChange) || 0;
+        const valB = Number(b.tick.percentChange) || 0;
+        return valB - valA;
+      })
+      .slice(0, 10);
+
+    // 2. Losers: Lowest percentChange (most negative)
+    const losers = [...validStocks]
+      .sort((a, b) => {
+        const valA = Number(a.tick.percentChange) || 0;
+        const valB = Number(b.tick.percentChange) || 0;
+        return valA - valB;
+      })
+      .slice(0, 10);
+
+    // 3. Hot: Highest Turnover (Value)
+    const hot = [...validStocks]
+      .sort((a, b) => {
+        const valA = Number(a.tick.value) || 0;
+        const valB = Number(b.tick.value) || 0;
+        return valB - valA;
+      })
+      .slice(0, 10);
+
+    const insights = {
+      gainers,
+      losers,
+      hot,
+      timestamp: now,
+    };
+
+    this.insightsCache = insights;
+    this.lastInsightsFetch = now;
+    return insights;
   }
 }

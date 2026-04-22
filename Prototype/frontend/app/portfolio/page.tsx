@@ -1,12 +1,30 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { io, Socket } from 'socket.io-client';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
-import { TrendingUp, TrendingDown, Minus, DollarSign, Briefcase, PiggyBank, Wallet, AlertTriangle, MoreHorizontal, ExternalLink, ArrowUpDown, Target, HeartCrack, Banknote, FileText } from 'lucide-react';
+import {
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  DollarSign,
+  Briefcase,
+  PiggyBank,
+  Wallet,
+  AlertTriangle,
+  MoreHorizontal,
+  ExternalLink,
+  ArrowUpDown,
+  Target,
+  HeartCrack,
+  Banknote,
+  FileText,
+} from 'lucide-react';
 import { AppShell } from '@/components/layout';
 import { PageHeader, EmptyState } from '@/components/common';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -42,6 +60,20 @@ import {
 import { http, ApiException } from '@/lib/http';
 import { formatUSD, formatPercent, getPnLClass } from '@/lib/format';
 import { cn } from '@/lib/utils';
+
+const isLocalhost = typeof window !== 'undefined' && window.location.hostname === 'localhost';
+const WS_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || (isLocalhost ? 'http://localhost:3001/api' : '/api');
+
+interface LiveTick {
+  c?: number;
+  price?: number;
+  ch?: number;
+  change?: number;
+  pch?: number;
+  changePercent?: number;
+  v?: number;
+  volume?: number;
+}
 
 interface PortfolioItem {
   symbol: string;
@@ -101,7 +133,9 @@ export default function Portfolio() {
   const [isSelling, setIsSelling] = useState(false);
   const [sellReason, setSellReason] = useState<SellReasonType | null>(null);
   const [sellNote, setSellNote] = useState('');
-  const healthPanelRef = useRef<HTMLDivElement>(null);
+  const [healthSheetOpen, setHealthSheetOpen] = useState(false);
+  const socketRef = useRef<Socket | null>(null);
+  const [livePrices, setLivePrices] = useState<Record<string, LiveTick>>({});
 
   // Tab + Transaction history state
   const [activeTab, setActiveTab] = useState('holdings');
@@ -124,7 +158,26 @@ export default function Portfolio() {
 
   useEffect(() => {
     fetchPortfolio();
-  }, [fetchPortfolio]);
+
+    // WebSocket: Connect once on mount
+    const socket = io(`${WS_BASE_URL}/ws`, {
+      withCredentials: true,
+      reconnectionAttempts: 5,
+    });
+    socketRef.current = socket;
+
+    socket.on('tickUpdate', (msg: { symbol: string; tick: LiveTick }) => {
+      if (msg?.symbol && msg?.tick) {
+        setLivePrices(prev => ({ ...prev, [msg.symbol]: msg.tick }));
+      }
+    });
+
+    return () => {
+      socket.close();
+      socketRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const fetchTransactions = useCallback(async () => {
     try {
@@ -192,7 +245,59 @@ export default function Portfolio() {
     }
   };
 
-  const totalPnlValue = portfolioData ? parseFloat(portfolioData.totalUnrealizedPnl) : 0;
+  // Subscribe to WebSocket rooms for held symbols
+  useEffect(() => {
+    if (socketRef.current?.connected && portfolioData?.portfolio) {
+      portfolioData.portfolio.forEach(item => {
+        socketRef.current!.emit('subscribeSymbol', item.symbol);
+      });
+    }
+  }, [portfolioData]);
+
+  // Compute live-adjusted portfolio metrics
+  const livePortfolio = useMemo(() => {
+    if (!portfolioData) return null;
+    return portfolioData.portfolio.map(item => {
+      const lt = livePrices[item.symbol];
+      if (!lt) return item; // No live tick yet, use server snapshot
+
+      const livePrice = lt.c ?? lt.price ?? parseFloat(item.currentPrice);
+      const qty = item.quantity;
+      const avg = parseFloat(item.avgPrice);
+      const currentValue = livePrice * qty;
+      const invested = avg * qty;
+      const pnl = currentValue - invested;
+      const pnlPct = invested !== 0 ? (pnl / invested) * 100 : 0;
+
+      return {
+        ...item,
+        currentPrice: livePrice.toFixed(2),
+        currentValue: currentValue.toFixed(2),
+        unrealizedPnl: pnl.toFixed(2),
+        pnlPercentage: pnlPct.toFixed(2),
+      };
+    });
+  }, [portfolioData, livePrices]);
+
+  const liveTotalPnl = useMemo(() => {
+    if (!livePortfolio) return 0;
+    return livePortfolio.reduce((sum, item) => sum + parseFloat(item.unrealizedPnl), 0);
+  }, [livePortfolio]);
+
+  const liveTotalPortfolioValue = useMemo(() => {
+    if (!livePortfolio) return 0;
+    return livePortfolio.reduce((sum, item) => sum + parseFloat(item.currentValue), 0);
+  }, [livePortfolio]);
+
+  const liveTotalInvested = useMemo(() => {
+    if (!livePortfolio) return 0;
+    return livePortfolio.reduce((sum, item) => sum + (parseFloat(item.avgPrice) * item.quantity), 0);
+  }, [livePortfolio]);
+
+  const liveTotalPnlPct = liveTotalInvested !== 0 ? (liveTotalPnl / liveTotalInvested) * 100 : 0;
+  const liveTotalAccountValue = (parseFloat(portfolioData?.balance || '0') + liveTotalPortfolioValue).toFixed(2);
+
+  const totalPnlValue = liveTotalPnl;
   const totalPnlIsPositive = totalPnlValue > 0;
   const totalPnlIsNegative = totalPnlValue < 0;
   const totalPnlIsZero = totalPnlValue === 0;
@@ -207,9 +312,6 @@ export default function Portfolio() {
     }
   }
 
-  const scrollToHealthPanel = () => {
-    healthPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
 
   if (loading) {
     return (
@@ -252,86 +354,123 @@ export default function Portfolio() {
         actions={
           <HealthBadge
             status={healthStatus}
-            onClick={scrollToHealthPanel}
+            onClick={() => setHealthSheetOpen(true)}
           />
         }
       />
 
-      {/* Summary Stats — Compact Bar */}
+      {/* Summary Stats — Monochrome with Accent */}
       <Card className="mb-6">
         <CardContent className="py-4">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
-                <Wallet className="h-4 w-4 text-muted-foreground" />
+          {/* Hero: Total Account Value - Amber Border Accent */}
+          <div className="flex items-center gap-3 p-3 mb-4 rounded-lg border-2 border-amber-500/40 bg-amber-500/5 shadow-sm">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/20 shrink-0">
+              <DollarSign className="h-5 w-5 text-amber-500" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm text-amber-600 dark:text-amber-400">Total Account Value</p>
+              <p className="text-lg font-bold tabular-nums text-amber-600 dark:text-amber-400">
+                {formatUSD(liveTotalAccountValue)}
+              </p>
+            </div>
+          </div>
+
+          {/* Other Metrics - Clean Monochrome */}
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+            {/* Cash Balance */}
+            <div className="flex items-center gap-3 p-2.5 rounded-lg bg-muted/30">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted shrink-0">
+                <Wallet className="h-4 w-4 text-blue-500" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-xs text-muted-foreground">Cash Balance</p>
-                <p className="text-sm font-semibold tabular-nums">{formatUSD(portfolioData.balance)}</p>
+                <p className="text-sm font-semibold tabular-nums">
+                  {formatUSD(portfolioData.balance)}
+                </p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
-                <PiggyBank className="h-4 w-4 text-muted-foreground" />
+
+            {/* Total Invested */}
+            <div className="flex items-center gap-3 p-2.5 rounded-lg bg-muted/30">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted shrink-0">
+                <PiggyBank className="h-4 w-4 text-purple-500" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-xs text-muted-foreground">Total Invested</p>
-                <p className="text-sm font-semibold tabular-nums">{formatUSD(portfolioData.totalInvested)}</p>
+                <p className="text-sm font-semibold tabular-nums">
+                  {formatUSD(portfolioData.totalInvested)}
+                </p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
-                <Briefcase className="h-4 w-4 text-muted-foreground" />
+
+            {/* Portfolio Value */}
+            <div className="flex items-center gap-3 p-2.5 rounded-lg bg-muted/30 lg:col-span-1 col-span-2">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted shrink-0">
+                <Briefcase className="h-4 w-4 text-emerald-500" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-xs text-muted-foreground">Portfolio Value</p>
-                <p className="text-sm font-semibold tabular-nums">{formatUSD(portfolioData.totalPortfolioValue)}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Total Account Value</p>
-                <p className="text-sm font-semibold tabular-nums">{formatUSD(portfolioData.totalAccountValue)}</p>
+                <p className="text-sm font-semibold tabular-nums">
+                  {formatUSD(liveTotalPortfolioValue > 0 ? liveTotalPortfolioValue.toFixed(2) : portfolioData.totalPortfolioValue)}
+                </p>
               </div>
             </div>
           </div>
-          {/* P&L integrated row */}
-          <div className="flex items-center justify-between mt-4 pt-4 border-t border-border/50">
+
+          {/* P&L Row - Enhanced Badge Style */}
+          <div className={cn(
+            'flex items-center justify-between mt-4 pt-3 border-t border-border/50 rounded-lg px-3 py-2',
+            totalPnlIsPositive && 'bg-emerald-500/10 border-emerald-500/20',
+            totalPnlIsNegative && 'bg-rose-500/10 border-rose-500/20',
+            totalPnlIsZero && 'bg-muted/30'
+          )}>
             <div className="flex items-center gap-2">
-              <p className="text-xs text-muted-foreground">Unrealized P&L</p>
-              <p className={cn('text-sm font-bold tabular-nums', getPnLClass(portfolioData.totalUnrealizedPnl))}>
-                {formatUSD(portfolioData.totalUnrealizedPnl)}
-              </p>
+              <span className="text-xs font-medium text-muted-foreground">Unrealized P&L</span>
             </div>
             <div className="flex items-center gap-1.5">
-              {totalPnlIsPositive && <TrendingUp className="h-3.5 w-3.5 text-emerald-400" />}
-              {totalPnlIsNegative && <TrendingDown className="h-3.5 w-3.5 text-rose-400" />}
-              {totalPnlIsZero && <Minus className="h-3.5 w-3.5 text-muted-foreground" />}
-              <p className={cn('text-sm font-bold tabular-nums', getPnLClass(portfolioData.totalPnlPercentage))}>
-                {formatPercent(portfolioData.totalPnlPercentage)}
+              {totalPnlIsPositive && <TrendingUp className="h-4 w-4 text-emerald-500" />}
+              {totalPnlIsNegative && <TrendingDown className="h-4 w-4 text-rose-500" />}
+              {totalPnlIsZero && <Minus className="h-4 w-4 text-muted-foreground" />}
+              <p className={cn('text-base font-bold tabular-nums', getPnLClass(liveTotalPnl.toFixed(2)))}>
+                {formatUSD(liveTotalPnl.toFixed(2))}
               </p>
+              <span className={cn(
+                'text-sm font-bold tabular-nums px-2 py-0.5 rounded-full',
+                totalPnlIsPositive && 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400',
+                totalPnlIsNegative && 'bg-rose-500/20 text-rose-600 dark:text-rose-400',
+                totalPnlIsZero && 'bg-muted text-muted-foreground'
+              )}>
+                {formatPercent(liveTotalPnlPct.toFixed(2))}
+              </span>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Health Insights Panel */}
-      <div ref={healthPanelRef}>
-        <HealthInsightsPanel
-          status={healthStatus}
-          signals={healthSignals}
-          id="health-insights"
-        />
-      </div>
+      {/* Health Insights Sheet */}
+      <Sheet open={healthSheetOpen} onOpenChange={setHealthSheetOpen}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>Portfolio Health</SheetTitle>
+            <SheetDescription>
+              {healthStatus === 'good'
+                ? 'No issues detected — your portfolio looks healthy.'
+                : `${healthSignals.filter(s => s.status !== 'good').length} issue(s) detected in your portfolio.`}
+            </SheetDescription>
+          </SheetHeader>
+          <HealthInsightsPanel
+            status={healthStatus}
+            signals={healthSignals}
+            embedded
+          />
+        </SheetContent>
+      </Sheet>
 
       {/* Portfolio Visualizer */}
       <PortfolioVisualizer
         balance={portfolioData.balance}
-        totalAccountValue={portfolioData.totalAccountValue}
-        portfolio={portfolioData.portfolio}
+        totalAccountValue={liveTotalAccountValue}
+        portfolio={livePortfolio || portfolioData.portfolio}
       />
 
       {/* Holdings / Trade History Tabs */}
@@ -339,8 +478,17 @@ export default function Portfolio() {
         <CardHeader className="pb-3">
           <Tabs
             tabs={[
-              { id: 'holdings', label: 'Holdings', badge: portfolioData.portfolio.length },
-              { id: 'history', label: 'Trade History' },
+              { 
+                id: 'holdings', 
+                label: 'Holdings', 
+                icon: <Briefcase className="h-4 w-4 text-primary" />,
+                badge: portfolioData.portfolio.length 
+              },
+              { 
+                id: 'history', 
+                label: 'Trade History',
+                icon: <FileText className="h-4 w-4 text-muted-foreground" />
+              },
             ]}
             activeTab={activeTab}
             onTabChange={setActiveTab}
@@ -362,7 +510,7 @@ export default function Portfolio() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {portfolioData.portfolio.map((item) => {
+                {(livePortfolio || portfolioData.portfolio).map((item) => {
                   const isPositive = parseFloat(item.unrealizedPnl) > 0;
                   const isNegative = parseFloat(item.unrealizedPnl) < 0;
                   const badgeClass = isPositive 

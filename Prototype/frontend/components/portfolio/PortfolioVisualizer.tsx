@@ -1,12 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { BarChart3, PieChartIcon, ArrowLeftRight } from 'lucide-react';
+import { BarChart3, PieChartIcon, ArrowLeftRight, TrendingUp } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs } from '@/components/ui/tabs';
 import { AllocationChart } from './AllocationChart';
 import { PnlBarChart } from './PnlBarChart';
 import { CostValueChart } from './CostValueChart';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface PortfolioVisualizerProps {
   balance: string;
@@ -21,9 +22,9 @@ interface PortfolioVisualizerProps {
 }
 
 const TABS = [
-  { id: 'allocation', label: 'Allocation' },
-  { id: 'pnl', label: 'Profit & Loss' },
-  { id: 'costValue', label: 'Cost vs. Value' },
+  { id: 'allocation', label: 'Allocation', mobileLabel: 'Alloc.', icon: <PieChartIcon className="h-4 w-4 text-emerald-500" /> },
+  { id: 'pnl', label: 'P&L', icon: <TrendingUp className="h-4 w-4 text-indigo-500" /> },
+  { id: 'costValue', label: 'Cost vs. Value', mobileLabel: 'Cost/Val', icon: <ArrowLeftRight className="h-4 w-4 text-amber-500" /> },
 ];
 
 export function PortfolioVisualizer({
@@ -32,6 +33,9 @@ export function PortfolioVisualizer({
   portfolio,
 }: PortfolioVisualizerProps) {
   const [activeTab, setActiveTab] = useState('allocation');
+
+  // Don't render the card at all if the portfolio is empty
+  if (portfolio.length === 0) return null;
 
   return (
     <Card className="mb-6">
@@ -45,18 +49,28 @@ export function PortfolioVisualizer({
           />
         </div>
       </CardHeader>
-      <CardContent>
-        {activeTab === 'allocation' && (
-          <AllocationChart
-            balance={balance}
-            totalAccountValue={totalAccountValue}
-            portfolio={portfolio}
-          />
-        )}
-        {activeTab === 'pnl' && <PnlBarChart portfolio={portfolio} />}
-        {activeTab === 'costValue' && (
-          <CostValueChart portfolio={portfolio} />
-        )}
+      <CardContent className="min-h-[320px]">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+          >
+            {activeTab === 'allocation' && (
+              <AllocationChart
+                balance={balance}
+                totalAccountValue={totalAccountValue}
+                portfolio={portfolio}
+              />
+            )}
+            {activeTab === 'pnl' && <PnlBarChart portfolio={portfolio} />}
+            {activeTab === 'costValue' && (
+              <CostValueChart portfolio={portfolio} />
+            )}
+          </motion.div>
+        </AnimatePresence>
       </CardContent>
     </Card>
   );
