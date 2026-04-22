@@ -1,9 +1,13 @@
 {
   "version": 2,
+  "install": {
+    "runtime": "nodejs20.x",
+    "framework": null
+  },
   "builds": [
     {
-      "use": "@vercel/node",
-      "src": "package.json"
+      "src": "package.json",
+      "use": "@vercel/node"
     }
   ],
   "routes": [
