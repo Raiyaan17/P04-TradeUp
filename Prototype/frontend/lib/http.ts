@@ -33,13 +33,13 @@ function getAuthToken(): string | null {
   return localStorage.getItem('access_token');
 }
 
-/**
- * Build headers for API requests
- */
 function buildHeaders(options?: RequestInit, includeAuth = true): HeadersInit {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
+  const headers: Record<string, string> = {};
+
+  // Only set Content-Type by default if we are sending a body
+  if (options?.body) {
+    headers['Content-Type'] = 'application/json';
+  }
 
   if (includeAuth) {
     const token = getAuthToken();
