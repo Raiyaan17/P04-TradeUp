@@ -9,7 +9,9 @@ export class LocalStorageService {
     mimeType: string,
   ): Promise<string> {
     // Fallback stub for prototype
-    console.log(`[LocalStorageFallback] Dummy storing image ${originalFileName}`);
+    console.log(
+      `[LocalStorageFallback] Dummy storing image ${originalFileName}`,
+    );
     return `https://placehold.co/600x400?text=Fallback+Image`;
   }
 }

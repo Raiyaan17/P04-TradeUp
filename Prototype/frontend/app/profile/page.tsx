@@ -2,7 +2,7 @@
 
 import { useRef } from "react";
 import { toast } from "sonner";
-import { Camera } from "lucide-react";
+import { Camera, Trophy } from "lucide-react";
 import { AppShell } from "@/components/layout";
 import { PageHeader } from "@/components/common";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -89,6 +89,13 @@ export default function Profile() {
                 <p className="text-sm text-muted-foreground">@{user.username}</p>
               )}
               <p className="text-sm text-muted-foreground">{user?.email || ''}</p>
+              
+              <div className="pt-4 pb-2">
+                <div className="inline-flex items-center gap-2 bg-primary/10 text-primary border border-primary/20 px-4 py-1.5 rounded-full font-bold">
+                  <Trophy className="w-4 h-4 text-primary" />
+                  <span>{user?.tournamentScore || 0} ELO</span>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>

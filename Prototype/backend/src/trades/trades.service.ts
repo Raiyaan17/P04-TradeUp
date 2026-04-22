@@ -16,7 +16,7 @@ export class TradesService {
     private readonly prisma: PrismaService,
     private readonly stocks: StocksService,
     private readonly friendsService: FriendsService,
-  ) { }
+  ) {}
 
   async buyStock(userId: number, symbol: string, quantity: number) {
     // Introduce execution lag (2-5s) to simulate order processing and exchange matching
@@ -100,7 +100,13 @@ export class TradesService {
     });
   }
 
-  async sellStock(userId: number, symbol: string, quantity: number, sellReason?: string, sellNote?: string) {
+  async sellStock(
+    userId: number,
+    symbol: string,
+    quantity: number,
+    sellReason?: string,
+    sellNote?: string,
+  ) {
     // Introduce execution lag (2-5s) to simulate order processing and exchange matching
     const executionDelay = Math.floor(Math.random() * 3000) + 2000;
     await new Promise((resolve) => setTimeout(resolve, executionDelay));

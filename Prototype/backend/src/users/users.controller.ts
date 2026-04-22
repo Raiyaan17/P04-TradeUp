@@ -49,7 +49,11 @@ export class UsersController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Upload profile picture' })
   async uploadProfilePicture(
-    @Request() req: AuthenticatedRequest & { isMultipart: () => boolean, file: () => Promise<any> },
+    @Request()
+    req: AuthenticatedRequest & {
+      isMultipart: () => boolean;
+      file: () => Promise<any>;
+    },
   ) {
     if (!req.isMultipart || !req.isMultipart()) {
       this.logger.error('Request is not multipart');
@@ -243,7 +247,7 @@ export class UsersController {
   @UseGuards(JwtAuthGuard)
   @Post('fund-wallet')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('TRADER')
+  @Roles('TRADER', 'ADMIN')
   async fundWallet(
     @Request() req: AuthenticatedRequest,
     @Body() fundWalletDto: FundWalletDto,

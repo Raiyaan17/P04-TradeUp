@@ -18,16 +18,16 @@ describe('ChatbotController', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ChatbotController],
-      providers: [
-        { provide: ChatbotService, useValue: chatbotService },
-      ],
+      providers: [{ provide: ChatbotService, useValue: chatbotService }],
     }).compile();
 
     controller = module.get<ChatbotController>(ChatbotController);
   });
 
   // Helper to build a fake authenticated request
-  const makeReq = (overrides: Partial<{ userId: number; email: string; role: string }> = {}) => ({
+  const makeReq = (
+    overrides: Partial<{ userId: number; email: string; role: string }> = {},
+  ) => ({
     user: {
       userId: overrides.userId ?? 1,
       email: overrides.email ?? 'test@example.com',
@@ -86,7 +86,11 @@ describe('ChatbotController', () => {
         message: 'analyze OGDC',
       });
 
-      expect(chatbotService.getChatResponse).toHaveBeenCalledWith(1, 5, 'analyze OGDC');
+      expect(chatbotService.getChatResponse).toHaveBeenCalledWith(
+        1,
+        5,
+        'analyze OGDC',
+      );
       expect(result).toEqual({ response: 'AI says hello' });
     });
   });
@@ -97,11 +101,18 @@ describe('ChatbotController', () => {
 
   describe('POST /chatbot/review', () => {
     it('should generate a periodic review with the given period', async () => {
-      chatbotService.generatePeriodicReview.mockResolvedValue('Your weekly review...');
+      chatbotService.generatePeriodicReview.mockResolvedValue(
+        'Your weekly review...',
+      );
 
-      const result = await controller.review(makeReq() as any, { period: 'weekly' });
+      const result = await controller.review(makeReq() as any, {
+        period: 'weekly',
+      });
 
-      expect(chatbotService.generatePeriodicReview).toHaveBeenCalledWith(1, 'weekly');
+      expect(chatbotService.generatePeriodicReview).toHaveBeenCalledWith(
+        1,
+        'weekly',
+      );
       expect(result).toEqual({ report: 'Your weekly review...' });
     });
   });
@@ -117,7 +128,9 @@ describe('ChatbotController', () => {
       const result = await controller.train(makeReq({ role: 'ADMIN' }) as any);
 
       expect(chatbotService.trainBaselineModel).toHaveBeenCalled();
-      expect(result).toEqual({ message: 'Market baseline refreshed successfully.' });
+      expect(result).toEqual({
+        message: 'Market baseline refreshed successfully.',
+      });
     });
 
     it('should block non-admin (TRADER) users with ForbiddenException', async () => {

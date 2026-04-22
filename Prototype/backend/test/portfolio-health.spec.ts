@@ -5,10 +5,8 @@ import { StocksService } from '../src/stocks/stocks.service';
 import { FriendsService } from '../src/friends/friends.service';
 import { Decimal } from '@prisma/client/runtime/library';
 
-
 // run with:
 // npx jest --config test/jest-e2e.json --testRegex="portfolio-health\\.spec\\.ts$"
-
 
 /**
  * Feature A: Portfolio Health Monitor — Unit Tests
@@ -52,7 +50,13 @@ function makePortfolioItem(
     quantity,
     avgPrice: new Decimal(avgPrice),
     createdAt: new Date(),
-    stock: { id: stockId, symbol, name: `${symbol} Inc`, marketType: 'REG', createdAt: new Date() },
+    stock: {
+      id: stockId,
+      symbol,
+      name: `${symbol} Inc`,
+      marketType: 'REG',
+      createdAt: new Date(),
+    },
   };
 }
 
@@ -68,7 +72,10 @@ type HealthSignal = {
 
 describe('Feature A: Portfolio Health Monitor', () => {
   let service: TradesService;
-  let prisma: { user: { findUnique: jest.Mock }; portfolio: { findMany: jest.Mock } };
+  let prisma: {
+    user: { findUnique: jest.Mock };
+    portfolio: { findMany: jest.Mock };
+  };
   let stocks: { getTick: jest.Mock };
 
   beforeEach(async () => {

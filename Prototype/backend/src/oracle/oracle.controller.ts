@@ -1,6 +1,16 @@
-import { Controller, Get, Post, Body, UseGuards, Req, Param } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  UseGuards,
+  Req,
+  Param,
+} from '@nestjs/common';
 import { OracleService } from './oracle.service';
 import { JwtAuthGuard } from '../auth/jwt.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 
 @Controller('oracle/tournament')
 @UseGuards(JwtAuthGuard)
@@ -27,16 +37,25 @@ export class OracleController {
     @Req() req: any,
     @Param('id') tournamentId: string,
   ) {
-    return this.oracleService.getParticipantAnalysis(req.user.userId, tournamentId);
+    return this.oracleService.getParticipantAnalysis(
+      req.user.userId,
+      tournamentId,
+    );
   }
 
   @Post('start')
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN')
   async startTournament(
     @Req() req: any,
     @Body('startingCash') startingCash: number,
     @Body('speed') speed?: 'normal' | 'fast',
   ) {
-    return this.oracleService.startTournament(req.user.userId, startingCash, speed || 'normal');
+    return this.oracleService.startTournament(
+      req.user.userId,
+      startingCash,
+      speed || 'normal',
+    );
   }
 
   @Post('join')

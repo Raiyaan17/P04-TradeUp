@@ -408,52 +408,56 @@ export default function OraclePage() {
             )}
           </div>
 
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-muted" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-4 text-muted-foreground font-semibold">Or</span>
-            </div>
-          </div>
-
-          <Card className="max-w-md mx-auto bg-card/60 backdrop-blur shadow-2xl border-primary/20">
-            <CardHeader>
-              <CardTitle>Start New Tournament</CardTitle>
-              <CardDescription>Initialize your own global trading simulation.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div>
-                <label className="text-sm font-semibold mb-2 block">Starting Cash (PKR)</label>
-                <input
-                  type="number"
-                  value={startingCash}
-                  onChange={e => setStartingCash(Number(e.target.value))}
-                  className="w-full bg-background border px-3 py-2 rounded focus:ring-2 ring-primary outline-none"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-semibold mb-2 block">Simulation Speed</label>
-                <div className="flex bg-muted rounded-md p-1">
-                  <button
-                    onClick={() => setSpeed("normal")}
-                    className={cn("flex-1 py-1.5 text-sm rounded transition", speed === "normal" ? "bg-background shadow font-semibold" : "opacity-70")}
-                  >
-                    Normal (1 Month in 60 mins)
-                  </button>
-                  <button
-                    onClick={() => setSpeed("fast")}
-                    className={cn("flex-1 py-1.5 text-sm rounded transition", speed === "fast" ? "bg-background shadow font-semibold text-primary" : "opacity-70")}
-                  >
-                    Fast (1 Month in 5 mins)
-                  </button>
+          {user?.role === 'ADMIN' && (
+            <>
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-muted" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-4 text-muted-foreground font-semibold">Or</span>
                 </div>
               </div>
-              <Button size="lg" className="w-full font-semibold" onClick={startTournament}>
-                <Play className="mr-2 w-5 h-5 fill-current" /> Initialize Global Tournament
-              </Button>
-            </CardContent>
-          </Card>
+
+              <Card className="max-w-md mx-auto bg-card/60 backdrop-blur shadow-2xl border-primary/20">
+                <CardHeader>
+                  <CardTitle>Start New Tournament</CardTitle>
+                  <CardDescription>Initialize your own global trading simulation.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div>
+                    <label className="text-sm font-semibold mb-2 block">Starting Cash (PKR)</label>
+                    <input
+                      type="number"
+                      value={startingCash}
+                      onChange={e => setStartingCash(Number(e.target.value))}
+                      className="w-full bg-background border px-3 py-2 rounded focus:ring-2 ring-primary outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-semibold mb-2 block">Simulation Speed</label>
+                    <div className="flex bg-muted rounded-md p-1">
+                      <button
+                        onClick={() => setSpeed("normal")}
+                        className={cn("flex-1 py-1.5 text-sm rounded transition", speed === "normal" ? "bg-background shadow font-semibold" : "opacity-70")}
+                      >
+                        Normal (1 Month in 60 mins)
+                      </button>
+                      <button
+                        onClick={() => setSpeed("fast")}
+                        className={cn("flex-1 py-1.5 text-sm rounded transition", speed === "fast" ? "bg-background shadow font-semibold text-primary" : "opacity-70")}
+                      >
+                        Fast (1 Month in 5 mins)
+                      </button>
+                    </div>
+                  </div>
+                  <Button size="lg" className="w-full font-semibold" onClick={startTournament}>
+                    <Play className="mr-2 w-5 h-5 fill-current" /> Initialize Global Tournament
+                  </Button>
+                </CardContent>
+              </Card>
+            </>
+          )}
 
         </div>
       </AppShell>

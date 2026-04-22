@@ -73,6 +73,12 @@ export class TradesController {
   ) {
     const userId = req.user.userId;
     const { symbol, quantity, sellReason, sellNote } = sellStockDto;
-    return this.tradesService.sellStock(userId, symbol, quantity, sellReason, sellNote);
+    return this.tradesService.sellStock(
+      userId,
+      symbol,
+      quantity,
+      sellReason,
+      sellNote,
+    );
   }
 }

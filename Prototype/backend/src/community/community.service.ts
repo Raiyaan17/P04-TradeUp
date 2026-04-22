@@ -357,13 +357,9 @@ export class CommunityService {
 
   // ─── USER MENTIONS & SEARCH ──────────────────────────────────────────
 
-  async searchMentions(
-    userId: number,
-    query: string,
-    limit: number = 10,
-  ) {
+  async searchMentions(userId: number, query: string, limit: number = 10) {
     const searchTerm = query.toLowerCase().trim();
-    
+
     // Get list of blocked users
     const blockedIds = await this.getBlockedIdPair(userId);
 
@@ -393,8 +389,18 @@ export class CommunityService {
           ? [
               {
                 OR: [
-                  { username: { contains: searchTerm, mode: 'insensitive' as const } },
-                  { name: { contains: searchTerm, mode: 'insensitive' as const } },
+                  {
+                    username: {
+                      contains: searchTerm,
+                      mode: 'insensitive' as const,
+                    },
+                  },
+                  {
+                    name: {
+                      contains: searchTerm,
+                      mode: 'insensitive' as const,
+                    },
+                  },
                 ],
               },
             ]
@@ -532,7 +538,7 @@ export class CommunityService {
     try {
       console.log('Starting image upload for user:', userId);
       console.log('File size:', fileBuffer.length, 'bytes');
-      
+
       // Try Supabase first (if configured)
       if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
         try {
@@ -546,14 +552,17 @@ export class CommunityService {
             });
 
           if (error) {
-            console.warn('Supabase upload error, falling back to local storage:', error);
+            console.warn(
+              'Supabase upload error, falling back to local storage:',
+              error,
+            );
           } else {
             console.log('Supabase upload successful');
             // Generate signed URL for private bucket (valid for 1 year)
             const { data: signedData } = await supabase.storage
               .from('TradeUp-profile-images')
               .createSignedUrl(data.path, 60 * 60 * 24 * 365);
-            
+
             if (signedData?.signedUrl) {
               console.log('Signed URL generated:', signedData.signedUrl);
               return signedData.signedUrl;
@@ -567,7 +576,10 @@ export class CommunityService {
             }
           }
         } catch (supabaseError) {
-          console.warn('Supabase error, falling back to local storage:', supabaseError);
+          console.warn(
+            'Supabase error, falling back to local storage:',
+            supabaseError,
+          );
         }
       }
 
@@ -584,9 +596,7 @@ export class CommunityService {
     } catch (error) {
       console.error('Image upload exception:', error);
       const errorMsg = error instanceof Error ? error.message : String(error);
-      throw new Error(
-        `Image upload failed: ${errorMsg}`,
-      );
+      throw new Error(`Image upload failed: ${errorMsg}`);
     }
   }
 }

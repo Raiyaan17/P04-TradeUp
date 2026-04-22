@@ -107,7 +107,7 @@ export interface LocalNewsArticle {
 
 @Controller('news')
 export class NewsController {
-  constructor(private readonly httpService: HttpService) { }
+  constructor(private readonly httpService: HttpService) {}
 
   @Get('latest')
   async getLatestNews(): Promise<LatestNewsArticle[]> {

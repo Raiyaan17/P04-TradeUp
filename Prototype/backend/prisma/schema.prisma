@@ -16,6 +16,7 @@ model User {
   name                   String?
   profileImageUrl        String?
   balance                Decimal                 @default(-1)
+  tournamentScore        Int                     @default(0)
   gender                 Gender?
   username               String                  @unique
   chatSessions           ChatSession[]

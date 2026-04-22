@@ -1,6 +1,9 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
-import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
+import {
+  FastifyAdapter,
+  NestFastifyApplication,
+} from '@nestjs/platform-fastify';
 import multipart from '@fastify/multipart';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
@@ -59,6 +62,9 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   app.useGlobalFilters(new CorsExceptionFilter());
-  await app.listen(process.env.PORT ? Number(process.env.PORT) : 3001, '0.0.0.0');
+  await app.listen(
+    process.env.PORT ? Number(process.env.PORT) : 3001,
+    '0.0.0.0',
+  );
 }
 void bootstrap();

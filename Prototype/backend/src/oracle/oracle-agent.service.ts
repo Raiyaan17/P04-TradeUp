@@ -33,30 +33,34 @@ export class OracleAgentService {
     this.ai = new GoogleGenAI({ apiKey });
   }
 
-  async generateTournamentData(): Promise<GeneratedTournamentData> {
+  async generateTournamentData(
+    basePrices: Record<string, number>,
+  ): Promise<GeneratedTournamentData> {
     try {
-      const trajectory = await this.architectAgent();
+      const trajectory = await this.architectAgent(basePrices);
       const news = await this.chroniclerAgent(trajectory);
       return { trajectory, news };
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Generation failed: ${errorMessage}`);
-      return this.getFallbackData();
+      return this.getFallbackData(basePrices);
     }
   }
 
-  private async architectAgent(): Promise<TournamentDataPoint[]> {
+  private async architectAgent(
+    basePrices: Record<string, number>,
+  ): Promise<TournamentDataPoint[]> {
     const prompt = `You are a strict financial market simulator. Generate a 30-day price trajectory for the Pakistani stock market.
 Included assets: PSX Index, HBL, UBL, MCB, HUBC, FFC.
 
 Base prices:
-PSX: 62000
-HBL: 125.5
-UBL: 142.3
-MCB: 178.9
-HUBC: 89.75
-FFC: 95.4
+PSX: ${basePrices['PSX'] || 171000}
+HBL: ${basePrices['HBL'] || 125.5}
+UBL: ${basePrices['UBL'] || 142.3}
+MCB: ${basePrices['MCB'] || 178.9}
+HUBC: ${basePrices['HUBC'] || 89.75}
+FFC: ${basePrices['FFC'] || 95.4}
 
 Requirements:
 1. Output exactly 30 data points (day 1 to 30).
@@ -71,7 +75,7 @@ Requirements:
 Format:
 {
   "trajectory": [
-    { "day": 1, "PSX": 62050, "HBL": 125.6, "UBL": 142.5, "MCB": 179.0, "HUBC": 89.8, "FFC": 95.5 },
+    { "day": 1, "PSX": 171050, "HBL": 125.6, "UBL": 142.5, "MCB": 179.0, "HUBC": 89.8, "FFC": 95.5 },
     ...
   ]
 }
@@ -85,7 +89,13 @@ No extra text, no markdown block syntax, just raw JSON.`;
   private async chroniclerAgent(
     trajectory: TournamentDataPoint[],
   ): Promise<TournamentNewsItem[]> {
-    const simplifiedTrajectory = trajectory.filter(t => t.day % 3 === 0).map(t => `Day ${t.day}: PSX ${Math.round(t.PSX)}, HBL ${t.HBL.toFixed(1)}, UBL ${t.UBL.toFixed(1)}, MCB ${t.MCB.toFixed(1)}, HUBC ${t.HUBC.toFixed(1)}, FFC ${t.FFC.toFixed(1)}`).join('\n');
+    const simplifiedTrajectory = trajectory
+      .filter((t) => t.day % 3 === 0)
+      .map(
+        (t) =>
+          `Day ${t.day}: PSX ${Math.round(t.PSX)}, HBL ${t.HBL.toFixed(1)}, UBL ${t.UBL.toFixed(1)}, MCB ${t.MCB.toFixed(1)}, HUBC ${t.HUBC.toFixed(1)}, FFC ${t.FFC.toFixed(1)}`,
+      )
+      .join('\n');
 
     const prompt = `You are a financial news AI. Generate 15-20 realistic breaking news headlines distributed across a 30-day window.
 These headlines must align intensely with the key market movements outlined below. When a stock dips significantly or spikes, create a corresponding sector, company, or macro news event around that exact day to justify the price movement.
@@ -117,7 +127,10 @@ No extra text, no markdown block syntax, just raw JSON.`;
     return this.parseNews(response);
   }
 
-  private async callGemini(prompt: string, isJson: boolean = true): Promise<string> {
+  private async callGemini(
+    prompt: string,
+    isJson: boolean = true,
+  ): Promise<string> {
     const config: any = {
       temperature: 0.7,
       maxOutputTokens: 8192,
@@ -136,13 +149,19 @@ No extra text, no markdown block syntax, just raw JSON.`;
   }
 
   private parseTrajectory(response: string): TournamentDataPoint[] {
-    const cleaned = response.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    const cleaned = response
+      .replace(/```json\n?/g, '')
+      .replace(/```\n?/g, '')
+      .trim();
     const parsed = JSON.parse(cleaned);
     return parsed.trajectory || [];
   }
 
   private parseNews(response: string): TournamentNewsItem[] {
-    const cleaned = response.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    const cleaned = response
+      .replace(/```json\n?/g, '')
+      .replace(/```\n?/g, '')
+      .trim();
     const parsed = JSON.parse(cleaned);
     return parsed.news || [];
   }
@@ -165,29 +184,43 @@ Do not use greetings or pleasantries. Do NOT use any asterisks (*), markdown for
       const response = await this.callGemini(prompt, false);
       return response;
     } catch (e) {
-      this.logger.error("Failed to generate analysis", e);
-      return "Unable to generate AI analysis at this time. Focus on evaluating your transaction history manually.";
+      this.logger.error('Failed to generate analysis', e);
+      return 'Unable to generate AI analysis at this time. Focus on evaluating your transaction history manually.';
     }
   }
 
-  private getFallbackData(): GeneratedTournamentData {
+  private getFallbackData(
+    basePrices: Record<string, number>,
+  ): GeneratedTournamentData {
     const trajectory: TournamentDataPoint[] = [];
     for (let i = 1; i <= 30; i++) {
       trajectory.push({
         day: i,
-        PSX: 62000 + (Math.random() * 200 - 100),
-        HBL: 125.5 + (Math.random() * 2 - 1),
-        UBL: 142.3 + (Math.random() * 2 - 1),
-        MCB: 178.9 + (Math.random() * 2 - 1),
-        HUBC: 89.75 + (Math.random() * 2 - 1),
-        FFC: 95.4 + (Math.random() * 2 - 1),
+        PSX: (basePrices['PSX'] || 171000) + (Math.random() * 500 - 250),
+        HBL: (basePrices['HBL'] || 125.5) + (Math.random() * 2 - 1),
+        UBL: (basePrices['UBL'] || 142.3) + (Math.random() * 2 - 1),
+        MCB: (basePrices['MCB'] || 178.9) + (Math.random() * 2 - 1),
+        HUBC: (basePrices['HUBC'] || 89.75) + (Math.random() * 2 - 1),
+        FFC: (basePrices['FFC'] || 95.4) + (Math.random() * 2 - 1),
       });
     }
 
     const news: TournamentNewsItem[] = [
-      { day: 5, headline: 'Markets open with cautious optimism', sentiment: 'neutral' },
-      { day: 15, headline: 'Mid-session trading shows volatile swings', sentiment: 'neutral' },
-      { day: 25, headline: 'Investors secure positions ahead of closing', sentiment: 'neutral' }
+      {
+        day: 5,
+        headline: 'Markets open with cautious optimism',
+        sentiment: 'neutral',
+      },
+      {
+        day: 15,
+        headline: 'Mid-session trading shows volatile swings',
+        sentiment: 'neutral',
+      },
+      {
+        day: 25,
+        headline: 'Investors secure positions ahead of closing',
+        sentiment: 'neutral',
+      },
     ];
 
     return { trajectory, news };

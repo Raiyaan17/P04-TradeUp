@@ -15,7 +15,9 @@ import { OracleService } from '../oracle/oracle.service';
     credentials: true,
   },
 })
-export class TournamentGateway implements OnGatewayInit, OnModuleInit, OnGatewayConnection {
+export class TournamentGateway
+  implements OnGatewayInit, OnModuleInit, OnGatewayConnection
+{
   @WebSocketServer()
   server!: Server;
 

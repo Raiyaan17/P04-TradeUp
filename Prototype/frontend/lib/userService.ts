@@ -10,6 +10,7 @@ export interface User {
   gender?: 'MALE' | 'FEMALE' | null;
   /** Balance as string or number (Prisma returns Decimal as string) */
   balance: string | number;
+  tournamentScore: number;
   profileImageUrl?: string | null;
 }
 

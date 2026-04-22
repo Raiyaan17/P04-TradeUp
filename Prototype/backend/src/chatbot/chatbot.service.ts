@@ -9,8 +9,6 @@ import { TradesService } from '../trades/trades.service';
 import { WatchlistService } from '../watchlist/watchlist.service';
 import { subDays } from 'date-fns';
 
-
-
 @Injectable()
 export class ChatbotService implements OnModuleInit {
   private readonly logger = new Logger(ChatbotService.name);
@@ -31,7 +29,9 @@ export class ChatbotService implements OnModuleInit {
 
   async onModuleInit() {
     if (!this.apiKey) {
-      this.logger.error('GEMINI_API_KEY is not defined in environment variables');
+      this.logger.error(
+        'GEMINI_API_KEY is not defined in environment variables',
+      );
     }
     await this.trainBaselineModel();
   }
@@ -85,7 +85,7 @@ export class ChatbotService implements OnModuleInit {
       this.logger.error('Failed to verify chat session:', err);
     }
     if (!session) {
-      return "It looks like your chat session has expired. Please close and reopen the chat to start a new session.";
+      return 'It looks like your chat session has expired. Please close and reopen the chat to start a new session.';
     }
 
     // 2. Load conversation history (non-critical — continue with empty if fails)
@@ -97,7 +97,10 @@ export class ChatbotService implements OnModuleInit {
         take: 20,
       });
     } catch (err) {
-      this.logger.warn('Failed to load chat history, continuing without it:', err);
+      this.logger.warn(
+        'Failed to load chat history, continuing without it:',
+        err,
+      );
     }
 
     // 3. Build user context (fully resilient — won't throw)
@@ -105,7 +108,10 @@ export class ChatbotService implements OnModuleInit {
     try {
       contextSnapshot = await this.buildUserContext(userId);
     } catch (err) {
-      this.logger.warn('Failed to build user context, continuing with minimal context:', err);
+      this.logger.warn(
+        'Failed to build user context, continuing with minimal context:',
+        err,
+      );
       contextSnapshot = `USER ID: ${userId}\nNote: Could not load detailed user data.`;
     }
 
@@ -154,11 +160,19 @@ export class ChatbotService implements OnModuleInit {
   private getStaticFallbackResponse(userMessage: string): string {
     const lowerMsg = userMessage.toLowerCase();
 
-    if (lowerMsg.includes('hi') || lowerMsg.includes('hello') || lowerMsg.includes('hey')) {
+    if (
+      lowerMsg.includes('hi') ||
+      lowerMsg.includes('hello') ||
+      lowerMsg.includes('hey')
+    ) {
       return "👋 **Hello!** Welcome to TradeUp AI!\n\nI'm your trading coach for the Pakistan Stock Exchange (PSX). I can help you with:\n\n• 📊 **Stock analysis** — ask me about any PSX stock\n• 📈 **Trading strategies** — learn about value investing, momentum trading, and more\n• 💼 **Portfolio advice** — I'll review your trades and suggest improvements\n• 📚 **Trading basics** — perfect if you're just getting started\n\nWhat would you like to explore?";
     }
 
-    if (lowerMsg.includes('trade') || lowerMsg.includes('buy') || lowerMsg.includes('sell')) {
+    if (
+      lowerMsg.includes('trade') ||
+      lowerMsg.includes('buy') ||
+      lowerMsg.includes('sell')
+    ) {
       return "📈 **Trading on TradeUp**\n\nHere are the basics:\n\n1. **Browse stocks** — Check out the featured PSX stocks on your dashboard\n2. **Add to watchlist** — Keep an eye on stocks you're interested in\n3. **Buy shares** — Use your simulated balance to practice buying\n4. **Sell shares** — Sell when you think the price is right\n5. **Track P&L** — Monitor your profit and loss in your portfolio\n\n💡 **Tip:** Start with small quantities to learn how price movements affect your portfolio!\n\nWould you like me to explain any of these steps in more detail?";
     }
 
@@ -170,16 +184,21 @@ export class ChatbotService implements OnModuleInit {
   // ─────────────────────────────────────────────
 
   async generatePeriodicReview(userId: number, period: 'weekly' | 'monthly') {
-    const since = period === 'weekly' ? subDays(new Date(), 7) : subDays(new Date(), 30);
+    const since =
+      period === 'weekly' ? subDays(new Date(), 7) : subDays(new Date(), 30);
 
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    const allTransactions = await this.tradesService.getTransactions(userId, 100);
+    const allTransactions = await this.tradesService.getTransactions(
+      userId,
+      100,
+    );
     const portfolioData = await this.tradesService.getPortfolio(userId);
 
     // Helper to safely convert Decimal/number/string to a displayable number
     const safeNum = (val: any, decimals = 2): string => {
       if (val === null || val === undefined) return '0';
-      const n = typeof val === 'object' && val.toNumber ? val.toNumber() : Number(val);
+      const n =
+        typeof val === 'object' && val.toNumber ? val.toNumber() : Number(val);
       return isNaN(n) ? '0' : n.toFixed(decimals);
     };
 
@@ -188,8 +207,9 @@ export class ChatbotService implements OnModuleInit {
       (t: any) => new Date(t.createdAt) >= since,
     );
 
-    const tradeLines = periodTransactions.map((t: any) =>
-      `• ${t.type} ${t.symbol} x${t.quantity} @ ${safeNum(t.price)} PKR on ${new Date(t.createdAt).toLocaleDateString('en-PK')}`,
+    const tradeLines = periodTransactions.map(
+      (t: any) =>
+        `• ${t.type} ${t.symbol} x${t.quantity} @ ${safeNum(t.price)} PKR on ${new Date(t.createdAt).toLocaleDateString('en-PK')}`,
     );
 
     const reviewPrompt = `
@@ -224,7 +244,11 @@ export class ChatbotService implements OnModuleInit {
       [Concrete, actionable advice for the Pakistani Stock Exchange (PSX)]
     `;
 
-    return await this.callGemini(this.buildBaseSystemPrompt(), [], reviewPrompt);
+    return await this.callGemini(
+      this.buildBaseSystemPrompt(),
+      [],
+      reviewPrompt,
+    );
   }
 
   // ─────────────────────────────────────────────
@@ -244,14 +268,16 @@ export class ChatbotService implements OnModuleInit {
         return;
       }
 
-      const summaries = tournaments.map((s) => {
-        const trajectory = s.trajectoryJson as any[];
-        if (!trajectory || trajectory.length === 0) return '';
-        const startPSX = trajectory[0]?.PSX || 62000;
-        const endPSX = trajectory[trajectory.length - 1]?.PSX || 62000;
-        const change = ((endPSX - startPSX) / startPSX) * 100;
-        return `• PSX Tournament trend: ${startPSX.toFixed(2)} → ${endPSX.toFixed(2)} (${change.toFixed(2)}%)`;
-      }).filter(s => s !== '');
+      const summaries = tournaments
+        .map((s) => {
+          const trajectory = s.trajectoryJson as any[];
+          if (!trajectory || trajectory.length === 0) return '';
+          const startPSX = trajectory[0]?.PSX || 62000;
+          const endPSX = trajectory[trajectory.length - 1]?.PSX || 62000;
+          const change = ((endPSX - startPSX) / startPSX) * 100;
+          return `• PSX Tournament trend: ${startPSX.toFixed(2)} → ${endPSX.toFixed(2)} (${change.toFixed(2)}%)`;
+        })
+        .filter((s) => s !== '');
 
       this.marketBaseline = `SIMULATION HISTORY (PSX Patterns):\n${summaries.join('\n')}`;
       this.logger.log('Market baseline loaded.');
@@ -292,7 +318,10 @@ export class ChatbotService implements OnModuleInit {
     // Fetch transactions — safe default: empty list
     let transactions: any[] = [];
     try {
-      const transactionData = await this.tradesService.getTransactions(userId, 20);
+      const transactionData = await this.tradesService.getTransactions(
+        userId,
+        20,
+      );
       transactions = transactionData?.transactions || [];
     } catch (err) {
       this.logger.warn(`Failed to fetch transactions for user ${userId}:`, err);
@@ -321,14 +350,17 @@ export class ChatbotService implements OnModuleInit {
     // Helper to safely convert Decimal/number/string to a displayable number
     const safeNum = (val: any, decimals = 2): string => {
       if (val === null || val === undefined) return '0';
-      const n = typeof val === 'object' && val.toNumber ? val.toNumber() : Number(val);
+      const n =
+        typeof val === 'object' && val.toNumber ? val.toNumber() : Number(val);
       return isNaN(n) ? '0' : n.toFixed(decimals);
     };
 
     // Format holdings as readable bullet points
     const holdingLines = (portfolioData.portfolio || []).map((h: any) => {
-      const pnl = typeof h.unrealizedPnl === 'object' && h.unrealizedPnl?.toNumber
-        ? h.unrealizedPnl.toNumber() : Number(h.unrealizedPnl || 0);
+      const pnl =
+        typeof h.unrealizedPnl === 'object' && h.unrealizedPnl?.toNumber
+          ? h.unrealizedPnl.toNumber()
+          : Number(h.unrealizedPnl || 0);
       const pnlSign = pnl >= 0 ? '+' : '';
       return `  • ${h.symbol} (${h.quantity} shares) — Avg: ${safeNum(h.avgPrice)} | Now: ${safeNum(h.currentPrice)} | P&L: ${pnlSign}${safeNum(h.pnlPercentage, 1)}%`;
     });
@@ -344,7 +376,8 @@ export class ChatbotService implements OnModuleInit {
 
     // Format live featured stocks
     const stockLines = (featuredStocks || []).map((s: any) => {
-      const change = s.tick?.percentChange != null ? safeNum(s.tick.percentChange) : 'N/A';
+      const change =
+        s.tick?.percentChange != null ? safeNum(s.tick.percentChange) : 'N/A';
       return `  • ${s.symbol}: ${s.tick?.price != null ? safeNum(s.tick.price) : 'N/A'} PKR (${change}%)`;
     });
 
@@ -371,7 +404,9 @@ ${stockLines.length > 0 ? (stockLines.every((l: string) => l.includes('N/A PKR')
 ${this.marketBaseline}
     `.trim();
 
-    this.logger.debug(`Built user context for user ${userId} (isNewUser=${isNewUser}, holdings=${(portfolioData.portfolio || []).length}, trades=${transactions.length}, watchlist=${watchlistItems.length})`);
+    this.logger.debug(
+      `Built user context for user ${userId} (isNewUser=${isNewUser}, holdings=${(portfolioData.portfolio || []).length}, trades=${transactions.length}, watchlist=${watchlistItems.length})`,
+    );
     return contextString;
   }
 
