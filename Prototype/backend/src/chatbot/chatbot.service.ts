@@ -1,4 +1,5 @@
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
+import { GoogleGenAI } from '@google/genai';
 import * as dotenv from 'dotenv';
 dotenv.config();
 import { ConfigService } from '@nestjs/config';
@@ -13,9 +14,8 @@ import { subDays } from 'date-fns';
 @Injectable()
 export class ChatbotService implements OnModuleInit {
   private readonly logger = new Logger(ChatbotService.name);
+  private readonly ai: GoogleGenAI;
   private readonly apiKey: string;
-  private readonly apiUrl =
-    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
   private marketBaseline: string = '';
 
   constructor(
@@ -26,6 +26,7 @@ export class ChatbotService implements OnModuleInit {
     private readonly watchlistService: WatchlistService,
   ) {
     this.apiKey = this.configService.get<string>('GEMINI_API_KEY') || '';
+    this.ai = new GoogleGenAI({ apiKey: this.apiKey });
   }
 
   async onModuleInit() {
@@ -426,39 +427,21 @@ ${contextSnapshot}
     conversationHistory: { role: string; parts: { text: string }[] }[],
     newMessage: string,
   ): Promise<string> {
-    const url = `${this.apiUrl}?key=${this.apiKey}`;
+    const contents: any[] = [
+      ...conversationHistory.map((h) => ({ role: h.role, parts: h.parts })),
+      { role: 'user', parts: [{ text: newMessage }] },
+    ];
 
-    const body = {
-      // system_instruction keeps the system prompt separate from conversation
-      system_instruction: {
-        parts: [{ text: systemPrompt }],
-      },
-      // contents = full conversation history + the new user message at the end
-      contents: [
-        ...conversationHistory,
-        { role: 'user', parts: [{ text: newMessage }] },
-      ],
-      generationConfig: {
+    const response = await this.ai.models.generateContent({
+      model: 'gemini-2.5-flash-lite',
+      contents,
+      config: {
+        systemInstruction: systemPrompt,
         temperature: 0.7,
         maxOutputTokens: 2048,
       },
-    };
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
     });
 
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Gemini API error ${response.status}: ${errText}`);
-    }
-
-    const data = await response.json();
-    return (
-      data.candidates?.[0]?.content?.parts?.[0]?.text ||
-      "I couldn't generate a response. Please try again."
-    );
+    return response.text || "I couldn't generate a response. Please try again.";
   }
 }

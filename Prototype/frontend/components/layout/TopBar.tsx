@@ -14,7 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { LogOut, Settings, User, Menu, X, Sun, Moon } from "lucide-react";
+import { LogOut, Settings, User, Menu, X, Sun, Moon, HelpCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import { getFriendRequests } from "@/lib/friendsService";
@@ -25,7 +25,6 @@ const NAV_LINKS = [
   { href: "/oracle", label: "Game" },
   { href: "/community", label: "Community" },
   { href: "/news", label: "News" },
-  { href: "/help", label: "Help" },
 ];
 
 export function TopBar() {
@@ -169,6 +168,12 @@ export function TopBar() {
                 <Link href="/settings/account" className="cursor-pointer">
                   <Settings className="mr-2 h-4 w-4" />
                   <span>Settings</span>
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/help" className="cursor-pointer">
+                  <HelpCircle className="mr-2 h-4 w-4" />
+                  <span>Help</span>
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />

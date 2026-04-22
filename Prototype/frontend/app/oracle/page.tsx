@@ -37,7 +37,7 @@ interface LeaderboardEntry {
 }
 
 interface TournamentNewsItem {
-  minute: number;
+  day: number;
   headline: string;
   sentiment: 'positive' | 'negative' | 'neutral';
 }
@@ -52,16 +52,20 @@ const COLORS = [
   "#ec4899", // FFC
 ];
 
-function PercentageChart({ history, currentMinute }: { history: Record<string, number>[], currentMinute: number }) {
+function PercentageChart({ history, currentMinute, stocksToRender, colors }: { history: Record<string, number>[], currentMinute: number, stocksToRender: string[], colors: string[] }) {
   if (history.length === 0) return <div className="h-full flex items-center justify-center text-muted-foreground">Waiting for market open...</div>;
 
   const firstPoint = history[0];
   const data = history.map(point => {
     let percentages: Record<string, number> = {};
-    STOCKS.forEach(s => {
+    stocksToRender.forEach(s => {
       const startPrice = firstPoint[s];
       const currentPrice = point[s];
-      percentages[s] = ((currentPrice - startPrice) / startPrice) * 100;
+      if (startPrice) {
+        percentages[s] = ((currentPrice - startPrice) / startPrice) * 100;
+      } else {
+        percentages[s] = 0;
+      }
     });
     return percentages;
   });
@@ -69,29 +73,29 @@ function PercentageChart({ history, currentMinute }: { history: Record<string, n
   let minPct = 0;
   let maxPct = 0;
   data.forEach(d => {
-    STOCKS.forEach(s => {
+    stocksToRender.forEach(s => {
       if (d[s] < minPct) minPct = d[s];
       if (d[s] > maxPct) maxPct = d[s];
     });
   });
 
-  minPct -= 0.5;
-  maxPct += 0.5;
+  minPct -= 0.2;
+  maxPct += 0.2;
 
   const width = 800;
   const height = 400;
   const paddingY = 40;
 
-  // Total ticks is 60. We graph continuously up to 60.
-  const getX = (index: number) => (index / 60) * width;
+  // Total ticks is 30. We graph continuously up to 30.
+  const getX = (index: number) => (index / 30) * width;
   const getY = (value: number) => {
     const range = maxPct - minPct;
-    const normalized = (value - minPct) / range;
+    const normalized = range === 0 ? 0.5 : (value - minPct) / range;
     return height - paddingY - (normalized * (height - 2 * paddingY));
   };
 
   return (
-    <div className="w-full h-full relative font-mono" style={{ minHeight: '400px' }}>
+    <div className="w-full h-full relative font-mono min-h-[250px]">
       <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="w-full h-full overflow-visible">
         {/* Grid lines and percentage labels */}
         {[maxPct, maxPct / 2, 0, minPct / 2, minPct].map((val, i) => {
@@ -106,13 +110,13 @@ function PercentageChart({ history, currentMinute }: { history: Record<string, n
         })}
 
         {/* Lines */}
-        {STOCKS.map((stock, i) => {
+        {stocksToRender.map((stock, i) => {
           const points = data.map((d, index) => `${getX(index)},${getY(d[stock])}`).join(" ");
           return (
             <polyline
               key={`line-${stock}`}
               fill="none"
-              stroke={COLORS[i]}
+              stroke={colors[i]}
               strokeWidth="2.5"
               points={points}
               style={{ strokeLinejoin: "round", strokeLinecap: "round" }}
@@ -143,8 +147,9 @@ export default function OraclePage() {
   const [currentPrices, setCurrentPrices] = useState<Record<string, number>>({});
   const [priceHistory, setPriceHistory] = useState<Record<string, number>[]>([]);
   const [news, setNews] = useState<TournamentNewsItem[]>([]);
-  const [tickMinute, setTickMinute] = useState(0);
+  const [tickDay, setTickDay] = useState(0);
   const [isGameOver, setIsGameOver] = useState(false);
+  const [analysis, setAnalysis] = useState<string | null>(null);
 
   // Trading form
   const [selectedStock, setSelectedStock] = useState("HBL");
@@ -161,6 +166,16 @@ export default function OraclePage() {
   useEffect(() => {
     newsEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [news]);
+
+  useEffect(() => {
+    if (isGameOver && tournament?.id) {
+      http.get(`/oracle/tournament/${tournament.id}/analysis`)
+        .then((res: any) => {
+          if (res && res.analysis) setAnalysis(res.analysis);
+        })
+        .catch(err => console.error("Failed to fetch analysis", err));
+    }
+  }, [isGameOver, tournament]);
 
   const fetchPortfolio = async () => {
     try {
@@ -240,11 +255,11 @@ export default function OraclePage() {
     });
 
     socket.on("tournamentTick", (data: { tick: any, news: any, leaderboard: LeaderboardEntry[] }) => {
-      if (!data.tick || Object.keys(data.tick).length === 0 || data.tick.status === 'completed' || data.tick.minute > 60) {
+      if (!data.tick || Object.keys(data.tick).length === 0 || data.tick.status === 'completed' || data.tick.day > 30) {
         return;
       }
 
-      setTickMinute(data.tick.minute);
+      setTickDay(data.tick.day);
       setLeaderboard(data.leaderboard);
 
       const prices: Record<string, number> = {
@@ -260,7 +275,21 @@ export default function OraclePage() {
       setPriceHistory(prev => [...prev, prices]);
 
       if (data.news && data.news.length > 0) {
-        setNews(prev => [...prev, ...data.news]);
+        data.news.forEach((n: any) => {
+          toast(n.headline, {
+            description: `DAY ${n.day} • ${n.sentiment.toUpperCase()}`,
+            duration: 3000,
+            icon: <Newspaper className="w-4 h-4 text-primary" />
+          });
+        });
+        
+        setTimeout(() => {
+          setNews(prev => {
+            const existing = new Set(prev.map(p => p.headline));
+            const newItems = data.news.filter((n: any) => !existing.has(n.headline));
+            return [...prev, ...newItems];
+          });
+        }, 3000);
       }
 
       // Auto refetch portfolio to catch dynamic leaderboard balance, though we can skip doing this on every tick.
@@ -328,7 +357,7 @@ export default function OraclePage() {
   if (!tournament) {
     return (
       <AppShell>
-        <PageHeader title="Tournament Oracle" description="Global 1-Hour Real-Time Market Competition" />
+        <PageHeader title="Tournament Oracle" description="Global 1-Month Real-Time Market Competition" />
 
         <div className="max-w-4xl mx-auto mt-8 space-y-12">
 
@@ -410,13 +439,13 @@ export default function OraclePage() {
                     onClick={() => setSpeed("normal")}
                     className={cn("flex-1 py-1.5 text-sm rounded transition", speed === "normal" ? "bg-background shadow font-semibold" : "opacity-70")}
                   >
-                    Normal (60 mins)
+                    Normal (1 Month in 60 mins)
                   </button>
                   <button
                     onClick={() => setSpeed("fast")}
                     className={cn("flex-1 py-1.5 text-sm rounded transition", speed === "fast" ? "bg-background shadow font-semibold text-primary" : "opacity-70")}
                   >
-                    Fast (5 mins)
+                    Fast (1 Month in 5 mins)
                   </button>
                 </div>
               </div>
@@ -468,6 +497,19 @@ export default function OraclePage() {
             </div>
           </Card>
 
+          {analysis && (
+            <Card className="border-4 border-primary/20 bg-card overflow-hidden">
+              <div className="bg-muted px-6 py-4 flex items-center justify-between border-b">
+                <div className="flex items-center gap-2 font-bold text-lg">
+                  <Briefcase className="w-5 h-5 text-primary" /> AI Performance Analysis
+                </div>
+              </div>
+              <div className="p-6 prose prose-invert max-w-none text-foreground/90 whitespace-pre-wrap leading-relaxed">
+                {analysis}
+              </div>
+            </Card>
+          )}
+
           <div className="flex justify-center">
             <Button size="lg" variant="outline" onClick={handleRestart}>
               Return To Lobby
@@ -483,44 +525,106 @@ export default function OraclePage() {
     <AppShell>
       <PageHeader
         title="Tournament Oracle"
-        description="Global 1-Hour Real-Time Market Competition"
+        description="Global 1-Month Real-Time Market Competition"
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mt-6">
+      <div className="flex flex-col gap-6 mt-6">
 
-        {/* Left Col: Chart & Terminals */}
-        <div className="col-span-1 lg:col-span-3 space-y-6">
-          <Card className="border-2 border-primary/20 shadow-xl shadow-primary/5 bg-card/95">
-            <CardHeader className="flex flex-col sm:flex-row sm:justify-between items-start sm:items-center bg-muted/40 pb-4 border-b">
-              <div className="mb-4 sm:mb-0">
-                <CardTitle className="flex items-center gap-2 text-xl">
-                  <Activity className="text-primary w-5 h-5 animate-pulse" /> Live Performance View
-                </CardTitle>
-                <CardDescription>Tracking percentage change from Minute 1 | Time remaining: {60 - tickMinute} mins</CardDescription>
-              </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                {STOCKS.map((s, idx) => {
-                  const startPrice = priceHistory[0]?.[s] || 0;
-                  const curPrice = currentPrices[s] || 0;
-                  const pctChange = startPrice ? (((curPrice - startPrice) / startPrice) * 100) : 0;
-                  return (
-                    <Badge key={s} variant="outline" className="px-2 py-1 flex items-center gap-1" style={{ borderColor: COLORS[idx] }}>
-                      <span style={{ color: COLORS[idx] }} className="font-bold">{s}</span>
-                      <span className="text-muted-foreground">{currentPrices[s] ? formatDecimal(currentPrices[s]) : "---"}</span>
-                      <span className={cn("text-xs ml-1", pctChange >= 0 ? "text-emerald-400" : "text-red-400")}>
-                        ({pctChange > 0 ? '+' : ''}{pctChange.toFixed(2)}%)
-                      </span>
-                    </Badge>
-                  );
-                })}
-              </div>
-            </CardHeader>
-            <CardContent className="pt-6 relative">
-              <PercentageChart history={priceHistory} currentMinute={tickMinute} />
-            </CardContent>
-          </Card>
+        {/* Top Section: Charts & Leaderboard */}
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Left Col: Charts */}
+          <div className="col-span-1 lg:col-span-3 space-y-6">
+            <Card className="border-2 border-primary/20 shadow-xl shadow-primary/5 bg-card/95">
+              <CardHeader className="flex flex-col sm:flex-row sm:justify-between items-start sm:items-center bg-muted/40 pb-4 border-b">
+                <div className="mb-4 sm:mb-0">
+                  <CardTitle className="flex items-center gap-2 text-xl">
+                    <Activity className="text-primary w-5 h-5 animate-pulse" /> Live Performance View
+                  </CardTitle>
+                  <CardDescription>Tracking percentage change from Day 1 | Time remaining: {30 - tickDay} Days</CardDescription>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {STOCKS.map((s, idx) => {
+                    const startPrice = priceHistory[0]?.[s] || 0;
+                    const curPrice = currentPrices[s] || 0;
+                    const pctChange = startPrice ? (((curPrice - startPrice) / startPrice) * 100) : 0;
+                    return (
+                      <Badge key={s} variant="outline" className="px-2 py-1 flex items-center gap-1" style={{ borderColor: COLORS[idx] }}>
+                        <span style={{ color: COLORS[idx] }} className="font-bold">{s}</span>
+                        <span className="text-muted-foreground">{currentPrices[s] ? formatDecimal(currentPrices[s]) : "---"}</span>
+                        <span className={cn("text-xs ml-1", pctChange >= 0 ? "text-emerald-400" : "text-red-400")}>
+                          ({pctChange > 0 ? '+' : ''}{pctChange.toFixed(2)}%)
+                        </span>
+                      </Badge>
+                    );
+                  })}
+                </div>
+              </CardHeader>
+              <CardContent className="pt-6 relative flex flex-col gap-8">
+                <div className="w-full relative min-h-[280px]">
+                  <div className="absolute -top-2 left-0 z-10 bg-background/80 backdrop-blur-sm px-3 py-1 rounded-full border shadow-sm">
+                    <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                       <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: "#3b82f6" }}></span> KSE 100 Benchmark
+                    </h3>
+                  </div>
+                  <PercentageChart history={priceHistory} currentMinute={tickDay} stocksToRender={["PSX"]} colors={["#3b82f6"]} />
+                </div>
+                
+                <div className="w-full h-[1px] bg-border/50"></div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="w-full relative min-h-[280px]">
+                  <div className="absolute -top-2 left-0 z-10 bg-background/80 backdrop-blur-sm px-3 py-1 rounded-full border shadow-sm flex items-center gap-3">
+                    <h3 className="text-sm font-bold text-foreground">Component Stocks</h3>
+                  </div>
+                  <PercentageChart history={priceHistory} currentMinute={tickDay} stocksToRender={["HBL", "UBL", "MCB", "HUBC", "FFC"]} colors={["#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899"]} />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Right Col: Leaderboard */}
+          <div className="col-span-1 flex flex-col gap-6">
+            <Card className="flex-1 flex flex-col overflow-hidden max-h-[660px]">
+              <div className="bg-muted px-4 py-3 border-b flex items-center justify-between font-semibold">
+                <div className="flex items-center gap-2">
+                  <Users className="w-4 h-4 text-primary" /> Leaderboard
+                </div>
+                <Badge variant="secondary" className="text-xs">{leaderboard.length} Players</Badge>
+              </div>
+              <div className="divide-y overflow-y-auto flex-1">
+                {leaderboard.length === 0 ? (
+                  <p className="p-6 text-center text-muted-foreground text-sm">Waiting for players...</p>
+                ) : (
+                  leaderboard.map((entry, idx) => (
+                    <div key={entry.userId} className={cn(
+                      "p-4 flex flex-col gap-1 transition-colors relative",
+                      entry.userId === user?.id ? "bg-primary/10" : "hover:bg-muted/50"
+                    )}>
+                      {idx === 0 && <div className="absolute top-0 right-0 w-1 h-full bg-emerald-500" />}
+                      <div className="flex justify-between items-center">
+                        <span className="font-semibold text-sm">#{entry.rank} {entry.username} {entry.userId === user?.id && <span className="text-primary">(You)</span>}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-muted-foreground text-xs font-mono">PNL</span>
+                        <span className={cn("font-bold font-mono tracking-tight", entry.pnl >= 0 ? "text-emerald-500" : "text-red-500")}>
+                          {entry.pnl > 0 ? "+" : ""}{formatDecimal(entry.pnl)}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </Card>
+            <div className="flex justify-center pt-2">
+              <Button variant="ghost" size="sm" onClick={handleEndTournament} className="text-muted-foreground text-xs hover:text-red-500 transition-colors">Abort Simulation</Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom Section: Trading Panel & Huge News Feed */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pb-12">
+          
+          {/* Col 1: Terminal & Portfolio */}
+          <div className="col-span-1 space-y-6">
             <Card className="bg-card/50 shadow-lg relative overflow-hidden">
               <div className="absolute top-0 right-0 p-4">
                 <div className="text-right">
@@ -598,71 +702,50 @@ export default function OraclePage() {
               </div>
             </Card>
           </div>
-        </div>
 
-        {/* Right Col: Leaderboard & News */}
-        <div className="col-span-1 flex flex-col gap-6">
-          <Card className="flex-1 flex flex-col overflow-hidden max-h-[400px]">
-            <div className="bg-muted px-4 py-3 border-b flex items-center justify-between font-semibold">
-              <div className="flex items-center gap-2">
-                <Users className="w-4 h-4 text-primary" /> Leaderboard
+          {/* Col 2 & 3: Giant Live Market Feed */}
+          <div className="col-span-1 lg:col-span-2 flex flex-col">
+            <Card className="flex-1 flex flex-col shadow-lg border-primary/20 relative overflow-hidden min-h-[500px]">
+              <div className="absolute top-0 right-0 p-6 opacity-5 pointer-events-none">
+                <Newspaper className="w-48 h-48" />
               </div>
-              <Badge variant="secondary" className="text-xs">{leaderboard.length} Players</Badge>
-            </div>
-            <div className="divide-y overflow-y-auto flex-1">
-              {leaderboard.length === 0 ? (
-                <p className="p-6 text-center text-muted-foreground text-sm">Waiting for players...</p>
-              ) : (
-                leaderboard.map((entry, idx) => (
-                  <div key={entry.userId} className={cn(
-                    "p-4 flex flex-col gap-1 transition-colors relative",
-                    entry.userId === user?.id ? "bg-primary/10" : "hover:bg-muted/50"
-                  )}>
-                    {idx === 0 && <div className="absolute top-0 right-0 w-1 h-full bg-emerald-500" />}
-                    <div className="flex justify-between items-center">
-                      <span className="font-semibold text-sm">#{entry.rank} {entry.username} {entry.userId === user?.id && <span className="text-primary">(You)</span>}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-muted-foreground text-xs font-mono">PNL</span>
-                      <span className={cn("font-bold font-mono tracking-tight", entry.pnl >= 0 ? "text-emerald-500" : "text-red-500")}>
-                        {entry.pnl > 0 ? "+" : ""}{formatDecimal(entry.pnl)}
-                      </span>
-                    </div>
+              <div className="bg-muted/80 backdrop-blur-md px-6 py-5 border-b shadow-sm z-10 flex items-center justify-between">
+                <div className="flex items-center gap-3 font-bold text-xl text-foreground">
+                  <Radio className="w-6 h-6 text-primary animate-pulse" /> Live Market News Feed
+                </div>
+                <Badge variant="outline" className="bg-background opacity-80">{news.length} updates</Badge>
+              </div>
+              <div className="flex-1 p-6 space-y-4 bg-muted/5 overflow-y-auto" style={{ maxHeight: '380px' }}>
+                {news.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center pt-12 text-muted-foreground">
+                     <Activity className="w-12 h-12 mb-4 opacity-20" />
+                     <p className="text-lg">Awaiting market events...</p>
                   </div>
-                ))
-              )}
-            </div>
-          </Card>
-
-          <Card className="flex-1 flex flex-col overflow-hidden max-h-[300px]">
-            <div className="bg-muted px-4 py-3 border-b flex items-center gap-2 font-semibold shadow-sm z-10">
-              <Newspaper className="w-4 h-4 text-primary" /> Live Market Feed
-            </div>
-            <div className="overflow-y-auto flex-1 p-3 space-y-3 bg-muted/10">
-              {news.length === 0 ? (
-                <p className="text-center text-muted-foreground text-sm my-4">Awaiting market news...</p>
-              ) : (
-                news.map((item, idx) => (
-                  <div key={idx} className="bg-background border rounded-lg p-3 text-sm shadow-sm animate-in slide-in-from-left-2 fade-in duration-300">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-xs font-mono font-bold text-muted-foreground">MIN {item.minute}</span>
-                      <Badge variant="outline" className={cn(
-                        "text-[10px] uppercase px-1.5 py-0 h-4 border",
-                        item.sentiment === 'positive' && "bg-emerald-500/10 text-emerald-500 border-emerald-500/50",
-                        item.sentiment === 'negative' && "bg-red-500/10 text-red-500 border-red-500/50",
-                      )}>{item.sentiment}</Badge>
+                ) : (
+                  news.map((item, idx) => (
+                    <div key={idx} className="bg-card border border-border/60 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow animate-in slide-in-from-left-4 fade-in duration-500">
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="flex items-center gap-3">
+                          <Badge variant="secondary" className="font-mono text-sm font-bold text-muted-foreground bg-muted/50 px-2 py-0.5">DAY {item.day}</Badge>
+                          <Badge variant="outline" className={cn(
+                            "text-xs uppercase px-2 py-0.5 border font-semibold tracking-wider",
+                            item.sentiment === 'positive' && "bg-emerald-500/10 text-emerald-500 border-emerald-500/40",
+                            item.sentiment === 'negative' && "bg-red-500/10 text-red-500 border-red-500/40",
+                            item.sentiment === 'neutral' && "bg-slate-500/10 text-slate-500 border-slate-500/40"
+                          )}>{item.sentiment}</Badge>
+                        </div>
+                      </div>
+                      <p className="font-medium text-lg lg:text-xl leading-relaxed text-foreground/90 tracking-wide mt-1">
+                        {item.headline}
+                      </p>
                     </div>
-                    <p className="font-medium leading-snug">{item.headline}</p>
-                  </div>
-                ))
-              )}
-              <div ref={newsEndRef} />
-            </div>
-          </Card>
-
-          <div className="flex justify-center pt-2">
-            <Button variant="ghost" size="sm" onClick={handleEndTournament} className="text-muted-foreground text-xs hover:text-red-500 transition-colors">Abort Simulation</Button>
+                  ))
+                )}
+                <div ref={newsEndRef} />
+              </div>
+            </Card>
           </div>
+
         </div>
 
       </div>

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, Req, Param } from '@nestjs/common';
 import { OracleService } from './oracle.service';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 
@@ -20,6 +20,14 @@ export class OracleController {
   @Get('portfolio')
   async getPortfolio(@Req() req: any) {
     return this.oracleService.getPortfolio(req.user.userId);
+  }
+
+  @Get(':id/analysis')
+  async getTournamentAnalysis(
+    @Req() req: any,
+    @Param('id') tournamentId: string,
+  ) {
+    return this.oracleService.getParticipantAnalysis(req.user.userId, tournamentId);
   }
 
   @Post('start')

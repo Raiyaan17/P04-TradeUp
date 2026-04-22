@@ -87,13 +87,56 @@ export class OracleService implements OnModuleDestroy {
     };
   }
 
+  async getParticipantAnalysis(userId: number, tournamentId: string) {
+    const participant = await this.prisma.tournamentParticipant.findUnique({
+      where: { tournamentId_userId: { tournamentId, userId } },
+      include: { tournament: true }
+    });
+
+    if (!participant) throw new NotFoundException('Not in tournament');
+    if (participant.tournament.status !== TournamentStatus.COMPLETED) {
+      throw new BadRequestException('Tournament must be completed first.');
+    }
+
+    const leaderboardRaw = await this.prisma.tournamentParticipant.findMany({
+      where: { tournamentId },
+      orderBy: { currentScore: 'desc' }
+    });
+
+    const rank = leaderboardRaw.findIndex(p => p.userId === userId) + 1;
+    const totalPlayers = leaderboardRaw.length;
+
+    const transactions = await this.prisma.tournamentTransaction.findMany({
+      where: { participantId: participant.id }
+    });
+
+    let topStock = "None";
+    if (transactions.length > 0) {
+      const counts: Record<string, number> = {};
+      transactions.forEach(t => counts[t.stockSymbol] = (counts[t.stockSymbol] || 0) + 1);
+      topStock = Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
+    }
+
+    const stats = {
+      startingCash: Number(participant.tournament.startingCash),
+      pnl: Number(participant.currentScore),
+      rank,
+      totalPlayers,
+      totalTrades: transactions.length,
+      topStock
+    };
+
+    const analysis = await this.agentService.generateTournamentAnalysis(stats);
+    return { analysis, stats };
+  }
+
   async getCurrentTickData(tournamentId: string) {
     if (!this.tickInterval || this.currentTickIndex === 0 || this.trajectoryPoints.length === 0) {
       return null;
     }
     const idx = Math.min(this.currentTickIndex - 1, this.trajectoryPoints.length - 1);
     const tick = this.trajectoryPoints[idx];
-    const tickNews = this.newsItems.filter(n => n.minute === tick.minute);
+    const tickNews = this.newsItems.filter(n => n.day === tick.day);
 
     const participants = await this.prisma.tournamentParticipant.findMany({
       where: { tournamentId },
@@ -328,7 +371,7 @@ export class OracleService implements OnModuleDestroy {
   private startTickEngine(tournamentId: string, speed: 'normal' | 'fast' = 'normal') {
     this.stopTickEngine();
 
-    const intervalMs = speed === 'fast' ? 5000 : 60000;
+    const intervalMs = speed === 'fast' ? 10000 : 120000;
 
     const tickFn = async () => {
       try {
@@ -366,12 +409,12 @@ export class OracleService implements OnModuleDestroy {
           Object.keys(rawTick).forEach(key => {
             tick[key.toUpperCase()] = (rawTick as any)[key];
           });
-          tick.minute = rawTick.minute;
+          tick.day = rawTick.day;
         }
         // Save the cleaned tick back so getCurrentStockPrice finds uppercase keys safely
         this.trajectoryPoints[this.currentTickIndex] = tick as TournamentDataPoint;
 
-        const tickNews = this.newsItems.filter(n => n.minute === tick.minute);
+        const tickNews = this.newsItems.filter(n => n.day === tick.day);
 
         // Recalculate everyone's score
         const participants = await this.prisma.tournamentParticipant.findMany({
