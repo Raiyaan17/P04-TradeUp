@@ -1,9 +1,5 @@
 {
   "version": 2,
-  "install": {
-    "runtime": "nodejs20.x",
-    "framework": null
-  },
   "builds": [
     {
       "src": "package.json",
