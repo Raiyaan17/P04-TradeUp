@@ -533,4 +533,106 @@ describe('ChatbotService', () => {
       expect(result).toContain('Monthly Performance Review');
     });
   });
+
+  // ═══════════════════════════════════════════════════════════════
+  // NEW TEST CASE 1:
+  // trainBaselineModel — DB exception sets fallback message
+  // ═══════════════════════════════════════════════════════════════
+
+  describe('trainBaselineModel — DB failure resilience', () => {
+    it('should set marketBaseline to unavailable message when tournament query throws', async () => {
+      // Simulate a hard database error (not just empty results)
+      prisma.tournament.findMany.mockRejectedValue(new Error('DB connection lost'));
+
+      // Should NOT throw — errors are caught internally
+      await expect(service.trainBaselineModel()).resolves.toBeUndefined();
+
+      const baseline = (service as any).marketBaseline as string;
+      expect(baseline).toBe('Market baseline unavailable.');
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // NEW TEST CASE 2:
+  // getChatResponse — prior conversation history is forwarded to
+  // Gemini in the correct multi-turn [{role, parts}] format
+  // ═══════════════════════════════════════════════════════════════
+
+  describe('getChatResponse — multi-turn conversation history forwarding', () => {
+    it('should include prior messages as multi-turn contents when calling Gemini', async () => {
+      prisma.chatSession.findFirst.mockResolvedValue({ id: 1, userId: 1 });
+
+      // Simulate 2 prior messages already stored in the DB
+      prisma.chatMessage.findMany.mockResolvedValue([
+        { id: 10, sessionId: 1, role: 'user',     content: 'What is PSX?',                        createdAt: new Date() },
+        { id: 11, sessionId: 1, role: 'assistant', content: 'PSX is the Pakistan Stock Exchange.', createdAt: new Date() },
+      ]);
+
+      let capturedHistory: { role: string; parts: { text: string }[] }[] = [];
+      let capturedNewMessage = '';
+      // Spy on the private callGemini method to capture what it receives
+      const callGeminiSpy = jest
+        .spyOn(service as any, 'callGemini')
+        .mockImplementation(
+          async (
+            _systemPrompt: string,
+            conversationHistory: { role: string; parts: { text: string }[] }[],
+            newMessage: string,
+          ) => {
+            capturedHistory = conversationHistory;
+            capturedNewMessage = newMessage;
+            return 'Great follow-up!';
+          },
+        );
+
+      await service.getChatResponse(1, 1, 'Tell me more about PSX.');
+
+      // History passed to callGemini must contain the two prior turns in order
+      expect(capturedHistory.length).toBe(2);
+      expect(capturedHistory[0]).toEqual({ role: 'user',  parts: [{ text: 'What is PSX?' }] });
+      expect(capturedHistory[1]).toEqual({ role: 'model', parts: [{ text: 'PSX is the Pakistan Stock Exchange.' }] });
+      // The new user message must be passed as the third argument
+      expect(capturedNewMessage).toBe('Tell me more about PSX.');
+
+      callGeminiSpy.mockRestore();
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // NEW TEST CASE 3:
+  // buildUserContext — watchlist symbols appear in the system
+  // prompt so Gemini can give targeted stock insights
+  // ═══════════════════════════════════════════════════════════════
+
+  describe('buildUserContext — watchlist included in system prompt', () => {
+    it('should include user watchlist symbols in the context sent to Gemini', async () => {
+      prisma.chatSession.findFirst.mockResolvedValue({ id: 1, userId: 1 });
+      prisma.chatMessage.findMany.mockResolvedValue([]);
+
+      // User watches two specific stocks
+      (watchlistService.list as jest.Mock).mockResolvedValue([
+        { symbol: 'PSO' },
+        { symbol: 'HBL' },
+      ]);
+
+      let capturedSystemPrompt = '';
+      // Spy on the private callGemini method to capture the system prompt argument
+      const callGeminiSpy = jest
+        .spyOn(service as any, 'callGemini')
+        .mockImplementation(async (systemPrompt: string) => {
+          capturedSystemPrompt = systemPrompt;
+          return 'Here are insights on PSO and HBL.';
+        });
+
+      await service.getChatResponse(1, 1, 'any recommendations?');
+
+      // Both watchlist symbols must appear in the system prompt
+      expect(capturedSystemPrompt).toContain('PSO');
+      expect(capturedSystemPrompt).toContain('HBL');
+      // And the WATCHLIST section header must be present
+      expect(capturedSystemPrompt).toContain('WATCHLIST');
+
+      callGeminiSpy.mockRestore();
+    });
+  });
 });
