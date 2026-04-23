@@ -33,6 +33,9 @@ async function bootstrap() {
     limits: { fileSize: 10 * 1024 * 1024 },
   });
 
+  // Set global prefix BEFORE Swagger so it picks up /api correctly
+  app.setGlobalPrefix('api');
+
   // Configure Swagger Documentation
   const config = new DocumentBuilder()
     .setTitle('TradeUp API')
@@ -72,7 +75,7 @@ async function bootstrap() {
     'https://p04-trade-up1.vercel.app',
   ]);
 
-  app.setGlobalPrefix('api');
+  // (global prefix already set above before Swagger)
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   app.useGlobalFilters(new CorsExceptionFilter());
   const port = process.env.PORT ? Number(process.env.PORT) : 3001;
