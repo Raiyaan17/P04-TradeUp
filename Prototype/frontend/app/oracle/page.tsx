@@ -42,6 +42,51 @@ interface TournamentNewsItem {
   sentiment: 'positive' | 'negative' | 'neutral';
 }
 
+interface TournamentParticipant {
+  userId: number;
+  username: string;
+  balance: number;
+}
+
+interface Tournament {
+  id: number;
+  participants?: TournamentParticipant[];
+  startingCash: number;
+  speed: string;
+}
+
+interface TournamentTick {
+  day: number;
+  status?: string;
+  PSX: number;
+  HBL: number;
+  UBL: number;
+  MCB: number;
+  HUBC: number;
+  FFC: number;
+}
+
+interface TournamentNews {
+  day: number;
+  headline: string;
+  sentiment: 'positive' | 'negative' | 'neutral';
+}
+
+interface Holding {
+  stockSymbol: string;
+  quantity: number;
+  avgPrice: number;
+}
+
+interface TournamentPortfolio {
+  balance: number;
+  holdings: Holding[];
+}
+
+interface ApiError {
+  message: string;
+}
+
 const STOCKS = ["PSX", "HBL", "UBL", "MCB", "HUBC", "FFC"];
 const COLORS = [
   "#3b82f6", // PSX
@@ -52,12 +97,12 @@ const COLORS = [
   "#ec4899", // FFC
 ];
 
-function PercentageChart({ history, currentMinute, stocksToRender, colors }: { history: Record<string, number>[], currentMinute: number, stocksToRender: string[], colors: string[] }) {
+function PercentageChart({ history, stocksToRender, colors }: { history: Record<string, number>[], stocksToRender: string[], colors: string[] }) {
   if (history.length === 0) return <div className="h-full flex items-center justify-center text-muted-foreground">Waiting for market open...</div>;
 
   const firstPoint = history[0];
-  const data = history.map(point => {
-    let percentages: Record<string, number> = {};
+const data = history.map((point) => {
+    const percentages: Record<string, number> = {};
     stocksToRender.forEach(s => {
       const startPrice = firstPoint[s];
       const currentPrice = point[s];
@@ -140,9 +185,9 @@ export default function OraclePage() {
   const [speed, setSpeed] = useState<"normal" | "fast">("normal");
 
   // Game Data
-  const [activeTournaments, setActiveTournaments] = useState<any[]>([]);
-  const [tournament, setTournament] = useState<any>(null);
-  const [portfolio, setPortfolio] = useState<{ balance: number, holdings: any[] }>({ balance: 0, holdings: [] });
+const [activeTournaments, setActiveTournaments] = useState<Tournament[]>([]);
+  const [tournament, setTournament] = useState<Tournament | null>(null);
+  const [portfolio, setPortfolio] = useState<TournamentPortfolio>({ balance: 0, holdings: [] });
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [currentPrices, setCurrentPrices] = useState<Record<string, number>>({});
   const [priceHistory, setPriceHistory] = useState<Record<string, number>[]>([]);
@@ -158,71 +203,74 @@ export default function OraclePage() {
   // End of feed ref
   const newsEndRef = useRef<HTMLDivElement>(null);
 
-  // Load Initial state
+// Load Initial state
   useEffect(() => {
     checkTournament();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   useEffect(() => {
     newsEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [news]);
 
-  useEffect(() => {
+useEffect(() => {
     if (isGameOver && tournament?.id) {
       http.get(`/oracle/tournament/${tournament.id}/analysis`)
-        .then((res: any) => {
-          if (res && res.analysis) setAnalysis(res.analysis);
+        .then((res) => {
+          if (res && typeof res === 'object' && 'analysis' in res) {
+            setAnalysis((res as { analysis: string }).analysis);
+          }
         })
         .catch(err => console.error("Failed to fetch analysis", err));
     }
   }, [isGameOver, tournament]);
 
-  const fetchPortfolio = async () => {
+const fetchPortfolio = async () => {
     try {
-      const res: any = await http.get("/oracle/tournament/portfolio");
+      const res = await http.get("/oracle/tournament/portfolio");
       if (res) {
-        setPortfolio(res);
+        setPortfolio(res as TournamentPortfolio);
       }
     } catch (e) {
       console.error(e);
     }
   };
 
-  const checkTournament = async () => {
+const checkTournament = async () => {
     if (!user) return;
     try {
       setLoading(true);
-      const res: any = await http.get("/oracle/tournament/list");
+      const res = await http.get("/oracle/tournament/list");
       if (Array.isArray(res)) {
-        setActiveTournaments(res);
+        setActiveTournaments(res as Tournament[]);
       }
-    } catch (e) {
+    } catch {
       console.log("Failed to fetch tournaments");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleJoinGame = async (t: any) => {
+  const handleJoinGame = async (t: Tournament) => {
     try {
       setLoading(true);
       await http.post("/oracle/tournament/join", { tournamentId: t.id });
       setTournament(t);
-      connectWS();
+connectWS();
       fetchPortfolio();
       toast.success("Joined Tournament!");
-    } catch (e) {
+    } catch {
       toast.error("Failed to join");
     } finally {
       setLoading(false);
     }
   };
 
-  const startTournament = async () => {
+const startTournament = async () => {
     try {
       setLoading(true);
-      const res: any = await http.post("/oracle/tournament/start", { startingCash, speed });
-      setTournament(res);
+      const res = await http.post("/oracle/tournament/start", { startingCash, speed });
+      setTournament(res as Tournament);
       connectWS();
       fetchPortfolio();
       toast.success("Joined Tournament!");
@@ -231,16 +279,7 @@ export default function OraclePage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const joinTournament = async (id: string) => {
-    try {
-      await http.post("/oracle/tournament/join", { tournamentId: id });
-      toast.success("Joined Tournament!");
-    } catch {
-      toast.error("Failed to join");
-    }
-  };
+};
 
   const connectWS = () => {
     const isLocalhost = typeof window !== 'undefined' && window.location.hostname === 'localhost';
@@ -250,11 +289,11 @@ export default function OraclePage() {
       withCredentials: true,
     });
 
-    socket.on("connect", () => {
+socket.on("connect", () => {
       console.log("Connected to Tournament Live Feed");
     });
 
-    socket.on("tournamentTick", (data: { tick: any, news: any, leaderboard: LeaderboardEntry[] }) => {
+    socket.on("tournamentTick", (data: { tick: TournamentTick, news: TournamentNews[], leaderboard: LeaderboardEntry[] }) => {
       if (!data.tick || Object.keys(data.tick).length === 0 || data.tick.status === 'completed' || data.tick.day > 30) {
         return;
       }
@@ -275,7 +314,7 @@ export default function OraclePage() {
       setPriceHistory(prev => [...prev, prices]);
 
       if (data.news && data.news.length > 0) {
-        data.news.forEach((n: any) => {
+        data.news.forEach((n: TournamentNews) => {
           toast(n.headline, {
             description: `DAY ${n.day} • ${n.sentiment.toUpperCase()}`,
             duration: 3000,
@@ -286,7 +325,7 @@ export default function OraclePage() {
         setTimeout(() => {
           setNews(prev => {
             const existing = new Set(prev.map(p => p.headline));
-            const newItems = data.news.filter((n: any) => !existing.has(n.headline));
+            const newItems = data.news.filter((n: TournamentNews) => !existing.has(n.headline));
             return [...prev, ...newItems];
           });
         }, 3000);
@@ -307,7 +346,8 @@ export default function OraclePage() {
     };
   };
 
-  const handleTrade = async (action: "buy" | "sell") => {
+const handleTrade = async (action: "buy" | "sell") => {
+    if (!tournament?.id) return;
     try {
       await http.post(`/oracle/tournament/${action}`, {
         tournamentId: tournament.id,
@@ -316,20 +356,23 @@ export default function OraclePage() {
       });
       toast.success(`Successfully ${action === 'buy' ? 'bought' : 'sold'} ${tradeQuantity} ${selectedStock}`);
       fetchPortfolio();
-    } catch (e: any) {
-      toast.error(e.message || "Trade failed");
+    } catch (e) {
+      const error = e as ApiError;
+      toast.error(error.message || "Trade failed");
     }
   };
 
   const handleEndTournament = async () => {
+    if (!tournament?.id) return;
     try {
       await http.post("/oracle/tournament/end", { tournamentId: tournament.id });
       toast.success("Tournament Ended prematurely. Please wait for the final whistle.");
-    } catch (e: any) {
-      if (e?.message === "Tournament not active" || e?.message?.includes("not active")) {
+    } catch (e) {
+      const error = e as ApiError;
+      if (error?.message === "Tournament not active" || error?.message?.includes("not active")) {
         toast.error("Tournament already ended. Returning to lobby.");
       } else {
-        toast.error(e.message || "Failed to end tournament");
+        toast.error(error.message || "Failed to end tournament");
       }
     } finally {
       // Always reset back to lobby if we are trying to abort an untracked/stuck tournament
@@ -367,8 +410,8 @@ export default function OraclePage() {
             </h2>
             {activeTournaments.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {activeTournaments.map(t => {
-                  const isParticipant = t.participants?.some((p: any) => p.userId === user?.id);
+{activeTournaments.map(t => {
+                  const isParticipant = t.participants?.some((p: TournamentParticipant) => p.userId === user?.id);
                   return (
                     <Card key={t.id} className="bg-card shadow-lg border-primary/20 hover:border-primary/50 transition-colors">
                       <CardHeader>
@@ -570,7 +613,7 @@ export default function OraclePage() {
                        <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: "#3b82f6" }}></span> KSE 100 Benchmark
                     </h3>
                   </div>
-                  <PercentageChart history={priceHistory} currentMinute={tickDay} stocksToRender={["PSX"]} colors={["#3b82f6"]} />
+                  <PercentageChart history={priceHistory} stocksToRender={["PSX"]} colors={["#3b82f6"]} />
                 </div>
                 
                 <div className="w-full h-[1px] bg-border/50"></div>
@@ -579,7 +622,7 @@ export default function OraclePage() {
                   <div className="absolute -top-2 left-0 z-10 bg-background/80 backdrop-blur-sm px-3 py-1 rounded-full border shadow-sm flex items-center gap-3">
                     <h3 className="text-sm font-bold text-foreground">Component Stocks</h3>
                   </div>
-                  <PercentageChart history={priceHistory} currentMinute={tickDay} stocksToRender={["HBL", "UBL", "MCB", "HUBC", "FFC"]} colors={["#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899"]} />
+                  <PercentageChart history={priceHistory} stocksToRender={["HBL", "UBL", "MCB", "HUBC", "FFC"]} colors={["#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899"]} />
                 </div>
               </CardContent>
             </Card>

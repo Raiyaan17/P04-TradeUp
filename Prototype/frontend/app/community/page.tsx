@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import Image from "next/image";
 import { toast } from "sonner";
 import {
   MessageSquare,
@@ -26,7 +27,7 @@ import {
 import { useUser } from "@/context/UserContext";
 import { AppShell } from "@/components/layout";
 import { PageHeader, PageState, usePageState } from "@/components/common";
-import { MentionAutocomplete, MentionSuggestion } from "@/components/common/MentionAutocomplete";
+import { MentionAutocomplete } from "@/components/common/MentionAutocomplete";
 import { useMentions } from "@/hooks/useMentions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -60,9 +61,8 @@ import {
   blockUser,
   unblockUser,
   getBlockedUsers,
-  savePost,
+savePost,
   getSavedPosts,
-  isPostSaved,
   uploadCommunityImage,
 } from "@/lib/communityService";
 import type {
@@ -218,12 +218,8 @@ function CommentItem({
           </div>
           <p className="text-sm text-foreground mt-0.5">{comment.content}</p>
           {comment.imageUrl && (
-            <div className="mt-2 rounded-lg overflow-hidden border border-border">
-              <img
-                src={comment.imageUrl}
-                alt="Comment image"
-                className="max-w-xs max-h-64 object-cover"
-              />
+<div className="mt-2 rounded-lg overflow-hidden border border-border">
+              <Image src={comment.imageUrl} alt="Comment image" width={256} height={256} className="max-w-xs max-h-64 object-cover" unoptimized />
             </div>
           )}
           <div className="flex items-center gap-2 mt-1">
@@ -301,8 +297,8 @@ function CommentItem({
             </div>
           </MentionAutocomplete>
           {replyImageUrl && (
-            <div className="relative inline-block">
-              <img src={replyImageUrl} alt="preview" className="max-h-24 rounded border border-border object-cover" />
+<div className="relative inline-block">
+              <Image src={replyImageUrl} alt="preview" width={96} height={96} className="max-h-24 rounded border border-border object-cover" unoptimized />
               <Button
                 variant="ghost"
                 size="sm"
@@ -354,8 +350,7 @@ function PostCard({ post, currentUserId, onDelete, onReaction, onBlock, onSave }
   const [comments, setComments] = useState<PostComment[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
   const [commentContent, setCommentContent] = useState("");
-  const [commentImageUrl, setCommentImageUrl] = useState("");
-  const [commentImageFile, setCommentImageFile] = useState<File | null>(null);
+const [commentImageUrl, setCommentImageUrl] = useState("");
   const [uploadingCommentImage, setUploadingCommentImage] = useState(false);
   const [submittingComment, setSubmittingComment] = useState(false);
   const [showReactions, setShowReactions] = useState(false);
@@ -366,11 +361,8 @@ function PostCard({ post, currentUserId, onDelete, onReaction, onBlock, onSave }
 
   // Mention state for comments
   const { mentions: commentMentions, addMention: addCommentMention, clearMentions: clearCommentMentions } = useMentions();
-  const commentTextareaRef = useRef<HTMLTextAreaElement>(null);
+const commentTextareaRef = useRef<HTMLTextAreaElement>(null);
   const commentImageInputRef = useRef<HTMLInputElement>(null);
-
-  // Mention state for replies
-  const replyTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   const isOwn = post.author.id === currentUserId;
 
@@ -397,10 +389,9 @@ function PostCard({ post, currentUserId, onDelete, onReaction, onBlock, onSave }
     if (!commentContent.trim()) return;
     setSubmittingComment(true);
     try {
-      await createComment(post.id, commentContent.trim(), undefined, commentImageUrl || undefined);
+await createComment(post.id, commentContent.trim(), undefined, commentImageUrl || undefined);
       setCommentContent("");
       setCommentImageUrl("");
-      setCommentImageFile(null);
       clearCommentMentions();
       toast.success("Comment added");
       setLocalCommentCount((c) => c + 1);
@@ -440,10 +431,9 @@ function PostCard({ post, currentUserId, onDelete, onReaction, onBlock, onSave }
 
   const handleCommentImageUpload = async (file: File) => {
     setUploadingCommentImage(true);
-    try {
+try {
       const uploadedUrl = await uploadCommunityImage(file);
       setCommentImageUrl(uploadedUrl);
-      setCommentImageFile(file);
       toast.success("Image uploaded");
     } catch (e) {
       toast.error((e as Error).message || "Failed to upload image");
@@ -527,12 +517,8 @@ function PostCard({ post, currentUserId, onDelete, onReaction, onBlock, onSave }
             {post.content}
           </p>
           {post.imageUrl && (
-            <div className="mt-3 rounded-lg overflow-hidden border border-border">
-              <img
-                src={post.imageUrl}
-                alt={post.title}
-                className="w-full max-h-96 object-cover"
-              />
+<div className="mt-3 rounded-lg overflow-hidden border border-border">
+              <Image src={post.imageUrl} alt={post.title} width={800} height={400} className="w-full max-h-96 object-cover" unoptimized />
             </div>
           )}
         </div>
@@ -718,17 +704,12 @@ function PostCard({ post, currentUserId, onDelete, onReaction, onBlock, onSave }
               
               {/* Image preview */}
               {commentImageUrl && (
-                <div className="rounded-lg overflow-hidden border border-border relative">
-                  <img
-                    src={commentImageUrl}
-                    alt="Comment image preview"
-                    className="max-h-40 w-full object-cover"
-                  />
+<div className="rounded-lg overflow-hidden border border-border relative">
+                  <Image src={commentImageUrl} alt="Comment image preview" width={400} height={160} className="max-h-40 w-full object-cover" unoptimized />
                   <button
                     type="button"
                     onClick={() => {
-                      setCommentImageUrl("");
-                      setCommentImageFile(null);
+setCommentImageUrl("");
                     }}
                     className="absolute top-2 right-2 bg-background/80 hover:bg-background rounded-full p-1"
                   >
@@ -780,13 +761,13 @@ export default function CommunityPage() {
   const [newTitle, setNewTitle] = useState("");
   const [newContent, setNewContent] = useState("");
   const [newTag, setNewTag] = useState<PostTag>("GENERAL");
-  const [newImageUrl, setNewImageUrl] = useState("");
-  const [newImageFile, setNewImageFile] = useState<File | null>(null);
+const [newImageUrl, setNewImageUrl] = useState("");
+  const [, setNewImageFile] = useState<File | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   // Mention state
-  const { mentions, mentionedUserIds, addMention, clearMentions } = useMentions();
+  const { mentions, addMention, clearMentions } = useMentions();
   const newPostTextareaRef = useRef<HTMLTextAreaElement>(null);
   const postImageInputRef = useRef<HTMLInputElement>(null);
 
@@ -1361,16 +1342,9 @@ export default function CommunityPage() {
                 </div>
               </div>
               {newImageUrl && (
-                <div className="mt-3 rounded-lg overflow-hidden border border-border relative">
-                  <img
-                    src={newImageUrl}
-                    alt="Preview"
-                    className="max-h-48 w-full object-cover"
-                    onError={() => {
-                      toast.error("Invalid image URL");
-                      setNewImageUrl("");
-                    }}
-                  />
+<div className="mt-3 rounded-lg overflow-hidden border border-border relative">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={newImageUrl} alt="Preview" className="max-h-48 w-full object-cover" />
                   <button
                     type="button"
                     onClick={() => {

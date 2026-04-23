@@ -1,5 +1,5 @@
 import API_BASE_URL from './api';
-import { uploadFile, ApiException } from '@/lib/http';
+import { uploadFile } from '@/lib/http';
 import type {
   CommunityPost,
   PostsResponse,

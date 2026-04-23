@@ -22,7 +22,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { http, ApiException } from "@/lib/http";
-import { formatDecimal, formatPercent, formatSigned, formatVolume, formatTimeAgo, getPnLClass } from "@/lib/format";
+import { formatDecimal, formatPercent, formatVolume, formatTimeAgo } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 interface Tick {
@@ -113,7 +113,7 @@ export default function DashboardPage() {
 
   const fetchInsights = useCallback(async () => {
     try {
-      const json = await http.get<{ gainers: any[]; losers: any[]; hot: any[] }>("/stocks/insights", { noAuth: true });
+      const json = await http.get<{ gainers: Record<string, unknown>[]; losers: Record<string, unknown>[]; hot: Record<string, unknown>[] }>("/stocks/insights", { noAuth: true });
       if (json) {
         setInsights({
           gainers: (json.gainers || []).map(x => normalizeStock(x)),
@@ -419,7 +419,7 @@ export default function DashboardPage() {
                   {getSortedItems(watchlistRows).map((row, i) => {
                     const s = row?.symbol ?? `w-${i}`;
                     const price = getPrice(row?.tick);
-                    const { chg, pct } = getChange(row?.tick);
+                    const { pct } = getChange(row?.tick);
                     const vol = getVolume(row?.tick);
                     const isRemoving = removing.has(s);
 
@@ -573,7 +573,7 @@ export default function DashboardPage() {
                 {filteredItems.map((row, i) => {
                   const s = row?.symbol ?? `${activeTab}-${i}`;
                   const price = getPrice(row?.tick);
-                  const { chg, pct } = getChange(row?.tick);
+                  const { pct } = getChange(row?.tick);
                   const vol = getVolume(row?.tick);
                   const isSaved = watchlist.has(s);
                   const isSaving = saving.has(s);

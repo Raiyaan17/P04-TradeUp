@@ -32,11 +32,8 @@ export function TopBar() {
   const { resolvedTheme, setTheme } = useTheme();
   const router = useRouter();
   const pathname = usePathname();
-  const [hasRequests, setHasRequests] = useState(false);
+const [hasRequests, setHasRequests] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => { setMounted(true); }, []);
 
   const handleSignOut = async () => {
     if (typeof window !== "undefined") {
@@ -112,9 +109,8 @@ export function TopBar() {
 
           {/* Right side Actions */}
           <div className="flex items-center gap-2">
-            {/* Theme Toggle */}
-            {mounted && (
-              <Button
+{/* Theme Toggle */}
+            <Button
                 variant="ghost"
                 size="icon"
                 aria-label="Toggle theme"
@@ -126,8 +122,7 @@ export function TopBar() {
                 ) : (
                   <Moon className="h-4 w-4" />
                 )}
-              </Button>
-            )}
+</Button>
 
             {/* User Menu */}
             <DropdownMenu>

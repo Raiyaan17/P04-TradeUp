@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { TrendingUp, TrendingDown, Minus, Plus, Search, Loader2 } from "lucide-react";
 import { AppShell } from "@/components/layout";
-import { PageHeader } from "@/components/common";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

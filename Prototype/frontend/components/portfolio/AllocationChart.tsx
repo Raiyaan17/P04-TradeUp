@@ -277,7 +277,7 @@ export function AllocationChart({
 
                   {/* Risk Badge — hidden on small screens */}
                   <div className="w-20 shrink-0 hidden sm:flex justify-end">
-                    <Badge variant={badgeVariant as any} className={cn("text-[10px] whitespace-nowrap px-2 py-0.5 h-auto", badgeClassName)}>
+                    <Badge variant={badgeVariant} className={cn("text-[10px] whitespace-nowrap px-2 py-0.5 h-auto", badgeClassName)}>
                       {badgeText}
                     </Badge>
                   </div>

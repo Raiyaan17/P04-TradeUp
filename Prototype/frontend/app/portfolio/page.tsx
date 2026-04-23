@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import { AppShell } from '@/components/layout';
 import { PageHeader, EmptyState } from '@/components/common';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
