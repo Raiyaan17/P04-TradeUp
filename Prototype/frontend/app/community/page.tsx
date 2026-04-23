@@ -135,41 +135,68 @@ function getInitials(name: string | null, username: string): string {
 
 interface CommentItemProps {
   comment: PostComment;
+  postId: number;
   currentUserId: number;
-  onReply: (commentId: number) => void;
   onDelete: (commentId: number) => void;
   onBlock: (userId: number, username: string) => void;
-  replyingTo: number | null;
-  replyContent: string;
-  onReplyContentChange: (value: string) => void;
-  onSubmitReply: () => void;
-  submittingReply: boolean;
+  onCommentAdded: () => void;
   depth?: number;
-  replyMentions?: any[];
-  onReplyMention?: (user: MentionSuggestion) => void;
 }
 
 function CommentItem({
   comment,
+  postId,
   currentUserId,
-  onReply,
   onDelete,
   onBlock,
-  replyingTo,
-  replyContent,
-  onReplyContentChange,
-  onSubmitReply,
-  submittingReply,
+  onCommentAdded,
   depth = 0,
-  replyMentions,
-  onReplyMention,
 }: CommentItemProps) {
   const isOwn = comment.author.id === currentUserId;
+  const [showReply, setShowReply] = useState(false);
+  const [replyContent, setReplyContent] = useState("");
+  const [replyImageUrl, setReplyImageUrl] = useState("");
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const { mentions, addMention, clearMentions } = useMentions();
+  const imageInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingImage(true);
+    try {
+      const url = await uploadCommunityImage(file);
+      setReplyImageUrl(url);
+    } catch {
+      toast.error("Failed to upload image");
+    } finally {
+      setUploadingImage(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!replyContent.trim()) return;
+    setSubmitting(true);
+    try {
+      await createComment(postId, replyContent.trim(), comment.id, replyImageUrl || undefined);
+      setReplyContent("");
+      setReplyImageUrl("");
+      clearMentions();
+      setShowReply(false);
+      onCommentAdded();
+    } catch (e) {
+      toast.error((e as Error).message || "Failed to add reply");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
-    <div className={cn("space-y-2", depth > 0 && "ml-8 border-l-2 border-border pl-4")}>
+    <div className={cn("space-y-2", depth > 0 && "ml-6 border-l-2 border-border pl-3")}>
       <div className="flex items-start gap-3 group">
-        <Avatar className="h-7 w-7 mt-0.5">
+        <Avatar className="h-7 w-7 mt-0.5 shrink-0">
           {comment.author.profileImageUrl ? (
             <AvatarImage src={comment.author.profileImageUrl} />
           ) : null}
@@ -200,16 +227,14 @@ function CommentItem({
             </div>
           )}
           <div className="flex items-center gap-2 mt-1">
-            {depth === 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
-                onClick={() => onReply(comment.id)}
-              >
-                <Reply className="h-3 w-3 mr-1" /> Reply
-              </Button>
-            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+              onClick={() => { setShowReply((v) => !v); setReplyContent(""); setReplyImageUrl(""); clearMentions(); }}
+            >
+              <Reply className="h-3 w-3 mr-1" /> Reply
+            </Button>
             {isOwn && (
               <Button
                 variant="ghost"
@@ -235,63 +260,80 @@ function CommentItem({
       </div>
 
       {/* Reply input */}
-      {replyingTo === comment.id && (
+      {showReply && (
         <div className="ml-10 space-y-2">
           <MentionAutocomplete
             value={replyContent}
-            onChange={onReplyContentChange}
-            onMention={onReplyMention || (() => {})}
+            onChange={setReplyContent}
+            onMention={addMention}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                onSubmitReply();
-              }
+              if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSubmit(); }
             }}
-            placeholder="Write a reply... Type @ to mention someone"
+            placeholder="Write a reply… Type @ to mention someone"
           >
             <div className="flex items-center gap-2">
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleImageChange}
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 px-2 text-muted-foreground"
+                onClick={() => imageInputRef.current?.click()}
+                disabled={uploadingImage}
+                title="Attach image"
+              >
+                <ImageIcon className="h-4 w-4" />
+              </Button>
               <Button
                 size="sm"
                 className="h-8"
-                onClick={onSubmitReply}
-                disabled={!replyContent.trim() || submittingReply}
+                onClick={handleSubmit}
+                disabled={!replyContent.trim() || submitting}
               >
                 <Send className="h-3 w-3" />
               </Button>
             </div>
           </MentionAutocomplete>
-          
-          {/* Mentioned users display for reply */}
-          {replyMentions && replyMentions.length > 0 && (
-            <div className="mt-1">
-              <p className="text-xs font-medium text-muted-foreground">
-                Mentioned: {replyMentions.map((u) => `@${u.username}`).join(", ")}
-              </p>
+          {replyImageUrl && (
+            <div className="relative inline-block">
+              <img src={replyImageUrl} alt="preview" className="max-h-24 rounded border border-border object-cover" />
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute -top-2 -right-2 h-5 w-5 p-0 rounded-full bg-background border border-border"
+                onClick={() => setReplyImageUrl("")}
+              >
+                <X className="h-3 w-3" />
+              </Button>
             </div>
+          )}
+          {mentions.length > 0 && (
+            <p className="text-xs text-muted-foreground">
+              Mentioned: {mentions.map((u) => `@${u.username}`).join(", ")}
+            </p>
           )}
         </div>
       )}
 
-      {/* Nested replies */}
-      {comment.replies &&
-        comment.replies.map((reply) => (
-          <CommentItem
-            key={reply.id}
-            comment={reply}
-            currentUserId={currentUserId}
-            onReply={onReply}
-            onDelete={onDelete}
-            onBlock={onBlock}
-            replyingTo={replyingTo}
-            replyContent={replyContent}
-            onReplyContentChange={onReplyContentChange}
-            onSubmitReply={onSubmitReply}
-            submittingReply={submittingReply}
-            depth={depth + 1}
-            replyMentions={replyMentions}
-            onReplyMention={onReplyMention}
-          />
-        ))}
+      {/* Nested replies — unlimited depth */}
+      {comment.replies?.map((reply) => (
+        <CommentItem
+          key={reply.id}
+          comment={reply}
+          postId={postId}
+          currentUserId={currentUserId}
+          onDelete={onDelete}
+          onBlock={onBlock}
+          onCommentAdded={onCommentAdded}
+          depth={depth + 1}
+        />
+      ))}
     </div>
   );
 }
@@ -316,12 +358,11 @@ function PostCard({ post, currentUserId, onDelete, onReaction, onBlock, onSave }
   const [commentImageFile, setCommentImageFile] = useState<File | null>(null);
   const [uploadingCommentImage, setUploadingCommentImage] = useState(false);
   const [submittingComment, setSubmittingComment] = useState(false);
-  const [replyingTo, setReplyingTo] = useState<number | null>(null);
-  const [replyContent, setReplyContent] = useState("");
-  const [submittingReply, setSubmittingReply] = useState(false);
   const [showReactions, setShowReactions] = useState(false);
   const [isSaved, setIsSaved] = useState(post.isSaved ?? false);
   const [savingPost, setSavingPost] = useState(false);
+  const [localCommentCount, setLocalCommentCount] = useState(post.commentCount);
+  const hideReactionsTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   // Mention state for comments
   const { mentions: commentMentions, addMention: addCommentMention, clearMentions: clearCommentMentions } = useMentions();
@@ -329,7 +370,6 @@ function PostCard({ post, currentUserId, onDelete, onReaction, onBlock, onSave }
   const commentImageInputRef = useRef<HTMLInputElement>(null);
 
   // Mention state for replies
-  const { mentions: replyMentions, addMention: addReplyMention, clearMentions: clearReplyMentions } = useMentions();
   const replyTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   const isOwn = post.author.id === currentUserId;
@@ -363,6 +403,7 @@ function PostCard({ post, currentUserId, onDelete, onReaction, onBlock, onSave }
       setCommentImageFile(null);
       clearCommentMentions();
       toast.success("Comment added");
+      setLocalCommentCount((c) => c + 1);
       loadComments();
     } catch (e) {
       toast.error((e as Error).message || "Failed to add comment");
@@ -371,22 +412,6 @@ function PostCard({ post, currentUserId, onDelete, onReaction, onBlock, onSave }
     }
   };
 
-  const handleSubmitReply = async () => {
-    if (!replyContent.trim() || replyingTo === null) return;
-    setSubmittingReply(true);
-    try {
-      await createComment(post.id, replyContent.trim(), replyingTo);
-      setReplyContent("");
-      clearReplyMentions();
-      setReplyingTo(null);
-      toast.success("Reply added");
-      loadComments();
-    } catch (e) {
-      toast.error((e as Error).message || "Failed to add reply");
-    } finally {
-      setSubmittingReply(false);
-    }
-  };
 
   const handleDeleteComment = async (commentId: number) => {
     try {
@@ -526,8 +551,8 @@ function PostCard({ post, currentUserId, onDelete, onReaction, onBlock, onSave }
                   : "text-muted-foreground",
               )}
               onClick={() => onReaction(post.id, "LIKE")}
-              onMouseEnter={() => setShowReactions(true)}
-              onMouseLeave={() => setShowReactions(false)}
+              onMouseEnter={() => { clearTimeout(hideReactionsTimer.current); setShowReactions(true); }}
+              onMouseLeave={() => { hideReactionsTimer.current = setTimeout(() => setShowReactions(false), 120); }}
             >
               <ThumbsUp className="h-4 w-4" />
               {post.totalReactions > 0 && (
@@ -539,8 +564,8 @@ function PostCard({ post, currentUserId, onDelete, onReaction, onBlock, onSave }
             {showReactions && (
               <div
                 className="absolute bottom-full left-0 mb-1 flex items-center gap-0.5 bg-card border border-border rounded-full px-2 py-1 shadow-lg z-10"
-                onMouseEnter={() => setShowReactions(true)}
-                onMouseLeave={() => setShowReactions(false)}
+                onMouseEnter={() => { clearTimeout(hideReactionsTimer.current); setShowReactions(true); }}
+                onMouseLeave={() => { hideReactionsTimer.current = setTimeout(() => setShowReactions(false), 120); }}
               >
                 {REACTION_CONFIG.map((r) => (
                   <Button
@@ -592,7 +617,7 @@ function PostCard({ post, currentUserId, onDelete, onReaction, onBlock, onSave }
             onClick={handleToggleComments}
           >
             <MessageSquare className="h-4 w-4" />
-            <span className="tabular-nums">{post.commentCount}</span>
+            <span className="tabular-nums">{localCommentCount}</span>
             {showComments ? (
               <ChevronUp className="h-3 w-3" />
             ) : (
@@ -638,21 +663,11 @@ function PostCard({ post, currentUserId, onDelete, onReaction, onBlock, onSave }
                   <CommentItem
                     key={c.id}
                     comment={c}
+                    postId={post.id}
                     currentUserId={currentUserId}
-                    onReply={(id) => {
-                      setReplyingTo(replyingTo === id ? null : id);
-                      setReplyContent("");
-                      clearReplyMentions();
-                    }}
                     onDelete={handleDeleteComment}
                     onBlock={onBlock}
-                    replyingTo={replyingTo}
-                    replyContent={replyContent}
-                    onReplyContentChange={setReplyContent}
-                    onSubmitReply={handleSubmitReply}
-                    submittingReply={submittingReply}
-                    replyMentions={replyMentions}
-                    onReplyMention={addReplyMention}
+                    onCommentAdded={loadComments}
                   />
                 ))}
               </>

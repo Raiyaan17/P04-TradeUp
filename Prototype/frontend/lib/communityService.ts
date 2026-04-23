@@ -221,6 +221,7 @@ export const savePost = async (postId: number): Promise<void> => {
     {
       method: 'POST',
       headers: getAuthHeaders(),
+      body: JSON.stringify({}),
     },
   );
 

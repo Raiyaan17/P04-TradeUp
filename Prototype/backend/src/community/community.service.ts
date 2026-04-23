@@ -221,28 +221,36 @@ export class CommunityService {
   async getComments(postId: number, userId: number) {
     const blockedIds = await this.getBlockedIdPair(userId);
 
-    // Fetch top-level comments (parentId === null)
-    const comments = await this.prisma.comment.findMany({
+    // Fetch all comments for the post, then build the tree in JS
+    const allComments = await this.prisma.comment.findMany({
       where: {
         postId,
-        parentId: null,
         ...(blockedIds.length > 0 ? { authorId: { notIn: blockedIds } } : {}),
       },
-      include: {
-        author: { select: AUTHOR_SELECT },
-        replies: {
-          where:
-            blockedIds.length > 0 ? { authorId: { notIn: blockedIds } } : {},
-          include: {
-            author: { select: AUTHOR_SELECT },
-          },
-          orderBy: { createdAt: 'asc' },
-        },
-      },
+      include: { author: { select: AUTHOR_SELECT } },
       orderBy: { createdAt: 'asc' },
     });
 
-    return comments;
+    type CommentNode = (typeof allComments)[number] & {
+      replies: CommentNode[];
+    };
+
+    const map = new Map<number, CommentNode>();
+    for (const c of allComments) map.set(c.id, { ...c, replies: [] });
+
+    const roots: CommentNode[] = [];
+    for (const c of allComments) {
+      const node = map.get(c.id)!;
+      if (c.parentId === null) {
+        roots.push(node);
+      } else {
+        const parent = map.get(c.parentId);
+        if (parent) parent.replies.push(node);
+        else roots.push(node); // orphan (parent blocked) — show at top level
+      }
+    }
+
+    return roots;
   }
 
   async deleteComment(commentId: number, userId: number) {
