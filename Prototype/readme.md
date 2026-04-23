@@ -1,553 +1,294 @@
-# TradeUp Project 
+# TradeUp - Pakistani Stock Exchange Trading Simulator
 
-## Overview
-This document summarizes the key changes and additions to the TradeUp project since the original README.md was created.
+> A full-stack web application for practicing PSX stock trading with real-time market data, AI coaching, community features, and tournament simulations.
 
-## Phase 2 Implementation Status: COMPLETE ✓
+## Tech Stack
 
-### Major New Features Implemented
+| Layer | Technology |
+|-------|------------|
+| **Backend** | NestJS 11 + PostgreSQL (Prisma 6) + JWT + Socket.IO |
+| **Frontend** | Next.js 16 (App Router) + React 19 + Tailwind 4 |
+| **AI** | Google Gemini (chatbot coach, tournament generator, sentiment analysis) |
+| **Storage** | Supabase (image uploads) + Local fallback |
+| **Market Data** | PSX API (KSE-100 Index, PSX listed stocks) |
 
-## 1. Trading System (Fully Implemented)
-
-### Backend Additions
-- **New Module**: `src/trades/`
-  - `trades.controller.ts` - Buy/Sell endpoints
-  - `trades.service.ts` - Trading business logic
-  - `dto/buy-stock.dto.ts` - Buy validation
-  - `dto/sell-stock.dto.ts` - Sell validation
-  - `trades.module.ts` - Module definition
-
-### Database Changes
-- **New Model**: `Portfolio`
-  - Tracks user stock holdings
-  - Fields: id, userId, stockId, quantity, avgPrice, createdAt
-  - Unique constraint: userId + stockId
-
-- **New Model**: `Transaction`
-  - Records all buy/sell operations
-  - Fields: id, userId, stockId, type, quantity, price, total, createdAt
-  - Enums: TransactionType (BUY, SELL)
-
-- **User Model Updates**
-  - Added `balance` field (Decimal, default: 1000000 PKR)
-  - Added `name` field (String, optional)
-  - Added `profileImageUrl` field (String, optional)
-  - Added relations: portfolio[], transactions[]
-
-- **Stock Model Updates**
-  - Added relations: portfolio[], transactions[]
-
-### API Endpoints Added
-
-#### POST /trades/buy
-- **Auth**: Required (JWT)
-- **Body**: `{ "symbol": "HBL", "quantity": 10 }`
-- **Response**: User balance, portfolio item, transaction
-- **Validation**: symbol (required), quantity (≥ 1)
-- **Errors**: Insufficient balance, stock not found
-
-#### POST /trades/sell
-- **Auth**: Required (JWT)
-- **Body**: `{ "symbol": "HBL", "quantity": 5 }`
-- **Response**: User balance, portfolio item, transaction
-- **Validation**: symbol (required), quantity (≥ 1)
-- **Errors**: Insufficient shares, stock not found
-
-#### GET /trades/portfolio
-- **Auth**: Required (JWT)
-- **Response**: 
-  - balance, totalInvested, totalPortfolioValue
-  - totalUnrealizedPnl, totalPnlPercentage
-  - totalAccountValue
-  - portfolio array with P&L calculations
-
-#### GET /trades/transactions
-- **Auth**: Required (JWT)
-- **Query**: ?limit=50&offset=0
-- **Response**: Paginated transaction history with metadata
-
-### Frontend Additions
-
-#### New Pages
-- **`app/buy/page.tsx`** - Buy stocks interface
-  - Stock selection dropdown
-  - Quantity input with validation
-  - Current price display
-  - Total cost calculation
-  - Balance check
-
-- **`app/portfolio/page.tsx`** - Portfolio & transactions
-  - Portfolio overview with total value
-  - Holdings table with P&L
-  - Transaction history with pagination
-  - Sell functionality
-
-## 2. News Feed System (Fully Implemented)
-
-### Backend Additions
-- **New Module**: `src/news/`
-  - `news.controller.ts` - News endpoints
-  - `news.module.ts` - Module definition
-
-### API Endpoints Added
-
-#### GET /news/latest
-- **Auth**: Not required
-- **Response**: Array of latest market news articles
-- **API**: Financial Modeling Prep
-
-#### POST /news/stock
-- **Auth**: Not required
-- **Body**: `{ "ticker": "HBL" }`
-- **Response**: Stock-specific news articles
-- **API**: MarketAux
-
-### Frontend Additions
-
-#### New Files
-- **`lib/newsService.ts`** - News API service
-  - `fetchLatestNews()` - Get latest news
-  - `fetchStockNews(ticker)` - Get stock-specific news
-
-- **`types/news.ts`** - TypeScript types
-  - `NewsArticle` interface
-  - `StockNewsArticle` interface
-  - Response type definitions
-
-- **`app/news/page.tsx`** - News feed page
-  - Latest market news display
-  - News articles with images
-  - Stock-specific filtering
-
-## 3. User Profile Management (Fully Implemented)
-
-### Backend Additions
-
-#### New API Endpoints
-
-##### GET /users/profile
-- **Auth**: Required (JWT)
-- **Response**: User profile (id, email, name, role, balance, profileImageUrl)
-
-##### PUT /users/email
-- **Auth**: Required (JWT)
-- **Body**: `{ "newEmail": "...", "currentPassword": "..." }`
-- **Response**: Updated user profile
-
-##### PUT /users/password
-- **Auth**: Required (JWT)
-- **Body**: `{ "currentPassword": "...", "newPassword": "..." }`
-- **Response**: Success message
-
-##### PUT /users/name
-- **Auth**: Required (JWT)
-- **Body**: `{ "newName": "...", "currentPassword": "..." }`
-- **Response**: Updated user profile
-
-##### POST /users/profile-picture
-- **Auth**: Required (JWT)
-- **Body**: `file` (multipart/form-data)
-- **Response**: `{ "imageUrl": "..." }`
-
-### Frontend Additions
-
-#### New Files
-- **`lib/userService.ts`** - User management service
-  - `uploadProfileImage(file)` - Upload profile picture
-  - `getUserProfile()` - Get user profile
-  - `updateUserEmail(newEmail, currentPassword)`
-  - `updateUserPassword(currentPassword, newPassword)`
-  - `updateUserName(newName, currentPassword)`
-
-- **`app/settings/page.tsx`** - Settings page
-  - Update name, email, password
-  - Upload profile picture
-  - View account information
-
-## 4. Additional Frontend Pages (Fully Implemented)
-
-### New Pages
-- **`app/help/page.tsx`** - Help & documentation
-- **`app/settings/page.tsx`** - User profile settings
-- **`app/news/page.tsx`** - Latest news feed
-- **`app/portfolio/page.tsx`** - Portfolio management
-- **`app/buy/page.tsx`** - Buy stocks interface
-
-## 5. Frontend Architecture Improvements
-
-### New Components
-- **`components/auth/auth-form.tsx`** - Login/Signup form
-- **`components/auth/role-chip.tsx`** - Role display chip
-- **`components/auth/tagline.tsx`** - Tagline component
-- **`components/spinner.tsx`** - Loading spinner
-- **`components/topbar.tsx`** - Navigation top bar
-
-### New Context
-- **`context/UserContext.tsx`** - User authentication context
-  - Provides user state and authentication methods
-  - Replaces localStorage-based auth with React context
-
-### New Utilities
-- **`lib/api.ts`** - API base URL configuration
-  - Production: `https://p04-trade-up1.vercel.app`
-  - Development: `http://localhost:3001`
-
-## 6. Database Schema Updates
-
-### Complete Schema (Prisma)
-
-```prisma
-model User {
-  id              Int      @id @default(autoincrement())
-  email           String   @unique
-  passwordHash    String
-  role            Role     @default(TRADER)
-  createdAt       DateTime @default(now())
-  balance         Decimal  @default(1000000)  // NEW
-  name            String?  // NEW
-  profileImageUrl String?  // NEW
-  portfolio       Portfolio[]
-  transactions    Transaction[]
-  watchlist       WatchlistItem[]
-}
-
-model Stock {
-  id           Int             @id @default(autoincrement())
-  symbol       String          @unique
-  name         String?
-  marketType   String          @default("REG")
-  createdAt    DateTime        @default(now())
-  portfolio    Portfolio[]     // NEW
-  transactions Transaction[]  // NEW
-  watchers     WatchlistItem[]
-}
-
-model WatchlistItem {
-  id        Int      @id @default(autoincrement())
-  userId    Int
-  stockId   Int
-  createdAt DateTime @default(now())
-  stock     Stock    @relation(fields: [stockId], references: [id])
-  user      User     @relation(fields: [userId], references: [id])
-  @@unique([userId, stockId])
-}
-
-model Portfolio {
-  id        Int      @id @default(autoincrement())
-  userId    Int
-  stockId   Int
-  quantity  Int
-  avgPrice  Decimal
-  createdAt DateTime @default(now())
-  stock     Stock    @relation(fields: [stockId], references: [id])
-  user      User     @relation(fields: [userId], references: [id])
-  @@unique([userId, stockId])
-}
-
-model Transaction {
-  id        Int             @id @default(autoincrement())
-  userId    Int
-  stockId   Int
-  type      TransactionType
-  quantity  Int
-  price     Decimal
-  total     Decimal
-  createdAt DateTime        @default(now())
-  stock     Stock           @relation(fields: [stockId], references: [id])
-  user      User            @relation(fields: [userId], references: [id])
-}
-
-enum Role {
-  TRADER
-  ADMIN
-}
-
-enum TransactionType {
-  BUY
-  SELL
-}
-```
-
-## 7. Technology Stack Updates
-
-### Backend Version Updates
-- **NestJS**: 11.0.1 (updated from 10.x)
-- **Next.js**: 16.0.7 (updated from 16.0.0)
-- **React**: 19.2.0
-
-### New Dependencies
-
-#### Backend
-- `@nestjs/axios`: ^4.0.1 - HTTP client for news API
-- `@prisma/client`: ^6.18.0 - Prisma ORM
-
-#### Frontend
-- `@radix-ui/react-avatar`: ^1.1.11 - Avatar component
-- `@radix-ui/react-label`: ^2.1.7 - Label component
-- `@radix-ui/react-separator`: ^1.1.7 - Separator component
-- `@radix-ui/react-slot`: ^1.2.3 - Slot component
-- `class-variance-authority`: ^0.7.1 - Variant utilities
-- `clsx`: ^2.1.1 - Class name utilities
-- `lightweight-charts`: ^4.1.3 - Candlestick charts
-- `lucide-react`: ^0.552.0 - Icon library
-- `next`: ^16.0.7 - Next.js framework
-- `react`: 19.2.0 - React library
-- `react-dom`: 19.2.0 - React DOM
-- `react-hook-form`: ^7.66.0 - Form management
-- `tailwind-merge`: ^3.3.1 - Tailwind class merging
-- `zod`: ^4.1.12 - Validation
-
-## 8. API Documentation Updates
-
-### New Endpoints Summary
-
-| Category | Endpoint | Method | Auth Required | Description |
-|----------|----------|--------|---------------|-------------|
-| **Trades** | `/trades/buy` | POST | ✓ | Buy stocks |
-| **Trades** | `/trades/sell` | POST | ✓ | Sell stocks |
-| **Trades** | `/trades/portfolio` | GET | ✓ | Get portfolio with P&L |
-| **Trades** | `/trades/transactions` | GET | ✓ | Get transaction history |
-| **News** | `/news/latest` | GET | ✗ | Get latest market news |
-| **News** | `/news/stock` | POST | ✗ | Get stock-specific news |
-| **Users** | `/users/profile` | GET | ✓ | Get user profile |
-| **Users** | `/users/email` | PUT | ✓ | Update email |
-| **Users** | `/users/password` | PUT | ✓ | Update password |
-| **Users** | `/users/name` | PUT | ✓ | Update name |
-| **Users** | `/users/profile-picture` | POST | ✓ | Upload profile picture |
-
-## 9. Frontend Structure Updates
-
-### New Directory Structure
+## Project Structure
 
 ```
-frontend/
-├── app/
-│   ├── buy/              # NEW - Buy page
-│   ├── portfolio/        # NEW - Portfolio page
-│   ├── settings/         # NEW - Settings page
-│   ├── help/             # NEW - Help page
-│   ├── news/             # NEW - News page
-│   ├── dashboard/
-│   ├── charts/
-│   ├── layout.tsx
-│   └── page.tsx
+Prototype/
+├── backend/                    # NestJS 11 API
+│   └── src/
+│       ├── auth/               # JWT authentication (signup, login)
+│       ├── users/              # User management, profile pictures
+│       ├── stocks/             # PSX stock data, featured stocks, candles
+│       ├── watchlist/          # User watchlists
+│       ├── trades/             # Buy/sell, portfolio, P&L calculations
+│       ├── news/               # Market news + sentiment analysis
+│       ├── friends/            # Friend requests, accept/decline
+│       ├── community/         # Posts, comments, reactions, image upload
+│       ├── oracle/             # Tournament simulation engine
+│       ├── chatbot/            # AI trading coach (Gemini)
+│       └── ws/                 # WebSocket gateways (market + tournament)
 │
-├── components/
-│   ├── auth/             # NEW - Auth components
-│   │   ├── auth-form.tsx
-│   │   ├── role-chip.tsx
-│   │   └── tagline.tsx
-│   ├── spinner.tsx       # NEW - Loading spinner
-│   ├── topbar.tsx        # NEW - Navigation bar
-│   └── ui/
-│       └── ... (existing)
+├── frontend/                   # Next.js 16 app
+│   ├── app/                    # Pages (dashboard, buy, portfolio, etc.)
+│   ├── components/             # UI components (ui/, auth/, portfolio/, etc.)
+│   ├── context/                # React Context (UserContext)
+│   ├── lib/                    # Services (http, userService, friendsService, etc.)
+│   └── types/                  # TypeScript types
 │
-├── context/              # NEW - React context
-│   └── UserContext.tsx
-│
-├── lib/
-│   ├── api.ts            # NEW - API config
-│   ├── newsService.ts    # NEW - News service
-│   ├── userService.ts    # UPDATED - User service
-│   └── utils.ts
-│
-└── types/                # NEW - TypeScript types
-    └── news.ts
+└── prisma/
+    └── schema.prisma           # Database schema
 ```
 
-## 10. Key Features Status
+## Database Schema
 
-### Phase 1 (Complete ✓)
-- ✓ User authentication
-- ✓ Stock market data
-- ✓ Watchlist management
-- ✓ Real-time updates
-- ✓ Live candlestick charts
-- ✓ Guest browsing
+### Core Models
 
-### Phase 2 (Complete ✓)
-- ✓ Buy/Sell trading
-- ✓ Portfolio management
-- ✓ Transaction history
-- ✓ News feed
-- ✓ User profile settings
-- ✓ Profile pictures
-- ✓ Additional pages (Help, Settings)
+| Model | Description |
+|-------|-------------|
+| **User** | id, email, username, passwordHash, role, balance, name, gender, profileImageUrl, tournamentScore |
+| **Stock** | PSX stocks: id, symbol, name, marketType |
+| **WatchlistItem** | Links user to watched stocks |
+| **Portfolio** | User stock holdings: quantity, avgPrice |
+| **Transaction** | Buy/Sell records: type, quantity, price, total, sellReason, sellNote |
 
-### Phase 3 (Not Started)
-- Advanced charts (multiple timeframes, indicators)
-- AI features
-- Gamification
-- Community features
-- Educational content
-- Mobile app
-- Admin dashboard
+### Tournament Models
 
-## 11. Database Migrations
+| Model | Description |
+|-------|-------------|
+| **Tournament** | 30-day simulated market: trajectoryJson, newsJson, status, startingCash |
+| **TournamentParticipant** | User's tournament balance & score |
+| **TournamentPortfolio** | Tournament holdings (symbol-based, not FK to Stock) |
+| **TournamentTransaction** | Tournament trade history |
 
-### Migration History
+### Community Models
 
-1. **20251022144710_user_auth_watchlist**
-   - Initial schema: User, Stock, WatchlistItem
+| Model | Description |
+|-------|-------------|
+| **Post** | Community posts: title, content, tag, imageUrl |
+| **Comment** | Nested replies via parentId |
+| **Reaction** | LIKE, LOVE, FIRE, BEARISH, BULLISH reactions |
+| **SavedPost** | User saved posts |
+| **UserBlock** | Blocked users |
+| **Friendship** | Friend requests: status (PENDING/ACCEPTED/DECLINED) |
 
-2. **20251124123310_add_user_name_field**
-   - Added `name` field to User model
+### Chat Models
 
-3. **20251128183330_add_profile_image_url**
-   - Added `profileImageUrl` field to User model
+| Model | Description |
+|-------|-------------|
+| **ChatSession** | User chat sessions (24h active window) |
+| **ChatMessage** | Persisted conversation history |
 
-4. **20251130163218_add_user_balance_field**
-   - Added `balance` field to User model
+## API Endpoints
 
-5. **20251130210857_change_default_balance_to_neg1**
-   - Changed default balance from 1000000 to -1 (temporary)
-   - **Note**: Current default is -1, should be updated to 1000000 for production
+### Auth (No Auth Required)
 
-### Pending Migration
-The balance field default should be updated from -1 to 1000000 for proper functionality.
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/auth/signup` | Register (email, username, password, gender) |
+| POST | `/auth/login` | Login, returns JWT |
 
-## 12. Environment Variables Updates
+### Stocks (No Auth Required)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/stocks/featured` | Featured PSX stocks with live ticks |
+| GET | `/stocks/:symbol` | Get stock price details |
+| GET | `/stocks/:symbol/candles` | OHLCV candles (1m, 5m, 15m, 30m, 1h, 1d) |
+
+### Watchlist (Auth Required)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/watchlist` | Get user's watchlist |
+| POST | `/watchlist` | Add stock to watchlist |
+| DELETE | `/watchlist/:symbol` | Remove from watchlist |
+
+### Trades (Auth Required)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/trades/portfolio` | Portfolio with P&L calculations |
+| GET | `/trades/transactions` | Paginated transaction history |
+| POST | `/trades/buy` | Buy stock (symbol, quantity) |
+| POST | `/trades/sell` | Sell stock (symbol, quantity, sellReason, sellNote) |
+
+### News (No Auth Required)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/news/latest` | Latest market news |
+| POST | `/news/stock` | Stock-specific news |
+| POST | `/news/sentiment` | AI sentiment analysis of headline |
+
+### Friends (Auth Required)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/friends` | List accepted friends |
+| GET | `/friends/requests` | Pending friend requests |
+| POST | `/friends/request` | Send friend request |
+| POST | `/friends/accept/:id` | Accept request |
+| POST | `/friends/decline/:id` | Decline request |
+| DELETE | `/friends/:friendId` | Remove friend |
+
+### Community (Auth Required)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/community/posts` | Paginated posts (filter by tag) |
+| POST | `/community/posts` | Create post |
+| GET | `/community/posts/:id` | Get single post |
+| DELETE | `/community/posts/:id` | Delete post |
+| GET | `/community/posts/:id/comments` | Get post comments (tree) |
+| POST | `/community/posts/:id/comments` | Add comment |
+| DELETE | `/community/comments/:id` | Delete comment |
+| POST | `/community/reactions` | Toggle reaction (LIKE/LOVE/FIRE/BEARISH/BULLISH) |
+| POST | `/community/save/:postId` | Toggle save post |
+| GET | `/community/saved` | Get saved posts |
+| POST | `/community/block/:userId` | Block user |
+| DELETE | `/community/unblock/:userId` | Unblock user |
+| GET | `/community/blocked` | List blocked users |
+| GET | `/community/search-mentions` | Search users for @mentions |
+
+### Oracle / Tournaments (Auth Required)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/oracle/active` | Get active tournament |
+| POST | `/oracle/start` | Start new tournament |
+| POST | `/oracle/join/:tournamentId` | Join tournament |
+| POST | `/oracle/buy` | Buy in tournament |
+| POST | `/oracle/sell` | Sell in tournament |
+| POST | `/oracle/end/:tournamentId` | End tournament (admin) |
+| GET | `/oracle/portfolio` | Get tournament portfolio |
+| GET | `/oracle/analysis/:tournamentId` | AI analysis of performance |
+| GET | `/oracle/leaderboard` | Current leaderboard |
+
+### Chatbot (Auth Required)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/chatbot/session` | Get or create chat session |
+| GET | `/chatbot/history/:sessionId` | Get session messages |
+| POST | `/chatbot/chat` | Send message, get AI response |
+| GET | `/chatbot/review` | Periodic AI performance review |
+
+### Users (Auth Required)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/users/profile` | Get current user profile |
+| PUT | `/users/email` | Update email |
+| PUT | `/users/password` | Update password |
+| PUT | `/users/name` | Update display name |
+| POST | `/users/profile-picture` | Upload profile picture |
+| GET | `/users/profile-picture` | Get signed profile picture URL |
+| POST | `/users/fund` | Add funds to wallet |
+| GET | `/users/search` | Search users by username |
+| GET | `/users/:id` | Get user profile by ID |
+
+## WebSocket Namespaces
+
+| Namespace | Events | Description |
+|-----------|--------|-------------|
+| `/ws` (market) | `subscribeSymbol`, `unsubscribeSymbol`, `tickUpdate` | Real-time stock ticks |
+| `/tournament` | `tournamentTick`, `tournamentEnd` | Live tournament tick data & leaderboard |
+
+## Key Features
+
+### Trading System
+- Buy/sell PSX stocks with simulated balance
+- Real-time P&L tracking per holding and overall
+- Transaction history with sell journal (reason, note)
+- Cost basis calculation (average price)
+
+### AI Tournament System
+- AI-generated 30-day market trajectories (Gemini) for PSX stocks (HBL, UBL, MCB, HUBC, FFC) and KSE-100 index
+- AI-generated realistic news headlines tied to price movements
+- Real-time tick engine (normal: 2min, fast: 10sec intervals)
+- Leaderboard with ELO-style ranking points (top 10 finishers earn points)
+- Post-tournament AI performance analysis
+
+### AI Chatbot Coach
+- Multi-turn conversational AI coach (Gemini)
+- Context-aware: loads user's portfolio, trades, watchlist, live market data
+- Periodic performance reviews (weekly/monthly)
+- Fallback responses when AI is unavailable
+- Session-based chat with 24h active window
+
+### Community
+- Posts with tags: GENERAL, STOCKS, CRYPTO, NEWS, ANALYSIS, QUESTION
+- Nested comment threads
+- 5 reaction types: LIKE, LOVE, FIRE, BEARISH, BULLISH
+- Save/bookmark posts
+- @mention autocomplete (friends first, then search)
+- Block/unblock users
+- Image uploads (Supabase with local fallback)
+
+### News & Sentiment
+- Latest market news feed
+- Stock-specific news
+- AI-powered headline sentiment analysis (positive/negative/neutral + confidence + keywords)
+
+### User Profile
+- Email, username, display name management
+- Profile pictures (Supabase storage)
+- Wallet funding
+- Tournament score tracking
+
+## Environment Variables
 
 ### Backend (.env)
-
-**New Variables:**
 ```
-NEWS_API_KEY=your-news-api-key
-STOCK_API_KEY=your-stock-api-key
+DATABASE_URL="postgresql://..."
+JWT_SECRET="..."
+PORT=3001
+GEMINI_API_KEY="..."
+SUPABASE_URL="..."
+SUPABASE_SERVICE_ROLE_KEY="..."
+NEWS_API_KEY="..."
+STOCK_API_KEY="..."
 ```
 
 ### Frontend (.env.local)
-
-**Updated Variable:**
 ```
 NEXT_PUBLIC_API_BASE_URL=http://localhost:3001
 ```
 
-## 13. Build & Deployment
+## Build Commands
 
-### Build Status
-- ✓ Backend builds successfully
-- ✓ Frontend builds successfully
-- ✓ All TypeScript checks pass
-- ✓ All ESLint checks pass
+### Backend
+```bash
+cd backend
+npm run build
+npm run start:dev       # Hot reload
+npm run start:prod       # Production
+npm run lint -- --fix
+npm run prisma:generate
+npm run prisma:migrate
+npm test
+```
 
-### Deployment
-- Backend: Can be deployed to Vercel, Railway, or any Node.js host
-- Frontend: Deployed to Vercel (https://p04-trade-up1.vercel.app)
-
-## 14. Testing
-
-### Manual Testing Performed
-- ✓ User registration and login
-- ✓ Stock data fetching
-- ✓ Watchlist management
-- ✓ Buy/sell transactions
-- ✓ Portfolio calculations
-- ✓ Transaction history
-- ✓ News feed
-- ✓ Profile updates
-- ✓ Profile picture upload
-
-### Automated Testing
-- Unit tests: Basic structure in place
-- E2E tests: Basic structure in place
-- Integration tests: Not fully implemented
-
-## 15. Known Issues & Limitations
-
-### Current Limitations
-1. **Balance Default**: User balance defaults to -1 instead of 1000000
-2. **News API Keys**: Required for news feed to work
-3. **Stock News**: Limited to 3 articles per request
-4. **WebSocket**: Only works when backend is running
-5. **PSX API**: Rate limited to 100 requests per minute
-
-### Workarounds
-1. **Balance**: Update migration or manually set balance after user creation
-2. **News API**: Use free tiers or obtain API keys
-3. **WebSocket**: Ensure backend is always running
-4. **PSX API**: Implement caching and rate limiting
-
-## 16. Performance Considerations
-
-### Optimizations Implemented
-- ✓ Prisma transactions for atomic operations
-- ✓ WebSocket for real-time updates
-- ✓ Pagination for transaction history
-- ✓ Caching in browser (localStorage)
-- ✓ Efficient database queries
-
-### Potential Improvements
-- Redis caching for frequent queries
-- Query optimization for portfolio calculations
-- Load testing and benchmarking
-- Database indexing optimization
-
-## 17. Security Considerations
-
-### Security Measures
-- ✓ Password hashing with bcrypt
-- ✓ JWT authentication with 7-day expiration
-- ✓ Input validation with DTOs
-- ✓ SQL injection prevention (Prisma ORM)
-- ✓ CORS configuration
-- ✓ Rate limiting (throttler module)
-
-### Potential Improvements
-- Implement refresh tokens
-- Add CSRF protection
-- Implement security headers
-- Regular security audits
-- Dependency vulnerability scanning
-
-## 18. Documentation Updates
-
-### Files Updated
-- ✓ README.md (this document)
-- ✓ CHANGES_SUMMARY.md (new)
-- ✓ Backend README (if exists)
-- ✓ Frontend README (if exists)
-
-### Documentation Status
-- ✓ API documentation complete
-- ✓ Setup instructions complete
-- ✓ Troubleshooting guide complete
-- ✓ Code standards documented
-
-## 19. Version History
-
-| Version | Date | Description |
-|---------|------|-------------|
-| 1.0.0 | 2025-11-06 | Phase 1 Complete - Auth, Watchlist, Real-time Updates, Charts |
-| 2.0.0 | 2025-12-16 | Phase 2 Complete - Trading System, Portfolio, News Feed, User Profile |
-
-## 20. Next Steps
-
-### Immediate Tasks
-1. Fix balance default value (-1 → 1000000)
-2. Add proper error handling for news API
-3. Implement loading states in UI
-4. Add more comprehensive tests
-5. Improve documentation
-
-### Future Enhancements
-1. Advanced charting features
-2. Technical indicators
-3. AI-powered insights
-4. Mobile application
-5. Gamification elements
-6. Social features
-
-## Summary
-
-The TradeUp project has successfully completed Phase 2 with the following major additions:
-
-1. **Trading System** - Full buy/sell functionality with portfolio tracking
-2. **News Feed** - Latest market news and stock-specific articles
-3. **User Profile** - Profile management with profile pictures
-4. **Additional Pages** - Help, Settings, Portfolio, Buy interfaces
-5. **Enhanced Architecture** - React Context, improved service layer
+### Frontend
+```bash
+cd frontend
+npm run dev              # localhost:3000
+npm run build
+npm run lint -- --fix
+```
 
 
+## Frontend Key Libraries
 
-**Last Updated**: December 16, 2025
+| Library | Purpose |
+|---------|---------|
+| `lightweight-charts` | Candlestick charts |
+| `recharts` | Portfolio charts (allocation, P&L) |
+| `socket.io-client` | Real-time WebSocket |
+| `react-hook-form` + `zod` | Form validation |
+| `framer-motion` | Animations |
+| `sonner` | Toast notifications |
+| `next-themes` | Dark/light mode |
+| `@radix-ui/*` | UI primitives (dialog, dropdown, avatar, etc.) |

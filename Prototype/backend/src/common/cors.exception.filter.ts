@@ -58,7 +58,7 @@ export class CorsExceptionFilter implements ExceptionFilter {
       'https://p04-trade-up.vercel.app',
       'https://p04-trade-up1.vercel.app',
       'https://tradeup-syai.onrender.com/',
-      'http://136.119.205.38/'
+      'http://136.119.205.38/',
     ];
     const requestOrigin = request.headers.origin;
 
