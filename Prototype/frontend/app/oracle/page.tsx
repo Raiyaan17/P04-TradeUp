@@ -244,7 +244,7 @@ export default function OraclePage() {
 
   const connectWS = () => {
     const isLocalhost = typeof window !== 'undefined' && window.location.hostname === 'localhost';
-    const WS_URL = process.env.NEXT_PUBLIC_WS_URL || (isLocalhost ? "http://localhost:3001" : "");
+    const WS_URL = process.env.NEXT_PUBLIC_WS_URL || (isLocalhost ? "http://localhost:3001" : "https://tradeup-syai.onrender.com");
 
     const socket = io.connect(`${WS_URL}/tournament`, {
       withCredentials: true,

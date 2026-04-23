@@ -4,6 +4,8 @@ import {
   FastifyAdapter,
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
+import { IoAdapter } from '@nestjs/platform-socket.io';
+import { ServerOptions } from 'socket.io';
 import multipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
@@ -14,11 +16,38 @@ import { ValidationPipe } from '@nestjs/common';
 
 import { CorsExceptionFilter } from './common/cors.exception.filter';
 
+const ALLOWED_ORIGINS = [
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'http://localhost:3002',
+  'https://p04-trade-up.vercel.app',
+  'https://p04-trade-up1.vercel.app',
+];
+
+/** Custom adapter that injects CORS into Socket.IO's own HTTP server.
+ *  app.enableCors() only covers Fastify REST routes — polling WS transports
+ *  need CORS configured directly on the Socket.IO ServerOptions. */
+class CorsIoAdapter extends IoAdapter {
+  createIOServer(port: number, options?: ServerOptions): any {
+    return super.createIOServer(port, {
+      ...options,
+      cors: {
+        origin: ALLOWED_ORIGINS,
+        methods: ['GET', 'POST'],
+        credentials: true,
+      },
+    });
+  }
+}
+
 async function bootstrap() {
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
-    new FastifyAdapter(),
+    new FastifyAdapter({ logger: false }),
   );
+
+  // Wire Socket.IO to the underlying HTTP server so WS handshakes work with Fastify
+  app.useWebSocketAdapter(new IoAdapter(app));
 
   // Ensure uploads directory exists and serve it as static files
   const uploadsDir = join(process.cwd(), 'uploads');
@@ -32,6 +61,9 @@ async function bootstrap() {
   await app.register(multipart as any, {
     limits: { fileSize: 10 * 1024 * 1024 },
   });
+
+  // Set global prefix BEFORE Swagger so it picks up /api correctly
+  app.setGlobalPrefix('api');
 
   // Configure Swagger Documentation
   const config = new DocumentBuilder()
@@ -72,7 +104,7 @@ async function bootstrap() {
     'https://p04-trade-up1.vercel.app',
   ]);
 
-  app.setGlobalPrefix('api');
+  // (global prefix already set above before Swagger)
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   app.useGlobalFilters(new CorsExceptionFilter());
   const port = process.env.PORT ? Number(process.env.PORT) : 3001;

@@ -39,7 +39,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const token = localStorage.getItem('access_token');
         if (token) {
           const isLocalhost = typeof window !== 'undefined' && window.location.hostname === 'localhost';
-          const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || (isLocalhost ? 'http://localhost:3001/api' : '/api');
+          const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || (isLocalhost ? 'http://localhost:3001/api' : 'https://tradeup-syai.onrender.com/api');
           const res = await fetch(`${API_BASE_URL}/users/profile-picture`, {
             method: 'GET',
             headers: {
