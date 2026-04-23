@@ -34,6 +34,8 @@ interface Tick {
   chgPct?: number;
   changePct?: number;
   pct?: number;
+  percentChange?: number;
+  changePercent?: number;
   pc?: number;
   prev?: number;
   previous?: number;

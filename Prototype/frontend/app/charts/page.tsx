@@ -713,15 +713,15 @@ export default function Charts() {
   // Derive stats for top bar
   // Ideally this comes from a dedicated 24h ticker API. For now, use the current tick or fallback
   const currentPrice = currentCandle?.close ?? tickData?.tick?.c ?? (historicalData.length > 0 ? historicalData[historicalData.length - 1].close : 0);
-  const changeAmt = tickData?.tick?.chg ?? tickData?.tick?.change ?? 0;
-  const changePct = tickData?.tick?.chgPct ?? tickData?.tick?.percentChange ?? 0;
+  const changeAmt = tickData?.tick?.chg ?? 0;
+  const changePct = tickData?.tick?.chgPct ?? 0;
   const isPositive = changeAmt >= 0;
 
   // Calculate mock 24h stats from historical data if 24h ticker isn't providing it yet
-  const high24h = tickData?.tick?.h ?? tickData?.tick?.high ?? (historicalData.length > 0 ? Math.max(...historicalData.slice(-24).map(c => c.high)) : 0);
-  const low24h = tickData?.tick?.l ?? tickData?.tick?.low ?? (historicalData.length > 0 ? Math.min(...historicalData.slice(-24).map(c => c.low)) : 0);
-  const vol24h = tickData?.tick?.v ?? tickData?.tick?.volume ?? 0;
-  const value24h = tickData?.tick?.val ?? tickData?.tick?.value ?? 0;
+  const high24h = tickData?.tick?.h ?? (historicalData.length > 0 ? Math.max(...historicalData.slice(-24).map(c => c.high)) : 0);
+  const low24h = tickData?.tick?.l ?? (historicalData.length > 0 ? Math.min(...historicalData.slice(-24).map(c => c.low)) : 0);
+  const vol24h = tickData?.tick?.v ?? 0;
+  const value24h = tickData?.tick?.val ?? 0;
 
   const getStatusVariant = (): "default" | "secondary" | "success" | "warning" | "error" => {
     if (isLoadingHistory) return "warning";
