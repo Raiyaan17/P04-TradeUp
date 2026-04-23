@@ -52,8 +52,8 @@ export class StocksService {
 
     const normalized: TickData = {
       ...tick,
-      price: Number(tick.price || tick.last || 0),
-      change: Number(tick.change ?? tick.chg ?? 0),
+      price: Number(tick.price || tick.last || tick.c || 0),
+      change: Number(tick.change ?? tick.ch ?? tick.chg ?? 0),
       percentChange,
       volume: Number(tick.volume ?? tick.vol ?? 0),
       value: Number(tick.value ?? tick.turnover ?? 0),
