@@ -1,16 +1,16 @@
 /**
-                CHATBOT FEATURE — AUTOMATED TESTS       
-                                                          
-   Run with:  npm run test:e2e -- chatbot_tests          
-                                                          
-   5 core test cases covering the main chatbot use-cases:
-     TC-01  Session creation / reuse                      
-     TC-02  Successful chat response via Gemini          
-     TC-03  Graceful fallback when Gemini API fails      
-     TC-04  New user context detection                    
-     TC-05  Admin-only access control on /train          
- 
- */
+                 CHATBOT FEATURE — AUTOMATED TESTS       
+                                                           
+    Run with:  npm run test:e2e -- chatbot_tests          
+                                                           
+    5 core test cases covering the main chatbot use-cases:
+      TC-01  Session creation / reuse                      
+      TC-02  Successful chat response via Gemini          
+      TC-03  Graceful fallback when Gemini API fails      
+      TC-04  New user context detection                    
+      TC-05  Admin-only access control on /train          
+  
+  */
 
 import { Test, TestingModule } from '@nestjs/testing';
 import { ForbiddenException } from '@nestjs/common';
@@ -22,36 +22,101 @@ import { StocksService } from '../src/stocks/stocks.service';
 import { TradesService } from '../src/trades/trades.service';
 import { WatchlistService } from '../src/watchlist/watchlist.service';
 
-// ─── Mock global fetch (used by ChatbotService to call Gemini API) ──
-const mockFetch = jest.fn();
-global.fetch = mockFetch as any;
+interface GeminiResponse {
+  ok: boolean;
+  status?: number;
+  json(): Promise<{
+    candidates: { content: { parts: { text: string }[] }[] }[];
+  }>;
+  text(): Promise<string>;
+  error(): Promise<string>;
+}
 
-/** Simulate a successful Gemini API response */
-function geminiOk(text: string) {
+interface GeminiRequestBody {
+  system_instruction?: { parts?: { text?: string }[] };
+  contents?: { parts?: { text?: string }[] }[];
+}
+
+const mockFetch = jest.fn<
+  Promise<GeminiResponse>,
+  [url: string | URL | Request, options?: RequestInit]
+>();
+global.fetch = mockFetch;
+
+interface GeminiResponse {
+  ok: boolean;
+  status?: number;
+  json(): Promise<{
+    candidates: { content: { parts: { text: string }[] }[] }[];
+  }>;
+  text(): Promise<string>;
+  error(): Promise<string>;
+}
+
+interface GeminiRequestBody {
+  system_instruction?: { parts?: { text?: string }[] };
+  contents?: { parts?: { text?: string }[] }[];
+}
+
+function createGeminiResponse(text: string): GeminiResponse {
   return {
     ok: true,
     json: async () => ({
       candidates: [{ content: { parts: [{ text }] } }],
     }),
+    text: async () => '',
+    error: async () => '',
   };
 }
 
-/** Simulate a failed Gemini API response */
-function geminiFail(status = 500) {
+function createGeminiError(status: number): GeminiResponse {
   return {
     ok: false,
     status,
+    json: async () => ({ candidates: [] }),
     text: async () => 'Internal Server Error',
+    error: async () => 'Internal Server Error',
   };
 }
 
-// ═════════════════════════════════════════════════════════════════════
-//  TC-01 to TC-04 — ChatbotService
-// ═════════════════════════════════════════════════════════════════════
+function createGeminiError(status = 500): GeminiResponse {
+  const response: GeminiResponse = {
+    ok: false,
+    status,
+    async json() {
+      return { candidates: [] };
+    },
+    async text() {
+      return 'Internal Server Error';
+    },
+    async error() {
+      return 'Internal Server Error';
+    },
+  };
+  return response;
+}
+
+interface MockPrisma {
+  chatSession: {
+    findFirst: jest.Mock;
+    create: jest.Mock;
+    update: jest.Mock;
+  };
+  chatMessage: {
+    findMany: jest.Mock;
+    createMany: jest.Mock;
+  };
+  user: {
+    findUnique: jest.Mock;
+  };
+  tournament: {
+    findMany: jest.Mock;
+  };
+}
 
 describe('ChatbotService', () => {
   let service: ChatbotService;
-  let prisma: Record<string, any>;
+  let prisma: MockPrisma;
   let tradesService: Partial<TradesService>;
   let watchlistService: Partial<WatchlistService>;
   let stocksService: Partial<StocksService>;
@@ -102,7 +167,7 @@ describe('ChatbotService', () => {
     watchlistService = { list: jest.fn().mockResolvedValue([]) };
     stocksService = { listFeaturedWithTicks: jest.fn().mockResolvedValue([]) };
 
-    mockFetch.mockResolvedValue(geminiOk('baseline loaded'));
+    mockFetch.mockResolvedValue(createGeminiResponse('baseline loaded'));
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -125,7 +190,6 @@ describe('ChatbotService', () => {
   });
 
   it('TC-01: should reuse existing session or create a new one', async () => {
-    // First call — no existing session → creates new
     prisma.chatSession.findFirst.mockResolvedValue(null);
     const newSession = {
       id: 99,
@@ -141,7 +205,6 @@ describe('ChatbotService', () => {
       data: { userId: 1 },
     });
 
-    // Second call — existing session within 24h → reuses it
     jest.clearAllMocks();
     prisma.chatSession.findFirst.mockResolvedValue(newSession);
 
@@ -153,7 +216,7 @@ describe('ChatbotService', () => {
   it('TC-02: should call Gemini, persist messages, and return the AI response', async () => {
     prisma.chatSession.findFirst.mockResolvedValue({ id: 1, userId: 1 });
     mockFetch.mockResolvedValue(
-      geminiOk('Great question! Here is my analysis...'),
+      createGeminiResponse('Great question! Here is my analysis...'),
     );
 
     const result = await service.getChatResponse(1, 1, 'analyze my portfolio');
@@ -174,13 +237,13 @@ describe('ChatbotService', () => {
 
   it('TC-03: should return a helpful static fallback when Gemini API fails', async () => {
     prisma.chatSession.findFirst.mockResolvedValue({ id: 1, userId: 1 });
-    mockFetch.mockResolvedValue(geminiFail(503));
+    mockFetch.mockResolvedValue(createGeminiError(503));
 
     const greetingResult = await service.getChatResponse(1, 1, 'hello');
     expect(greetingResult).toContain('Hello');
     expect(greetingResult).toContain('TradeUp AI');
 
-    mockFetch.mockResolvedValue(geminiFail(503));
+    mockFetch.mockResolvedValue(createGeminiError(503));
     const genericResult = await service.getChatResponse(
       1,
       1,
@@ -192,12 +255,15 @@ describe('ChatbotService', () => {
   it('TC-04: should detect new users and include NEW USER marker in context', async () => {
     prisma.chatSession.findFirst.mockResolvedValue({ id: 1, userId: 1 });
 
-    mockFetch.mockImplementation(async (_url: string, options: any) => {
-      const body = JSON.parse(options.body);
-      const systemText = body.system_instruction.parts[0].text;
-      expect(systemText).toContain('NEW USER');
-      return geminiOk('Welcome to TradeUp!');
-    });
+    mockFetch.mockImplementation(
+      (_url: string | URL | Request, options?: RequestInit): GeminiResponse => {
+        const requestBody = (options?.body as string) ?? '{}';
+        const body = JSON.parse(requestBody) as GeminiRequestBody;
+        const systemText = body.system_instruction?.parts?.[0]?.text;
+        expect(systemText).toContain('NEW USER');
+        return createGeminiResponse('Welcome to TradeUp!');
+      },
+    );
 
     const result = await service.getChatResponse(1, 1, 'hi');
     expect(result).toBe('Welcome to TradeUp!');
@@ -205,13 +271,15 @@ describe('ChatbotService', () => {
   });
 });
 
-// ═════════════════════════════════════════════════════════════════════
-//  TC-05 — ChatbotController (admin access control)
-// ═════════════════════════════════════════════════════════════════════
-
 describe('ChatbotController', () => {
   let controller: ChatbotController;
-  let chatbotService: Record<string, jest.Mock>;
+  let chatbotService: {
+    getOrCreateSession: jest.Mock;
+    getSessionHistory: jest.Mock;
+    getChatResponse: jest.Mock;
+    generatePeriodicReview: jest.Mock;
+    trainBaselineModel: jest.Mock;
+  };
 
   beforeEach(async () => {
     chatbotService = {
@@ -231,22 +299,20 @@ describe('ChatbotController', () => {
   });
 
   it('TC-05: should allow ADMIN to train and block TRADER with ForbiddenException', async () => {
-    // ADMIN → allowed
     chatbotService.trainBaselineModel.mockResolvedValue(undefined);
     const adminReq = {
       user: { userId: 1, email: 'admin@test.com', role: 'ADMIN' },
-    };
-    const result = await controller.train(adminReq as any);
+    } as unknown as { user: { userId: number; email: string; role: string } };
+    const result = await controller.train(adminReq);
     expect(chatbotService.trainBaselineModel).toHaveBeenCalled();
     expect(result).toEqual({
       message: 'Market baseline refreshed successfully.',
     });
 
-    // TRADER → blocked
     const traderReq = {
       user: { userId: 2, email: 'trader@test.com', role: 'TRADER' },
-    };
-    await expect(controller.train(traderReq as any)).rejects.toThrow(
+    } as unknown as { user: { userId: number; email: string; role: string } };
+    await expect(controller.train(traderReq)).rejects.toThrow(
       ForbiddenException,
     );
   });

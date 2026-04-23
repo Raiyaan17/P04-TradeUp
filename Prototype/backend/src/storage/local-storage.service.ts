@@ -12,7 +12,6 @@ export class LocalStorageService {
     userId: number,
     fileBuffer: Buffer,
     originalFileName: string,
-    mimeType: string,
   ): Promise<string> {
     if (!existsSync(UPLOADS_DIR)) {
       await mkdir(UPLOADS_DIR, { recursive: true });
@@ -22,7 +21,8 @@ export class LocalStorageService {
     const filename = `${Date.now()}-${userId}-${randomBytes(6).toString('hex')}${ext}`;
     await writeFile(join(UPLOADS_DIR, filename), fileBuffer);
 
-    const baseUrl = process.env.BACKEND_URL ?? `http://localhost:${process.env.PORT ?? 3001}`;
+    const baseUrl =
+      process.env.BACKEND_URL ?? `http://localhost:${process.env.PORT ?? 3001}`;
     return `${baseUrl}/uploads/${filename}`;
   }
 }

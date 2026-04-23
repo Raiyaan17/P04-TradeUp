@@ -9,9 +9,6 @@ import {
   UseGuards,
   Req,
   ParseIntPipe,
-  UseInterceptors,
-  UploadedFile,
-  Logger,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { CommunityService } from './community.service';
@@ -23,11 +20,11 @@ import { BlockUserDto } from './dto/block-user.dto';
 import { SearchMentionDto } from './dto/search-mention.dto';
 import { PostTag } from '@prisma/client';
 
-type UploadedFileType = {
-  buffer: Buffer;
-  originalname: string;
+interface MultipartFile {
+  toBuffer: () => Promise<Buffer>;
+  filename: string;
   mimetype: string;
-};
+}
 
 interface AuthenticatedRequest {
   user: {
@@ -212,7 +209,7 @@ export class CommunityController {
     @Req()
     req: AuthenticatedRequest & {
       isMultipart: () => boolean;
-      file: () => Promise<any>;
+      file: () => Promise<MultipartFile | null>;
     },
   ) {
     if (!req.isMultipart || !req.isMultipart()) {

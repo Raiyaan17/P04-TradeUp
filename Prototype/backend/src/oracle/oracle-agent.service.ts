@@ -131,7 +131,11 @@ No extra text, no markdown block syntax, just raw JSON.`;
     prompt: string,
     isJson: boolean = true,
   ): Promise<string> {
-    const config: any = {
+    const config: {
+      temperature: number;
+      maxOutputTokens: number;
+      responseMimeType?: string;
+    } = {
       temperature: 0.7,
       maxOutputTokens: 8192,
     };
@@ -153,8 +157,10 @@ No extra text, no markdown block syntax, just raw JSON.`;
       .replace(/```json\n?/g, '')
       .replace(/```\n?/g, '')
       .trim();
-    const parsed = JSON.parse(cleaned);
-    return parsed.trajectory || [];
+    const parsed = JSON.parse(cleaned) as {
+      trajectory?: TournamentDataPoint[];
+    };
+    return parsed.trajectory ?? [];
   }
 
   private parseNews(response: string): TournamentNewsItem[] {
@@ -162,11 +168,18 @@ No extra text, no markdown block syntax, just raw JSON.`;
       .replace(/```json\n?/g, '')
       .replace(/```\n?/g, '')
       .trim();
-    const parsed = JSON.parse(cleaned);
-    return parsed.news || [];
+    const parsed = JSON.parse(cleaned) as { news?: TournamentNewsItem[] };
+    return parsed.news ?? [];
   }
 
-  async generateTournamentAnalysis(stats: any): Promise<string> {
+  async generateTournamentAnalysis(stats: {
+    startingCash: number;
+    pnl: number;
+    rank: number;
+    totalPlayers: number;
+    totalTrades: number;
+    topStock: string;
+  }): Promise<string> {
     const prompt = `You are a strict, senior hedge fund manager acting as a mentor. Analyze this trader's 60-minute quick tournament performance:
     
 Starting Balance: ${stats.startingCash} PKR
@@ -183,8 +196,8 @@ Do not use greetings or pleasantries. Do NOT use any asterisks (*), markdown for
     try {
       const response = await this.callGemini(prompt, false);
       return response;
-    } catch (e) {
-      this.logger.error('Failed to generate analysis', e);
+    } catch (_e) {
+      this.logger.error('Failed to generate analysis', _e);
       return 'Unable to generate AI analysis at this time. Focus on evaluating your transaction history manually.';
     }
   }

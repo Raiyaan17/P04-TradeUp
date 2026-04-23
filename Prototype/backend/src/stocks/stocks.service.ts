@@ -46,21 +46,22 @@ export class StocksService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  updateTickCache(symbol: string, tick: any) {
+  updateTickCache(symbol: string, tick: Record<string, unknown>) {
     // Normalize data: PSX Terminal uses changePercent/chgPct, we expect percentChange
     const normalized: TickData = {
       ...tick,
-      price: Number(tick.price || tick.last || 0),
-      change: Number(tick.change ?? tick.chg ?? 0),
+      symbol,
+      price: Number((tick['price'] ?? tick['last']) || 0),
+      change: Number(tick['change'] ?? tick['chg'] ?? 0),
       percentChange: Number(
-        tick.percentChange ??
-          tick.changePercent ??
-          tick.chgPct ??
-          tick.pct ??
+        tick['percentChange'] ??
+          tick['changePercent'] ??
+          tick['chgPct'] ??
+          tick['pct'] ??
           0,
       ),
-      volume: Number(tick.volume ?? tick.vol ?? 0),
-      value: Number(tick.value ?? tick.turnover ?? 0),
+      volume: Number(tick['volume'] ?? tick['vol'] ?? 0),
+      value: Number(tick['value'] ?? tick['turnover'] ?? 0),
     };
 
     this.tickCache.set(symbol, normalized);
@@ -117,7 +118,9 @@ export class StocksService {
     try {
       while (this.missingQueue.size > 0) {
         this.lastWorkerHeartbeat = Date.now();
-        const symbol = this.missingQueue.values().next().value;
+        const symbol = this.missingQueue.values().next().value as
+          | string
+          | undefined;
         if (!symbol) break;
 
         // Respect 100 req/min limit by sleeping for 1000ms between calls
@@ -255,7 +258,9 @@ export class StocksService {
       stock = await this.prisma.stock.create({
         data: {
           symbol,
-          name: SYMBOL_NAME_MAP[symbol as any] || null,
+          name:
+            (SYMBOL_NAME_MAP as Record<string, string | undefined>)[symbol] ||
+            null,
         },
       });
     }

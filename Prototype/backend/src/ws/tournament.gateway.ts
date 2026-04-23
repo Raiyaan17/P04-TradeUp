@@ -23,7 +23,7 @@ export class TournamentGateway
 
   constructor(private readonly oracleService: OracleService) {}
 
-  afterInit(server: Server) {
+  afterInit() {
     console.log('TournamentGateway Initialized');
   }
 

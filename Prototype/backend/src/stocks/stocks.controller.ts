@@ -27,7 +27,7 @@ export class StocksController {
   }
 
   @Get('insights')
-  async getInsights() {
+  async getInsights(): Promise<unknown> {
     return this.stocks.getMarketInsights();
   }
 

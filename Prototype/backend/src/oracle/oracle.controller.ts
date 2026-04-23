@@ -12,6 +12,14 @@ import { JwtAuthGuard } from '../auth/jwt.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 
+interface AuthenticatedRequest {
+  user: {
+    userId: number;
+    email: string;
+    role: 'TRADER' | 'ADMIN';
+  };
+}
+
 @Controller('oracle/tournament')
 @UseGuards(JwtAuthGuard)
 export class OracleController {
@@ -28,13 +36,13 @@ export class OracleController {
   }
 
   @Get('portfolio')
-  async getPortfolio(@Req() req: any) {
+  async getPortfolio(@Req() req: AuthenticatedRequest) {
     return this.oracleService.getPortfolio(req.user.userId);
   }
 
   @Get(':id/analysis')
   async getTournamentAnalysis(
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
     @Param('id') tournamentId: string,
   ) {
     return this.oracleService.getParticipantAnalysis(
@@ -47,7 +55,7 @@ export class OracleController {
   @UseGuards(RolesGuard)
   @Roles('ADMIN')
   async startTournament(
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
     @Body('startingCash') startingCash: number,
     @Body('speed') speed?: 'normal' | 'fast',
   ) {
@@ -60,7 +68,7 @@ export class OracleController {
 
   @Post('join')
   async joinTournament(
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
     @Body('tournamentId') tournamentId: string,
   ) {
     return this.oracleService.joinTournament(req.user.userId, tournamentId);
@@ -68,7 +76,7 @@ export class OracleController {
 
   @Post('buy')
   async buyStock(
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
     @Body('tournamentId') tournamentId: string,
     @Body('stockSymbol') stockSymbol: string,
     @Body('quantity') quantity: number,
@@ -83,7 +91,7 @@ export class OracleController {
 
   @Post('sell')
   async sellStock(
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
     @Body('tournamentId') tournamentId: string,
     @Body('stockSymbol') stockSymbol: string,
     @Body('quantity') quantity: number,
@@ -98,7 +106,7 @@ export class OracleController {
 
   @Post('end')
   async endTournament(
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
     @Body('tournamentId') tournamentId: string,
   ) {
     return this.oracleService.endTournament(req.user.userId, tournamentId);

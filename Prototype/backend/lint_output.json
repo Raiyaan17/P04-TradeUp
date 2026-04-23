@@ -1,0 +1,14 @@
+﻿node : 
+At line:1 char:1
++ node .\node_modules\eslint\bin\eslint.js "{src}/**/*.ts" --format jso ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Oops! Something went wrong! :(
+
+ESLint: 9.38.0
+
+No files matching the pattern "{src}/**/*.ts" were found.
+Please check for typing mistakes in the pattern.
+

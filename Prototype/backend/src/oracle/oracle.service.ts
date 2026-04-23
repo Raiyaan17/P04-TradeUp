@@ -12,7 +12,7 @@ import {
   TournamentNewsItem,
 } from './oracle-agent.service';
 import { StocksService } from '../stocks/stocks.service';
-import { TournamentStatus, TransactionType } from '@prisma/client';
+import { Prisma, TournamentStatus, TransactionType } from '@prisma/client';
 
 export interface LeaderboardEntry {
   userId: number;
@@ -208,7 +208,7 @@ export class OracleService implements OnModuleDestroy {
         basePrices['PSX'] = psxTick.price;
         this.logger.log(`Live KSE-100 index price: ${psxTick.price}`);
       }
-    } catch (e) {
+    } catch {
       this.logger.warn(
         `Could not fetch live KSE-100 index price, using generator default.`,
       );
@@ -220,7 +220,7 @@ export class OracleService implements OnModuleDestroy {
         if (tick && tick.price) {
           basePrices[symbol] = tick.price;
         }
-      } catch (e) {
+      } catch {
         this.logger.warn(
           `Could not fetch live price for ${symbol}, using generator default.`,
         );
@@ -235,8 +235,9 @@ export class OracleService implements OnModuleDestroy {
         status: TournamentStatus.ACTIVE,
         startingCash,
         startedAt: new Date(),
-        trajectoryJson: generatedData.trajectory as any,
-        newsJson: generatedData.news as any,
+        trajectoryJson:
+          generatedData.trajectory as unknown as Prisma.InputJsonValue,
+        newsJson: generatedData.news as unknown as Prisma.InputJsonValue,
       },
     });
 
@@ -530,16 +531,18 @@ export class OracleService implements OnModuleDestroy {
 
         const rawTick = this.trajectoryPoints[this.currentTickIndex];
         // Enforce uppercase keys just in case Gemini returned lowercase JSON
-        const tick: any = {};
+        const tick: TournamentDataPoint = {} as TournamentDataPoint;
         if (rawTick) {
           Object.keys(rawTick).forEach((key) => {
-            tick[key.toUpperCase()] = (rawTick as any)[key];
+            const upper = key.toUpperCase() as keyof TournamentDataPoint;
+            (tick as unknown as Record<string, unknown>)[upper] = (
+              rawTick as unknown as Record<string, unknown>
+            )[key];
           });
           tick.day = rawTick.day;
         }
         // Save the cleaned tick back so getCurrentStockPrice finds uppercase keys safely
-        this.trajectoryPoints[this.currentTickIndex] =
-          tick as TournamentDataPoint;
+        this.trajectoryPoints[this.currentTickIndex] = tick;
 
         const tickNews = this.newsItems.filter((n) => n.day === tick.day);
 
@@ -589,8 +592,8 @@ export class OracleService implements OnModuleDestroy {
     setTimeout(() => {
       // Check if we didn't stop it in the meantime
       if (this.currentTickIndex === 0) {
-        tickFn();
-        this.tickInterval = setInterval(tickFn, intervalMs);
+        void tickFn();
+        this.tickInterval = setInterval(() => void tickFn(), intervalMs);
       }
     }, 2500);
   }

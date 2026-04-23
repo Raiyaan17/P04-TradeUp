@@ -6,8 +6,6 @@ import {
   UseGuards,
   Get,
   Post,
-  UseInterceptors,
-  UploadedFile,
   Param,
   ParseIntPipe,
 } from '@nestjs/common';
@@ -33,11 +31,11 @@ interface AuthenticatedRequest {
   };
 }
 
-type UploadedFileType = {
-  buffer: Buffer;
-  originalname: string;
+interface MultipartFile {
+  toBuffer: () => Promise<Buffer>;
+  filename: string;
   mimetype: string;
-};
+}
 
 @ApiTags('Users')
 @Controller('users')
@@ -52,7 +50,7 @@ export class UsersController {
     @Request()
     req: AuthenticatedRequest & {
       isMultipart: () => boolean;
-      file: () => Promise<any>;
+      file: () => Promise<MultipartFile | null>;
     },
   ) {
     if (!req.isMultipart || !req.isMultipart()) {

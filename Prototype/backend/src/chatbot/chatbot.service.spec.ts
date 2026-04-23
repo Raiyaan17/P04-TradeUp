@@ -1,3 +1,7 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { ChatbotService } from './chatbot.service';
@@ -8,7 +12,7 @@ import { WatchlistService } from '../watchlist/watchlist.service';
 
 // ─── Mock global fetch ──────────────────────────────────────────────
 const mockFetch = jest.fn();
-global.fetch = mockFetch as any;
+global.fetch = mockFetch as typeof global.fetch;
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -16,9 +20,10 @@ global.fetch = mockFetch as any;
 function geminiOk(text: string) {
   return {
     ok: true,
-    json: async () => ({
-      candidates: [{ content: { parts: [{ text }] } }],
-    }),
+    json: () =>
+      Promise.resolve({
+        candidates: [{ content: { parts: [{ text }] } }],
+      }),
   };
 }
 
@@ -27,7 +32,7 @@ function geminiFail(status = 500) {
   return {
     ok: false,
     status,
-    text: async () => 'Internal Server Error',
+    text: () => Promise.resolve('Internal Server Error'),
   };
 }
 
@@ -542,7 +547,9 @@ describe('ChatbotService', () => {
   describe('trainBaselineModel — DB failure resilience', () => {
     it('should set marketBaseline to unavailable message when tournament query throws', async () => {
       // Simulate a hard database error (not just empty results)
-      prisma.tournament.findMany.mockRejectedValue(new Error('DB connection lost'));
+      prisma.tournament.findMany.mockRejectedValue(
+        new Error('DB connection lost'),
+      );
 
       // Should NOT throw — errors are caught internally
       await expect(service.trainBaselineModel()).resolves.toBeUndefined();
@@ -564,8 +571,20 @@ describe('ChatbotService', () => {
 
       // Simulate 2 prior messages already stored in the DB
       prisma.chatMessage.findMany.mockResolvedValue([
-        { id: 10, sessionId: 1, role: 'user',     content: 'What is PSX?',                        createdAt: new Date() },
-        { id: 11, sessionId: 1, role: 'assistant', content: 'PSX is the Pakistan Stock Exchange.', createdAt: new Date() },
+        {
+          id: 10,
+          sessionId: 1,
+          role: 'user',
+          content: 'What is PSX?',
+          createdAt: new Date(),
+        },
+        {
+          id: 11,
+          sessionId: 1,
+          role: 'assistant',
+          content: 'PSX is the Pakistan Stock Exchange.',
+          createdAt: new Date(),
+        },
       ]);
 
       let capturedHistory: { role: string; parts: { text: string }[] }[] = [];
@@ -589,8 +608,14 @@ describe('ChatbotService', () => {
 
       // History passed to callGemini must contain the two prior turns in order
       expect(capturedHistory.length).toBe(2);
-      expect(capturedHistory[0]).toEqual({ role: 'user',  parts: [{ text: 'What is PSX?' }] });
-      expect(capturedHistory[1]).toEqual({ role: 'model', parts: [{ text: 'PSX is the Pakistan Stock Exchange.' }] });
+      expect(capturedHistory[0]).toEqual({
+        role: 'user',
+        parts: [{ text: 'What is PSX?' }],
+      });
+      expect(capturedHistory[1]).toEqual({
+        role: 'model',
+        parts: [{ text: 'PSX is the Pakistan Stock Exchange.' }],
+      });
       // The new user message must be passed as the third argument
       expect(capturedNewMessage).toBe('Tell me more about PSX.');
 

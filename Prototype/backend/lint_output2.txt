@@ -1,0 +1,194 @@
+﻿
+D:\spring 26\sproj\sporjj\P04-TradeUp\Prototype\backend\src\chatbot\chatbot.controller.spec.ts
+   47:58  warning  Unsafe argument of type `any` assigned to a parameter of type `AuthenticatedRequest`  @typescript-eslint/no-unsafe-argument
+   69:50  warning  Unsafe argument of type `any` assigned to a parameter of type `AuthenticatedRequest`  @typescript-eslint/no-unsafe-argument
+   84:44  warning  Unsafe argument of type `any` assigned to a parameter of type `AuthenticatedRequest`  @typescript-eslint/no-unsafe-argument
+  108:46  warning  Unsafe argument of type `any` assigned to a parameter of type `AuthenticatedRequest`  @typescript-eslint/no-unsafe-argument
+  128:45  warning  Unsafe argument of type `any` assigned to a parameter of type `AuthenticatedRequest`  @typescript-eslint/no-unsafe-argument
+  138:26  warning  Unsafe argument of type `any` assigned to a parameter of type `AuthenticatedRequest`  @typescript-eslint/no-unsafe-argument
+
+D:\spring 26\sproj\sporjj\P04-TradeUp\Prototype\backend\src\chatbot\chatbot.service.spec.ts
+   11:1   error    Unsafe assignment of an `any` value                                     @typescript-eslint/no-unsafe-assignment
+   19:5   error    Async method 'json' has no 'await' expression                           @typescript-eslint/require-await
+   30:5   error    Async method 'text' has no 'await' expression                           @typescript-eslint/require-await
+  140:7   error    Unsafe call of a(n) `any` typed value                                   @typescript-eslint/no-unsafe-call
+  140:26  error    Unsafe member access .findFirst on an `any` value                       @typescript-eslint/no-unsafe-member-access
+  145:33  error    Unsafe member access .findFirst on an `any` value                       @typescript-eslint/no-unsafe-member-access
+  147:11  error    Unsafe assignment of an `any` value                                     @typescript-eslint/no-unsafe-assignment
+  150:33  error    Unsafe member access .create on an `any` value                          @typescript-eslint/no-unsafe-member-access
+  154:7   error    Unsafe call of a(n) `any` typed value                                   @typescript-eslint/no-unsafe-call
+  154:26  error    Unsafe member access .findFirst on an `any` value                       @typescript-eslint/no-unsafe-member-access
+  161:7   error    Unsafe call of a(n) `any` typed value                                   @typescript-eslint/no-unsafe-call
+  161:26  error    Unsafe member access .create on an `any` value                          @typescript-eslint/no-unsafe-member-access
+  166:33  error    Unsafe member access .create on an `any` value                          @typescript-eslint/no-unsafe-member-access
+  178:7   error    Unsafe call of a(n) `any` typed value                                   @typescript-eslint/no-unsafe-call
+  178:26  error    Unsafe member access .findFirst on an `any` value                       @typescript-eslint/no-unsafe-member-access
+  195:7   error    Unsafe call of a(n) `any` typed value                                   @typescript-eslint/no-unsafe-call
+  195:26  error    Unsafe member access .findMany on an `any` value                        @typescript-eslint/no-unsafe-member-access
+  200:33  error    Unsafe member access .findMany on an `any` value                        @typescript-eslint/no-unsafe-member-access
+  209:7   error    Unsafe call of a(n) `any` typed value                                   @typescript-eslint/no-unsafe-call
+  209:26  error    Unsafe member access .findFirst on an `any` value                       @typescript-eslint/no-unsafe-member-access
+  223:7   error    Unsafe call of a(n) `any` typed value                                   @typescript-eslint/no-unsafe-call
+  223:26  error    Unsafe member access .findFirst on an `any` value                       @typescript-eslint/no-unsafe-member-access
+  232:7   error    Unsafe call of a(n) `any` typed value                                   @typescript-eslint/no-unsafe-call
+  232:26  error    Unsafe member access .findFirst on an `any` value                       @typescript-eslint/no-unsafe-member-access
+  233:7   error    Unsafe call of a(n) `any` typed value                                   @typescript-eslint/no-unsafe-call
+  233:26  error    Unsafe member access .findMany on an `any` value                        @typescript-eslint/no-unsafe-member-access
+  247:33  error    Unsafe member access .createMany on an `any` value                      @typescript-eslint/no-unsafe-member-access
+  258:33  error    Unsafe member access .update on an `any` value                          @typescript-eslint/no-unsafe-member-access
+  261:11  error    Unsafe assignment of an `any` value                                     @typescript-eslint/no-unsafe-assignment
+  261:43  error    Unsafe assignment of an `any` value                                     @typescript-eslint/no-unsafe-assignment
+  267:7   error    Unsafe call of a(n) `any` typed value                                   @typescript-eslint/no-unsafe-call
+  267:26  error    Unsafe member access .findFirst on an `any` value                       @typescript-eslint/no-unsafe-member-access
+  268:7   error    Unsafe call of a(n) `any` typed value                                   @typescript-eslint/no-unsafe-call
+  268:26  error    Unsafe member access .findMany on an `any` value                        @typescript-eslint/no-unsafe-member-access
+  280:7   error    Unsafe call of a(n) `any` typed value                                   @typescript-eslint/no-unsafe-call
+  280:26  error    Unsafe member access .findFirst on an `any` value                       @typescript-eslint/no-unsafe-member-access
+  281:7   error    Unsafe call of a(n) `any` typed value                                   @typescript-eslint/no-unsafe-call
+  281:26  error    Unsafe member access .findMany on an `any` value                        @typescript-eslint/no-unsafe-member-access
+  284:7   error    Unsafe call of a(n) `any` typed value                                   @typescript-eslint/no-unsafe-call
+  284:26  error    Unsafe member access .createMany on an `any` value                      @typescript-eslint/no-unsafe-member-access
+  301:7   error    Unsafe call of a(n) `any` typed value                                   @typescript-eslint/no-unsafe-call
+  301:26  error    Unsafe member access .findFirst on an `any` value                       @typescript-eslint/no-unsafe-member-access
+  302:7   error    Unsafe call of a(n) `any` typed value                                   @typescript-eslint/no-unsafe-call
+  302:26  error    Unsafe member access .findMany on an `any` value                        @typescript-eslint/no-unsafe-member-access
+  334:7   error    Unsafe call of a(n) `any` typed value                                   @typescript-eslint/no-unsafe-call
+  334:26  error    Unsafe member access .findFirst on an `any` value                       @typescript-eslint/no-unsafe-member-access
+  335:7   error    Unsafe call of a(n) `any` typed value                                   @typescript-eslint/no-unsafe-call
+  335:26  error    Unsafe member access .findMany on an `any` value                        @typescript-eslint/no-unsafe-member-access
+  350:71  error    Async arrow function has no 'await' expression                          @typescript-eslint/require-await
+  351:15  error    Unsafe assignment of an `any` value                                     @typescript-eslint/no-unsafe-assignment
+  351:33  warning  Unsafe argument of type `any` assigned to a parameter of type `string`  @typescript-eslint/no-unsafe-argument
+  351:41  error    Unsafe member access .body on an `any` value                            @typescript-eslint/no-unsafe-member-access
+  352:15  error    Unsafe assignment of an `any` value                                     @typescript-eslint/no-unsafe-assignment
+  352:33  error    Unsafe member access .system_instruction on an `any` value              @typescript-eslint/no-unsafe-member-access
+  362:7   error    Unsafe call of a(n) `any` typed value                                   @typescript-eslint/no-unsafe-call
+  362:26  error    Unsafe member access .findFirst on an `any` value                       @typescript-eslint/no-unsafe-member-access
+  363:7   error    Unsafe call of a(n) `any` typed value                                   @typescript-eslint/no-unsafe-call
+  363:26  error    Unsafe member access .findMany on an `any` value                        @typescript-eslint/no-unsafe-member-access
+  394:71  error    Async arrow function has no 'await' expression                          @typescript-eslint/require-await
+  395:15  error    Unsafe assignment of an `any` value                                     @typescript-eslint/no-unsafe-assignment
+  395:33  warning  Unsafe argument of type `any` assigned to a parameter of type `string`  @typescript-eslint/no-unsafe-argument
+  395:41  error    Unsafe member access .body on an `any` value                            @typescript-eslint/no-unsafe-member-access
+  396:15  error    Unsafe assignment of an `any` value                                     @typescript-eslint/no-unsafe-assignment
+  396:33  error    Unsafe member access .system_instruction on an `any` value              @typescript-eslint/no-unsafe-member-access
+  409:7   error    Unsafe call of a(n) `any` typed value                                   @typescript-eslint/no-unsafe-call
+  409:26  error    Unsafe member access .findFirst on an `any` value                       @typescript-eslint/no-unsafe-member-access
+  410:7   error    Unsafe call of a(n) `any` typed value                                   @typescript-eslint/no-unsafe-call
+  410:26  error    Unsafe member access .findMany on an `any` value                        @typescript-eslint/no-unsafe-member-access
+  412:7   error    Unsafe call of a(n) `any` typed value                                   @typescript-eslint/no-unsafe-call
+  412:19  error    Unsafe member access .findUnique on an `any` value                      @typescript-eslint/no-unsafe-member-access
+  440:7   error    Unsafe call of a(n) `any` typed value                                   @typescript-eslint/no-unsafe-call
+  440:25  error    Unsafe member access .findMany on an `any` value                        @typescript-eslint/no-unsafe-member-access
+  451:41  error    Unsafe member access .marketBaseline on an `any` value                  @typescript-eslint/no-unsafe-member-access
+  458:7   error    Unsafe call of a(n) `any` typed value                                   @typescript-eslint/no-unsafe-call
+  458:25  error    Unsafe member access .findMany on an `any` value                        @typescript-eslint/no-unsafe-member-access
+  462:41  error    Unsafe member access .marketBaseline on an `any` value                  @typescript-eslint/no-unsafe-member-access
+  473:7   error    Unsafe call of a(n) `any` typed value                                   @typescript-eslint/no-unsafe-call
+  473:19  error    Unsafe member access .findUnique on an `any` value                      @typescript-eslint/no-unsafe-member-access
+  493:71  error    Async arrow function has no 'await' expression                          @typescript-eslint/require-await
+  494:15  error    Unsafe assignment of an `any` value                                     @typescript-eslint/no-unsafe-assignment
+  494:33  warning  Unsafe argument of type `any` assigned to a parameter of type `string`  @typescript-eslint/no-unsafe-argument
+  494:41  error    Unsafe member access .body on an `any` value                            @typescript-eslint/no-unsafe-member-access
+  495:15  error    Unsafe assignment of an `any` value                                     @typescript-eslint/no-unsafe-assignment
+  495:30  error    Unsafe member access .contents on an `any` value                        @typescript-eslint/no-unsafe-member-access
+  508:7   error    Unsafe call of a(n) `any` typed value                                   @typescript-eslint/no-unsafe-call
+  508:19  error    Unsafe member access .findUnique on an `any` value                      @typescript-eslint/no-unsafe-member-access
+  520:71  error    Async arrow function has no 'await' expression                          @typescript-eslint/require-await
+  521:15  error    Unsafe assignment of an `any` value                                     @typescript-eslint/no-unsafe-assignment
+  521:33  warning  Unsafe argument of type `any` assigned to a parameter of type `string`  @typescript-eslint/no-unsafe-argument
+  521:41  error    Unsafe member access .body on an `any` value                            @typescript-eslint/no-unsafe-member-access
+  522:15  error    Unsafe assignment of an `any` value                                     @typescript-eslint/no-unsafe-assignment
+  522:30  error    Unsafe member access .contents on an `any` value                        @typescript-eslint/no-unsafe-member-access
+  545:7   error    Unsafe call of a(n) `any` typed value                                   @typescript-eslint/no-unsafe-call
+  545:25  error    Unsafe member access .findMany on an `any` value                        @typescript-eslint/no-unsafe-member-access
+  552:41  error    Unsafe member access .marketBaseline on an `any` value                  @typescript-eslint/no-unsafe-member-access
+  565:7   error    Unsafe call of a(n) `any` typed value                                   @typescript-eslint/no-unsafe-call
+  565:26  error    Unsafe member access .findFirst on an `any` value                       @typescript-eslint/no-unsafe-member-access
+  568:7   error    Unsafe call of a(n) `any` typed value                                   @typescript-eslint/no-unsafe-call
+  568:26  error    Unsafe member access .findMany on an `any` value                        @typescript-eslint/no-unsafe-member-access
+  595:13  error    Async arrow function has no 'await' expression                          @typescript-eslint/require-await
+  629:7   error    Unsafe call of a(n) `any` typed value                                   @typescript-eslint/no-unsafe-call
+  629:26  error    Unsafe member access .findFirst on an `any` value                       @typescript-eslint/no-unsafe-member-access
+  630:7   error    Unsafe call of a(n) `any` typed value                                   @typescript-eslint/no-unsafe-call
+  630:26  error    Unsafe member access .findMany on an `any` value                        @typescript-eslint/no-unsafe-member-access
+  642:58  error    Async arrow function has no 'await' expression                          @typescript-eslint/require-await
+
+D:\spring 26\sproj\sporjj\P04-TradeUp\Prototype\backend\src\chatbot\chatbot.service.ts
+  138:17  error  Insert `(`                                                                                                                                                                                          prettier/prettier
+  142:8   error  Insert `)`                                                                                                                                                                                          prettier/prettier
+  242:22  error  Replace `val:┬╖Decimal┬╖|┬╖number┬╖|┬╖string┬╖|┬╖null┬╖|┬╖undefined┬╖|┬╖DecimalLike,┬╖decimals┬╖=┬╖2` with `ΓÉìΓÅÄ┬╖┬╖┬╖┬╖┬╖┬╖val:┬╖Decimal┬╖|┬╖number┬╖|┬╖string┬╖|┬╖null┬╖|┬╖undefined┬╖|┬╖DecimalLike,ΓÉìΓÅÄ┬╖┬╖┬╖┬╖┬╖┬╖decimals┬╖=┬╖2,ΓÉìΓÅÄ┬╖┬╖┬╖┬╖`  prettier/prettier
+  245:53  error  Replace `┬╖?┬╖val.toNumber()` with `ΓÉìΓÅÄ┬╖┬╖┬╖┬╖┬╖┬╖┬╖┬╖┬╖┬╖?┬╖val.toNumber()ΓÉìΓÅÄ┬╖┬╖┬╖┬╖┬╖┬╖┬╖┬╖┬╖`                                                                                                                          prettier/prettier
+  356:7   error  Unsafe assignment of an `any` value                                                                                                                                                                 @typescript-eslint/no-unsafe-assignment
+  356:22  error  Unsafe member access .balance on an `any` value                                                                                                                                                     @typescript-eslint/no-unsafe-member-access
+  357:7   error  Unsafe assignment of an `any` value                                                                                                                                                                 @typescript-eslint/no-unsafe-assignment
+  357:32  error  Unsafe member access .balance on an `any` value                                                                                                                                                     @typescript-eslint/no-unsafe-member-access
+  384:58  error  Replace `userId` with `ΓÉìΓÅÄ┬╖┬╖┬╖┬╖┬╖┬╖┬╖┬╖userId,ΓÉìΓÅÄ┬╖┬╖┬╖┬╖┬╖┬╖`                                                                                                                                                   prettier/prettier
+  392:23  error  Insert `ΓÉìΓÅÄ┬╖┬╖┬╖┬╖┬╖┬╖┬╖`                                                                                                                                                                                  prettier/prettier
+  399:7   error  Replace `(portfolioData.portfolio)` with `portfolioData.portfolio`                                                                                                                                  prettier/prettier
+  402:22  error  Replace `val:┬╖Decimal┬╖|┬╖number┬╖|┬╖string┬╖|┬╖null┬╖|┬╖undefined┬╖|┬╖DecimalLike,┬╖decimals┬╖=┬╖2` with `ΓÉìΓÅÄ┬╖┬╖┬╖┬╖┬╖┬╖val:┬╖Decimal┬╖|┬╖number┬╖|┬╖string┬╖|┬╖null┬╖|┬╖undefined┬╖|┬╖DecimalLike,ΓÉìΓÅÄ┬╖┬╖┬╖┬╖┬╖┬╖decimals┬╖=┬╖2,ΓÉìΓÅÄ┬╖┬╖┬╖┬╖`  prettier/prettier
+  405:53  error  Replace `┬╖?┬╖val.toNumber()` with `ΓÉìΓÅÄ┬╖┬╖┬╖┬╖┬╖┬╖┬╖┬╖┬╖┬╖?┬╖val.toNumber()ΓÉìΓÅÄ┬╖┬╖┬╖┬╖┬╖┬╖┬╖┬╖┬╖`                                                                                                                          prettier/prettier
+  410:26  error  Replace `(portfolioData.portfolio)` with `portfolioData.portfolio`                                                                                                                                  prettier/prettier
+  412:47  error  Replace `┬╖h.unrealizedPnl┬╖!==┬╖null┬╖&&` with `ΓÉìΓÅÄ┬╖┬╖┬╖┬╖┬╖┬╖┬╖┬╖h.unrealizedPnl┬╖!==┬╖null┬╖&&ΓÉìΓÅÄ┬╖┬╖┬╖┬╖┬╖┬╖┬╖`                                                                                                        prettier/prettier
+  426:47  error  Replace `(w:┬╖WatchlistRow)┬╖=>┬╖`┬╖┬╖ΓÇó┬╖${w.symbol}`` with `ΓÉìΓÅÄ┬╖┬╖┬╖┬╖┬╖┬╖(w:┬╖WatchlistRow)┬╖=>┬╖`┬╖┬╖ΓÇó┬╖${w.symbol}`,ΓÉìΓÅÄ┬╖┬╖┬╖┬╖`                                                                                       prettier/prettier
+  429:24  error  Replace `(featuredStocks)` with `featuredStocks`                                                                                                                                                    prettier/prettier
+  436:15  error  Unsafe member access .name on an `any` value                                                                                                                                                        @typescript-eslint/no-unsafe-member-access
+  436:29  error  Unsafe member access .username on an `any` value                                                                                                                                                    @typescript-eslint/no-unsafe-member-access
+  459:82  error  Replace `(portfolioData.portfolio)` with `portfolioData.portfolio`                                                                                                                                  prettier/prettier
+
+D:\spring 26\sproj\sporjj\P04-TradeUp\Prototype\backend\src\main.ts
+  26:22  warning  Unsafe argument of type `any` assigned to a parameter of type `FastifyPluginCallback<{ root: string; prefix: string; }> | FastifyPluginAsync<{ root: string; prefix: string; }> | Promise<{ default: FastifyPluginCallback<{ root: string; prefix: string; }>; }> | Promise<...>`  @typescript-eslint/no-unsafe-argument
+  32:22  warning  Unsafe argument of type `any` assigned to a parameter of type `FastifyPluginCallback<{ limits: { fileSize: number; }; }> | FastifyPluginAsync<{ limits: { fileSize: number; }; }> | Promise<{ default: FastifyPluginCallback<{ limits: { ...; }; }>; }> | Promise<...>`            @typescript-eslint/no-unsafe-argument
+
+D:\spring 26\sproj\sporjj\P04-TradeUp\Prototype\backend\src\oracle\oracle-agent.service.ts
+  160:11  error  Unsafe assignment of an `any` value                 @typescript-eslint/no-unsafe-assignment
+  161:5   error  Unsafe return of a value of type `any`              @typescript-eslint/no-unsafe-return
+  161:19  error  Unsafe member access .trajectory on an `any` value  @typescript-eslint/no-unsafe-member-access
+  169:11  error  Unsafe assignment of an `any` value                 @typescript-eslint/no-unsafe-assignment
+  170:5   error  Unsafe return of a value of type `any`              @typescript-eslint/no-unsafe-return
+  170:19  error  Unsafe member access .news on an `any` value        @typescript-eslint/no-unsafe-member-access
+
+D:\spring 26\sproj\sporjj\P04-TradeUp\Prototype\backend\src\oracle\oracle.service.ts
+  211:14  error  '_e' is defined but never used                                                                                        @typescript-eslint/no-unused-vars
+  223:16  error  '_e' is defined but never used                                                                                        @typescript-eslint/no-unused-vars
+  238:9   error  Unsafe assignment of an `any` value                                                                                   @typescript-eslint/no-unsafe-assignment
+  239:9   error  Unsafe assignment of an `any` value                                                                                   @typescript-eslint/no-unsafe-assignment
+  537:57  error  Replace `rawTick┬╖as┬╖Record<string,┬╖unknown>` with `ΓÉìΓÅÄ┬╖┬╖┬╖┬╖┬╖┬╖┬╖┬╖┬╖┬╖┬╖┬╖┬╖┬╖rawTick┬╖as┬╖Record<string,┬╖unknown>ΓÉìΓÅÄ┬╖┬╖┬╖┬╖┬╖┬╖┬╖┬╖┬╖┬╖┬╖┬╖`  prettier/prettier
+  543:11  error  This assertion is unnecessary since it does not change the type of the expression                                     @typescript-eslint/no-unnecessary-type-assertion
+
+D:\spring 26\sproj\sporjj\P04-TradeUp\Prototype\backend\src\stocks\stocks.service.ts
+   51:11  error    Unsafe assignment of an `any` value                                     @typescript-eslint/no-unsafe-assignment
+   53:26  error    Unsafe member access .price on an `any` value                           @typescript-eslint/no-unsafe-member-access
+   53:40  error    Unsafe member access .last on an `any` value                            @typescript-eslint/no-unsafe-member-access
+   54:27  error    Unsafe member access .change on an `any` value                          @typescript-eslint/no-unsafe-member-access
+   54:42  error    Unsafe member access .chg on an `any` value                             @typescript-eslint/no-unsafe-member-access
+   56:14  error    Unsafe member access .percentChange on an `any` value                   @typescript-eslint/no-unsafe-member-access
+   57:16  error    Unsafe member access .changePercent on an `any` value                   @typescript-eslint/no-unsafe-member-access
+   58:16  error    Unsafe member access .chgPct on an `any` value                          @typescript-eslint/no-unsafe-member-access
+   59:16  error    Unsafe member access .pct on an `any` value                             @typescript-eslint/no-unsafe-member-access
+   62:27  error    Unsafe member access .volume on an `any` value                          @typescript-eslint/no-unsafe-member-access
+   62:42  error    Unsafe member access .vol on an `any` value                             @typescript-eslint/no-unsafe-member-access
+   63:26  error    Unsafe member access .value on an `any` value                           @typescript-eslint/no-unsafe-member-access
+   63:40  error    Unsafe member access .turnover on an `any` value                        @typescript-eslint/no-unsafe-member-access
+  120:15  error    Unsafe assignment of an `any` value                                     @typescript-eslint/no-unsafe-assignment
+  127:33  warning  Unsafe argument of type `any` assigned to a parameter of type `string`  @typescript-eslint/no-unsafe-argument
+  129:30  warning  Unsafe argument of type `any` assigned to a parameter of type `string`  @typescript-eslint/no-unsafe-argument
+  134:46  error    Computed name [symbol] resolves to an `any` value                       @typescript-eslint/no-unsafe-member-access
+  137:24  error    Unsafe assignment of an `any` value                                     @typescript-eslint/no-unsafe-assignment
+  144:26  error    Unsafe assignment of an `any` value                                     @typescript-eslint/no-unsafe-assignment
+  156:34  warning  Unsafe argument of type `any` assigned to a parameter of type `string`  @typescript-eslint/no-unsafe-argument
+  258:33  error    Computed name [symbol as any] resolves to an `any` value                @typescript-eslint/no-unsafe-member-access
+
+D:\spring 26\sproj\sporjj\P04-TradeUp\Prototype\backend\src\storage\local-storage.service.ts
+  15:5  error  '_mimeType' is defined but never used  @typescript-eslint/no-unused-vars
+
+D:\spring 26\sproj\sporjj\P04-TradeUp\Prototype\backend\src\ws\market.gateway.ts
+  100:48  error  Replace `msg.symbol,┬╖(msg.tick┬╖??┬╖msg)┬╖as┬╖Record<string,┬╖unknown>` with `ΓÉìΓÅÄ┬╖┬╖┬╖┬╖┬╖┬╖┬╖┬╖┬╖┬╖┬╖┬╖┬╖┬╖msg.symbol,ΓÉìΓÅÄ┬╖┬╖┬╖┬╖┬╖┬╖┬╖┬╖┬╖┬╖┬╖┬╖┬╖┬╖(msg.tick┬╖??┬╖msg)┬╖as┬╖Record<string,┬╖unknown>,ΓÉìΓÅÄ┬╖┬╖┬╖┬╖┬╖┬╖┬╖┬╖┬╖┬╖┬╖┬╖`  prettier/prettier
+  100:60  error  This assertion is unnecessary since it does not change the type of the expression                                                                                                 @typescript-eslint/no-unnecessary-type-assertion
+
+D:\spring 26\sproj\sporjj\P04-TradeUp\Prototype\backend\src\ws\tournament.gateway.ts
+  26:13  error  '_server' is defined but never used  @typescript-eslint/no-unused-vars
+
+Γ£û 170 problems (155 errors, 15 warnings)
+  18 errors and 0 warnings potentially fixable with the `--fix` option.
+

@@ -8,6 +8,50 @@ import { StocksService } from '../stocks/stocks.service';
 import { TradesService } from '../trades/trades.service';
 import { WatchlistService } from '../watchlist/watchlist.service';
 import { subDays } from 'date-fns';
+import { Decimal } from '@prisma/client/runtime/library';
+
+interface ChatMessageRow {
+  id: number;
+  sessionId: number;
+  role: string;
+  content: string;
+  createdAt: Date;
+}
+
+interface PortfolioHolding {
+  symbol: string;
+  quantity: number;
+  avgPrice: Decimal | number;
+  currentPrice: Decimal | number;
+  unrealizedPnl: Decimal | number | { toNumber: () => number };
+  pnlPercentage: Decimal | number;
+}
+
+interface TransactionRow {
+  type: string;
+  symbol: string;
+  quantity: number;
+  price: Decimal | number;
+  createdAt: Date;
+}
+
+interface WatchlistRow {
+  symbol: string;
+}
+
+interface StockTick {
+  price?: number | null;
+  percentChange?: number | null;
+}
+
+interface FeaturedStock {
+  symbol: string;
+  tick?: StockTick | null;
+}
+
+interface DecimalLike {
+  toNumber: () => number;
+}
 
 @Injectable()
 export class ChatbotService implements OnModuleInit {
@@ -89,13 +133,13 @@ export class ChatbotService implements OnModuleInit {
     }
 
     // 2. Load conversation history (non-critical — continue with empty if fails)
-    let history: any[] = [];
+    let history: ChatMessageRow[] = [];
     try {
-      history = await this.prisma.chatMessage.findMany({
+      history = (await this.prisma.chatMessage.findMany({
         where: { sessionId },
         orderBy: { createdAt: 'asc' },
         take: 20,
-      });
+      })) as ChatMessageRow[];
     } catch (err) {
       this.logger.warn(
         'Failed to load chat history, continuing without it:',
@@ -119,7 +163,7 @@ export class ChatbotService implements OnModuleInit {
     const systemPrompt = this.buildSystemPrompt(contextSnapshot);
 
     // 5. Format history into Gemini multi-turn format
-    const conversationHistory = history.map((m) => ({
+    const conversationHistory = history.map((m: ChatMessageRow) => ({
       role: m.role === 'user' ? 'user' : 'model',
       parts: [{ text: m.content }],
     }));
@@ -195,20 +239,25 @@ export class ChatbotService implements OnModuleInit {
     const portfolioData = await this.tradesService.getPortfolio(userId);
 
     // Helper to safely convert Decimal/number/string to a displayable number
-    const safeNum = (val: any, decimals = 2): string => {
+    const safeNum = (
+      val: Decimal | number | string | null | undefined | DecimalLike,
+      decimals = 2,
+    ): string => {
       if (val === null || val === undefined) return '0';
       const n =
-        typeof val === 'object' && val.toNumber ? val.toNumber() : Number(val);
+        typeof val === 'object' && 'toNumber' in val
+          ? val.toNumber()
+          : Number(val);
       return isNaN(n) ? '0' : n.toFixed(decimals);
     };
 
     // Filter transactions within the period
     const periodTransactions = allTransactions.transactions.filter(
-      (t: any) => new Date(t.createdAt) >= since,
+      (t: TransactionRow) => new Date(t.createdAt) >= since,
     );
 
     const tradeLines = periodTransactions.map(
-      (t: any) =>
+      (t: TransactionRow) =>
         `• ${t.type} ${t.symbol} x${t.quantity} @ ${safeNum(t.price)} PKR on ${new Date(t.createdAt).toLocaleDateString('en-PK')}`,
     );
 
@@ -270,10 +319,10 @@ export class ChatbotService implements OnModuleInit {
 
       const summaries = tournaments
         .map((s) => {
-          const trajectory = s.trajectoryJson as any[];
+          const trajectory = s.trajectoryJson as Array<{ PSX?: number }>;
           if (!trajectory || trajectory.length === 0) return '';
-          const startPSX = trajectory[0]?.PSX || 62000;
-          const endPSX = trajectory[trajectory.length - 1]?.PSX || 62000;
+          const startPSX = trajectory[0]?.PSX ?? 62000;
+          const endPSX = trajectory[trajectory.length - 1]?.PSX ?? 62000;
           const change = ((endPSX - startPSX) / startPSX) * 100;
           return `• PSX Tournament trend: ${startPSX.toFixed(2)} → ${endPSX.toFixed(2)} (${change.toFixed(2)}%)`;
         })
@@ -293,7 +342,11 @@ export class ChatbotService implements OnModuleInit {
 
   private async buildUserContext(userId: number): Promise<string> {
     // Fetch user info — this is critical, but handle gracefully
-    let user: any = null;
+    let user: {
+      name?: string | null;
+      username?: string | null;
+      balance?: Decimal | number | null;
+    } | null = null;
     try {
       user = await this.prisma.user.findUnique({ where: { id: userId } });
     } catch (err) {
@@ -301,7 +354,14 @@ export class ChatbotService implements OnModuleInit {
     }
 
     // Fetch portfolio — safe default for new users with no trades
-    let portfolioData: any = {
+    let portfolioData: {
+      balance: number | Decimal;
+      totalAccountValue: number | Decimal;
+      totalInvested: number | Decimal;
+      totalUnrealizedPnl: number | Decimal;
+      totalPnlPercentage: number | Decimal;
+      portfolio: PortfolioHolding[];
+    } = {
       balance: user?.balance ?? 0,
       totalAccountValue: user?.balance ?? 0,
       totalInvested: 0,
@@ -316,73 +376,85 @@ export class ChatbotService implements OnModuleInit {
     }
 
     // Fetch transactions — safe default: empty list
-    let transactions: any[] = [];
+    let transactions: TransactionRow[] = [];
     try {
       const transactionData = await this.tradesService.getTransactions(
         userId,
         20,
       );
-      transactions = transactionData?.transactions || [];
+      transactions = (transactionData?.transactions ?? []) as TransactionRow[];
     } catch (err) {
       this.logger.warn(`Failed to fetch transactions for user ${userId}:`, err);
     }
 
     // Fetch watchlist — safe default: empty list
-    let watchlistItems: any[] = [];
+    let watchlistItems: WatchlistRow[] = [];
     try {
-      watchlistItems = await this.watchlistService.list(userId);
+      watchlistItems = (await this.watchlistService.list(
+        userId,
+      )) as WatchlistRow[];
     } catch (err) {
       this.logger.warn(`Failed to fetch watchlist for user ${userId}:`, err);
     }
 
     // Fetch featured/live stocks — safe default: empty list
-    let featuredStocks: any[] = [];
+    let featuredStocks: FeaturedStock[] = [];
     try {
-      featuredStocks = await this.stocksService.listFeaturedWithTicks();
+      featuredStocks =
+        (await this.stocksService.listFeaturedWithTicks()) as FeaturedStock[];
     } catch (err) {
       this.logger.warn(`Failed to fetch featured stocks:`, err);
     }
 
     // Detect new user state
     const isNewUser =
-      (portfolioData.portfolio || []).length === 0 && transactions.length === 0;
+      portfolioData.portfolio.length === 0 && transactions.length === 0;
 
     // Helper to safely convert Decimal/number/string to a displayable number
-    const safeNum = (val: any, decimals = 2): string => {
+    const safeNum = (
+      val: Decimal | number | string | null | undefined | DecimalLike,
+      decimals = 2,
+    ): string => {
       if (val === null || val === undefined) return '0';
       const n =
-        typeof val === 'object' && val.toNumber ? val.toNumber() : Number(val);
+        typeof val === 'object' && 'toNumber' in val
+          ? val.toNumber()
+          : Number(val);
       return isNaN(n) ? '0' : n.toFixed(decimals);
     };
 
     // Format holdings as readable bullet points
-    const holdingLines = (portfolioData.portfolio || []).map((h: any) => {
+    const holdingLines = portfolioData.portfolio.map((h: PortfolioHolding) => {
       const pnl =
-        typeof h.unrealizedPnl === 'object' && h.unrealizedPnl?.toNumber
-          ? h.unrealizedPnl.toNumber()
-          : Number(h.unrealizedPnl || 0);
+        typeof h.unrealizedPnl === 'object' &&
+        h.unrealizedPnl !== null &&
+        'toNumber' in (h.unrealizedPnl as object)
+          ? (h.unrealizedPnl as DecimalLike).toNumber()
+          : Number(h.unrealizedPnl ?? 0);
       const pnlSign = pnl >= 0 ? '+' : '';
       return `  • ${h.symbol} (${h.quantity} shares) — Avg: ${safeNum(h.avgPrice)} | Now: ${safeNum(h.currentPrice)} | P&L: ${pnlSign}${safeNum(h.pnlPercentage, 1)}%`;
     });
 
     // Format recent trades as readable bullet points
-    const tradeLines = transactions.map((t: any) => {
+    const tradeLines = transactions.map((t: TransactionRow) => {
       const date = new Date(t.createdAt).toLocaleDateString('en-PK');
       return `  • ${t.type} ${t.symbol} x${t.quantity} @ ${safeNum(t.price)} PKR on ${date}`;
     });
 
     // Format watchlist
-    const watchlistLines = watchlistItems.map((w: any) => `  • ${w.symbol}`);
+    const watchlistLines = watchlistItems.map(
+      (w: WatchlistRow) => `  • ${w.symbol}`,
+    );
 
     // Format live featured stocks
-    const stockLines = (featuredStocks || []).map((s: any) => {
+    const stockLines = featuredStocks.map((s: FeaturedStock) => {
       const change =
         s.tick?.percentChange != null ? safeNum(s.tick.percentChange) : 'N/A';
       return `  • ${s.symbol}: ${s.tick?.price != null ? safeNum(s.tick.price) : 'N/A'} PKR (${change}%)`;
     });
 
     const contextString = `
-USER: ${user?.name || user?.username || 'Unknown'} (ID: ${userId})
+USER: ${user?.name ?? user?.username ?? 'Unknown'} (ID: ${userId})
 ${isNewUser ? 'STATUS: NEW USER — no trades or holdings yet. Be welcoming and educational.\n' : ''}
 BALANCE: ${safeNum(portfolioData.balance)} PKR
 TOTAL ACCOUNT VALUE: ${safeNum(portfolioData.totalAccountValue)} PKR
@@ -405,7 +477,7 @@ ${this.marketBaseline}
     `.trim();
 
     this.logger.debug(
-      `Built user context for user ${userId} (isNewUser=${isNewUser}, holdings=${(portfolioData.portfolio || []).length}, trades=${transactions.length}, watchlist=${watchlistItems.length})`,
+      `Built user context for user ${userId} (isNewUser=${isNewUser}, holdings=${portfolioData.portfolio.length}, trades=${transactions.length}, watchlist=${watchlistItems.length})`,
     );
     return contextString;
   }
@@ -462,7 +534,7 @@ ${contextSnapshot}
     conversationHistory: { role: string; parts: { text: string }[] }[],
     newMessage: string,
   ): Promise<string> {
-    const contents: any[] = [
+    const contents: { role: string; parts: { text: string }[] }[] = [
       ...conversationHistory.map((h) => ({ role: h.role, parts: h.parts })),
       { role: 'user', parts: [{ text: newMessage }] },
     ];

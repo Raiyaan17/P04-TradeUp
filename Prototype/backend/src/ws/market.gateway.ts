@@ -11,9 +11,10 @@ import { WebSocket } from 'ws';
 import { FEATURED_SYMBOLS, PSX_WS_URL } from '../common/constants';
 import { StocksService } from '../stocks/stocks.service';
 
-interface TickUpdateMessage {
+interface WsMessage {
   type: string;
   symbol?: string;
+  tick?: Record<string, unknown>;
   [key: string]: unknown;
 }
 
@@ -84,7 +85,7 @@ export class MarketGateway implements OnModuleInit {
           rawMessage = String(data);
         }
 
-        const msg = JSON.parse(rawMessage);
+        const msg = JSON.parse(rawMessage) as WsMessage;
 
         // Handle PSX Heartbeat Requirements
         if (msg?.type === 'ping') {
@@ -96,7 +97,7 @@ export class MarketGateway implements OnModuleInit {
           // Gatekeeper: Only process allowed KSE-100 symbols
           if ((FEATURED_SYMBOLS as readonly string[]).includes(msg.symbol)) {
             // Update in-memory cache directly into the service layer
-            this.stocksService.updateTickCache(msg.symbol, msg.tick || msg);
+            this.stocksService.updateTickCache(msg.symbol, msg.tick ?? msg);
             // Broadcast to connected frontend clients
             this.server.to(`symbol:${msg.symbol}`).emit('tickUpdate', msg);
           }

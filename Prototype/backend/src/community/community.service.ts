@@ -597,7 +597,6 @@ export class CommunityService {
         userId,
         fileBuffer,
         originalFileName,
-        mimeType,
       );
       console.log('Local storage URL:', localUrl);
       return localUrl;
