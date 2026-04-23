@@ -78,7 +78,7 @@ interface PortfolioData {
 }
 
 const isLocalhost = typeof window !== 'undefined' && window.location.hostname === 'localhost';
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || (isLocalhost ? 'http://localhost:3001/api' : '/api');
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || (isLocalhost ? 'http://localhost:3001/api' : 'https://tradeup-syai.onrender.com/api');
 const CANDLE_INTERVAL = 1 * 60 * 1000;
 const MARKET_CLOSED_TIMEOUT = 5000;
 

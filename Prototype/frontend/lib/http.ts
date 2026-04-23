@@ -5,7 +5,8 @@
 
 const isServer = typeof window === 'undefined';
 const isLocalhost = !isServer && window.location.hostname === 'localhost';
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || (isServer ? (process.env.BACKEND_URL || 'http://localhost:3001/api') : (isLocalhost ? 'http://localhost:3001/api' : '/api'));
+const RENDER_BACKEND = 'https://tradeup-syai.onrender.com/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || (isServer ? (process.env.BACKEND_URL || 'http://localhost:3001/api') : (isLocalhost ? 'http://localhost:3001/api' : RENDER_BACKEND));
 
 export interface ApiError {
   message: string;

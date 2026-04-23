@@ -62,7 +62,7 @@ import { formatUSD, formatPercent, getPnLClass } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
 const isLocalhost = typeof window !== 'undefined' && window.location.hostname === 'localhost';
-const WS_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || (isLocalhost ? 'http://localhost:3001/api' : '/api');
+const WS_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || (isLocalhost ? 'http://localhost:3001/api' : 'https://tradeup-syai.onrender.com/api');
 
 interface LiveTick {
   c?: number;
