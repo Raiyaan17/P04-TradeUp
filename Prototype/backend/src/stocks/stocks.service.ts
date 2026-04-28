@@ -40,23 +40,25 @@ export class StocksService {
   private readonly missingQueue = new Set<string>();
   private isProcessingQueue = false;
   private lastWorkerHeartbeat = 0;
-  private insightsCache: any = null;
+  private insightsCache: unknown = null;
   private lastInsightsFetch = 0;
   private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
   constructor(private readonly prisma: PrismaService) {}
 
-  updateTickCache(symbol: string, tick: any) {
-    const rawPct = tick.changePercent ?? tick.pch ?? tick.pct ?? tick.percentChange ?? 0;
+  updateTickCache(symbol: string, tick: Record<string, unknown>) {
+    const rawPct =
+      (tick['changePercent'] ?? tick['pch'] ?? tick['pct'] ?? tick['percentChange'] ?? 0) as number;
     const percentChange = Number(rawPct) * 100;
 
     const normalized: TickData = {
       ...tick,
-      price: Number(tick.price || tick.last || 0),
-      change: Number(tick.change ?? tick.chg ?? 0),
+      symbol,
+      price: Number(tick['price'] || tick['last'] || 0),
+      change: Number(tick['change'] ?? tick['chg'] ?? 0),
       percentChange,
-      volume: Number(tick.volume ?? tick.vol ?? 0),
-      value: Number(tick.value ?? tick.turnover ?? 0),
+      volume: Number(tick['volume'] ?? tick['vol'] ?? 0),
+      value: Number(tick['value'] ?? tick['turnover'] ?? 0),
     };
 
     this.tickCache.set(symbol, normalized);
@@ -251,7 +253,10 @@ export class StocksService {
       stock = await this.prisma.stock.create({
         data: {
           symbol,
-          name: SYMBOL_NAME_MAP[symbol as any] || null,
+          name:
+            // @ts-ignore
+            SYMBOL_NAME_MAP[symbol as unknown as Record<string, unknown>] ||
+            null,
         },
       });
     }
@@ -262,10 +267,10 @@ export class StocksService {
     return stock;
   }
 
-  async getCompanyProfile(symbol: string): Promise<any> {
+  async getCompanyProfile(symbol: string): Promise<unknown> {
     const url = `${this.base}/api/companies/${encodeURIComponent(symbol)}`;
     try {
-      const { data } = await axios.get<PsxApiResponse<any>>(url, {
+      const { data } = await axios.get<PsxApiResponse<unknown>>(url, {
         timeout: 5000,
       });
       if (data?.success) return data.data;
@@ -279,10 +284,10 @@ export class StocksService {
     }
   }
 
-  async getFundamentals(symbol: string): Promise<any> {
+  async getFundamentals(symbol: string): Promise<unknown> {
     const url = `${this.base}/api/fundamentals/${encodeURIComponent(symbol)}`;
     try {
-      const { data } = await axios.get<PsxApiResponse<any>>(url, {
+      const { data } = await axios.get<PsxApiResponse<unknown>>(url, {
         timeout: 5000,
       });
       if (data?.success) return data.data;
@@ -296,7 +301,7 @@ export class StocksService {
     }
   }
 
-  async getMarketInsights(): Promise<any> {
+  async getMarketInsights(): Promise<unknown> {
     const now = Date.now();
     if (this.insightsCache && now - this.lastInsightsFetch < this.CACHE_TTL) {
       return this.insightsCache;

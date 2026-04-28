@@ -8,7 +8,7 @@ import { WatchlistService } from '../watchlist/watchlist.service';
 
 // ─── Mock global fetch ──────────────────────────────────────────────
 const mockFetch = jest.fn();
-global.fetch = mockFetch as any;
+global.fetch = mockFetch as unknown as typeof global.fetch;
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -35,7 +35,7 @@ function geminiFail(status = 500) {
 
 describe('ChatbotService', () => {
   let service: ChatbotService;
-  let prisma: Record<string, any>;
+  let prisma: Record<string, Record<string, jest.Mock>>;
   let tradesService: Partial<TradesService>;
   let watchlistService: Partial<WatchlistService>;
   let stocksService: Partial<StocksService>;
@@ -347,7 +347,8 @@ describe('ChatbotService', () => {
       });
 
       // Capture what prompt is sent to Gemini
-      mockFetch.mockImplementation(async (_url: string, options: any) => {
+      mockFetch.mockImplementation(async (_url: string, options: unknown) => {
+        // @ts-ignore
         const body = JSON.parse(options.body);
         const systemText = body.system_instruction.parts[0].text;
         expect(systemText).toContain('NEW USER');
@@ -391,7 +392,8 @@ describe('ChatbotService', () => {
         total: 1,
       });
 
-      mockFetch.mockImplementation(async (_url: string, options: any) => {
+      mockFetch.mockImplementation(async (_url: string, options: unknown) => {
+        // @ts-ignore
         const body = JSON.parse(options.body);
         const systemText = body.system_instruction.parts[0].text;
         // Should NOT contain new user marker
@@ -448,7 +450,8 @@ describe('ChatbotService', () => {
       await service.trainBaselineModel();
 
       // Access private field via bracket notation for testing
-      const baseline = (service as any).marketBaseline as string;
+      const baseline = (service as unknown as Record<string, unknown>)
+        .marketBaseline as string;
       expect(baseline).toContain('SIMULATION HISTORY');
       expect(baseline).toContain('60000');
       expect(baseline).toContain('62000');
@@ -459,7 +462,8 @@ describe('ChatbotService', () => {
 
       await service.trainBaselineModel();
 
-      const baseline = (service as any).marketBaseline as string;
+      const baseline = (service as unknown as Record<string, unknown>)
+        .marketBaseline as string;
       expect(baseline).toBe('No historical simulation data available.');
     });
   });
@@ -490,7 +494,8 @@ describe('ChatbotService', () => {
         balance: 80000,
       });
 
-      mockFetch.mockImplementation(async (_url: string, options: any) => {
+      mockFetch.mockImplementation(async (_url: string, options: unknown) => {
+        // @ts-ignore
         const body = JSON.parse(options.body);
         const userMsg = body.contents[0].parts[0].text;
         expect(userMsg).toContain('weekly');
@@ -517,7 +522,8 @@ describe('ChatbotService', () => {
         balance: 100000,
       });
 
-      mockFetch.mockImplementation(async (_url: string, options: any) => {
+      mockFetch.mockImplementation(async (_url: string, options: unknown) => {
+        // @ts-ignore
         const body = JSON.parse(options.body);
         const userMsg = body.contents[0].parts[0].text;
         expect(userMsg).toContain('monthly');

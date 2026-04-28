@@ -6,13 +6,14 @@ import { Search, ExternalLink } from "lucide-react";
 import { AppShell } from "@/components/layout";
 import { PageHeader, EmptyState } from "@/components/common";
 import { NewsSkeletonLoader, NewsErrorCard, SentimentButton } from "@/components/news";
-import { Card, CardContent } from "@/components/ui/card";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { http, ApiException } from "@/lib/http";
 import { formatDate } from "@/lib/format";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 interface NewsArticle {
   title: string;
@@ -194,24 +195,24 @@ export default function NewsPage() {
       />
 
       {/* Tabs */}
-      <div className="flex gap-2 mb-6 border-b border-border">
+      <div className="flex gap-4 mb-8 border-b border-border/50 max-w-2xl mx-auto">
         <button
           onClick={() => setActiveTab('global')}
-          className={`px-4 py-2 font-medium transition-colors ${activeTab === 'global'
-            ? 'text-primary border-b-2 border-primary'
+          className={`pb-3 text-label-caps transition-colors ${activeTab === 'global'
+            ? 'text-primary border-b-[3px] border-primary'
             : 'text-muted-foreground hover:text-foreground'
             }`}
         >
-          Global News
+          GLOBAL NEWS
         </button>
         <button
           onClick={() => setActiveTab('local')}
-          className={`px-4 py-2 font-medium transition-colors ${activeTab === 'local'
-            ? 'text-primary border-b-2 border-primary'
+          className={`pb-3 text-label-caps transition-colors ${activeTab === 'local'
+            ? 'text-primary border-b-[3px] border-primary'
             : 'text-muted-foreground hover:text-foreground'
             }`}
         >
-          Local News
+          LOCAL NEWS
         </button>
       </div>
 
@@ -251,15 +252,15 @@ export default function NewsPage() {
           )}
 
           {!loading && !error && (
-            <div className="space-y-8">
+            <div className="space-y-12 max-w-2xl mx-auto">
               {/* Stock-specific News */}
               {isSearching && stockArticles.length > 0 && (
                 <div>
-                  <div className="flex items-center gap-2 mb-4">
-                    <h2 className="text-xl font-semibold">{lastSearchedTicker} News</h2>
-                    <Badge variant="secondary">{stockArticles.length} articles</Badge>
+                  <div className="flex items-center gap-3 mb-6">
+                    <h2 className="text-3xl font-semibold tracking-tight">{lastSearchedTicker} NEWS</h2>
+                    <Badge variant="secondary" className="font-mono bg-primary/20 text-primary border-none">{stockArticles.length} ARTICLES</Badge>
                   </div>
-                  <div className="grid gap-4">
+                  <div className="grid gap-6">
                     {stockArticles.map((article, index) => (
                       <a
                         key={`stock-${index}-${article.title}`}
@@ -268,50 +269,49 @@ export default function NewsPage() {
                         rel="noopener noreferrer"
                         className="group"
                       >
-                        <Card className="transition-colors hover:bg-accent/50">
-                          <CardContent className="p-0">
-                            <div className="flex">
-                              {article.image_url && (
-                                <div className="w-48 h-36 flex-shrink-0 overflow-hidden rounded-l-lg bg-muted">
-                                  <Image
-                                    src={article.image_url}
-                                    alt={article.title}
-                                    width={192}
-                                    height={144}
-                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                                    onError={(e) => {
-                                      e.currentTarget.style.display = "none";
-                                    }}
-                                  />
-                                </div>
+                        <div className="bg-card rounded-2xl border border-primary/20 hover:border-primary transition-all overflow-hidden flex flex-col md:flex-row shadow-[0_4px_24px_rgba(0,0,0,0.2)]">
+                          {article.image_url && (
+                            <div className="w-full md:w-48 h-48 md:h-auto flex-shrink-0 overflow-hidden bg-muted">
+                              <Image
+                                src={article.image_url}
+                                alt={article.title}
+                                width={192}
+                                height={144}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = "none";
+                                }}
+                              />
+                            </div>
+                          )}
+                          <div className="p-6 flex flex-col justify-between flex-1">
+                            <div>
+                              <div className="mb-3">
+                                <Badge variant="secondary" className="text-label-caps tracking-widest border-none">STOCK UPDATE</Badge>
+                              </div>
+                              <h3 className="text-2xl font-semibold mb-3 group-hover:text-primary transition-colors line-clamp-2 leading-tight">
+                                {article.title}
+                              </h3>
+                              {article.description && (
+                                <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
+                                  {article.description}
+                                </p>
                               )}
-                              <div className="p-4 flex flex-col justify-between flex-1">
-                                <div>
-                                  <h3 className="font-semibold mb-2 group-hover:text-primary transition-colors line-clamp-2">
-                                    {article.title}
-                                  </h3>
-                                  {article.description && (
-                                    <p className="text-sm text-muted-foreground line-clamp-2">
-                                      {article.description}
-                                    </p>
-                                  )}
-                                </div>
-                                <div className="flex items-center justify-between mt-3 pt-3 border-t border-border">
-                                  <span className="text-xs text-muted-foreground">
-                                    {formatDate(article.published_at)}
-                                  </span>
-                                  <div className="flex items-center gap-2">
-                                    <SentimentButton
-                                      isAnalyzing={analyzingArticles.has(article.title)}
-                                      onAnalyze={(e) => handleSentimentAnalysis(article.title, e)}
-                                    />
-                                    <ExternalLink className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                                  </div>
-                                </div>
+                            </div>
+                            <div className="flex items-center justify-between mt-6 pt-4 border-t border-border/50">
+                              <span className="text-xs text-muted-foreground font-mono">
+                                {formatDate(article.published_at)}
+                              </span>
+                              <div className="flex items-center gap-3">
+                                <SentimentButton
+                                  isAnalyzing={analyzingArticles.has(article.title)}
+                                  onAnalyze={(e) => handleSentimentAnalysis(article.title, e)}
+                                />
+                                <ExternalLink className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
                               </div>
                             </div>
-                          </CardContent>
-                        </Card>
+                          </div>
+                        </div>
                       </a>
                     ))}
                   </div>
@@ -320,13 +320,13 @@ export default function NewsPage() {
 
               {/* General News */}
               <div>
-                <h2 className="text-xl font-semibold mb-4">
-                  {isSearching ? "General News" : "Latest News"}
+                <h2 className="text-3xl font-semibold mb-6 tracking-tight">
+                  {isSearching ? "GENERAL NEWS" : "LATEST UPDATES"}
                 </h2>
                 {generalArticles.length === 0 ? (
                   <EmptyState variant="news" />
                 ) : (
-                  <div className="grid gap-4">
+                  <div className="grid gap-6">
                     {generalArticles.map((article, index) => (
                       <a
                         key={`general-${index}-${article.title}`}
@@ -335,51 +335,53 @@ export default function NewsPage() {
                         rel="noopener noreferrer"
                         className="group"
                       >
-                        <Card className="transition-colors hover:bg-accent/50">
-                          <CardContent className="p-0">
-                            <div className="flex">
-                              {article.image && (
-                                <div className="w-48 h-36 flex-shrink-0 overflow-hidden rounded-l-lg bg-muted">
-                                  <Image
-                                    src={article.image}
-                                    alt={article.title}
-                                    width={192}
-                                    height={144}
-                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                                    onError={(e) => {
-                                      (e.target as HTMLElement).style.display = "none";
-                                    }}
-                                  />
-                                </div>
+                        <div className={cn(
+                          "rounded-2xl transition-all overflow-hidden flex flex-col md:flex-row shadow-[0_4px_24px_rgba(0,0,0,0.2)]",
+                          index === 0 ? "bg-card border border-primary hover:shadow-[0_0_20px_rgba(74,142,255,0.15)]" : "bg-card border border-transparent hover:border-border"
+                        )}>
+                          {article.image && (
+                            <div className="w-full md:w-48 h-48 md:h-auto flex-shrink-0 overflow-hidden bg-muted">
+                              <Image
+                                src={article.image}
+                                alt={article.title}
+                                width={192}
+                                height={144}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                onError={(e) => {
+                                  (e.target as HTMLElement).style.display = "none";
+                                }}
+                              />
+                            </div>
+                          )}
+                          <div className="p-6 flex flex-col justify-between flex-1">
+                            <div>
+                              <div className="mb-3">
+                                <Badge variant="secondary" className="text-label-caps tracking-widest border-none">MARKET NEWS</Badge>
+                              </div>
+                              <h3 className="text-2xl font-semibold mb-3 group-hover:text-primary transition-colors line-clamp-2 leading-tight">
+                                {article.title}
+                              </h3>
+                              {article.content && (
+                                <div
+                                  className="text-sm text-muted-foreground line-clamp-2 leading-relaxed"
+                                  dangerouslySetInnerHTML={{ __html: article.content }}
+                                />
                               )}
-                              <div className="p-4 flex flex-col justify-between flex-1">
-                                <div>
-                                  <h3 className="font-semibold mb-2 group-hover:text-primary transition-colors line-clamp-2">
-                                    {article.title}
-                                  </h3>
-                                  {article.content && (
-                                    <div
-                                      className="text-sm text-muted-foreground line-clamp-2"
-                                      dangerouslySetInnerHTML={{ __html: article.content }}
-                                    />
-                                  )}
-                                </div>
-                                <div className="flex items-center justify-between mt-3 pt-3 border-t border-border">
-                                  <span className="text-xs text-muted-foreground">
-                                    {formatDate(article.date)}
-                                  </span>
-                                  <div className="flex items-center gap-2">
-                                    <SentimentButton
-                                      isAnalyzing={analyzingArticles.has(article.title)}
-                                      onAnalyze={(e) => handleSentimentAnalysis(article.title, e)}
-                                    />
-                                    <ExternalLink className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                                  </div>
-                                </div>
+                            </div>
+                            <div className="flex items-center justify-between mt-6 pt-4 border-t border-border/50">
+                              <span className="text-xs text-muted-foreground font-mono">
+                                {formatDate(article.date)}
+                              </span>
+                              <div className="flex items-center gap-3">
+                                <SentimentButton
+                                  isAnalyzing={analyzingArticles.has(article.title)}
+                                  onAnalyze={(e) => handleSentimentAnalysis(article.title, e)}
+                                />
+                                <ExternalLink className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
                               </div>
                             </div>
-                          </CardContent>
-                        </Card>
+                          </div>
+                        </div>
                       </a>
                     ))}
                   </div>
@@ -404,12 +406,12 @@ export default function NewsPage() {
           )}
 
           {!localLoading && !error && localArticles.length > 0 && (
-            <div>
-              <div className="flex items-center gap-2 mb-4">
-                <h2 className="text-xl font-semibold">Dawn Business News</h2>
-                <Badge variant="secondary">{localArticles.length} articles</Badge>
+            <div className="max-w-2xl mx-auto">
+              <div className="flex items-center gap-3 mb-6">
+                <h2 className="text-3xl font-semibold tracking-tight">DAWN BUSINESS NEWS</h2>
+                <Badge variant="secondary" className="font-mono bg-primary/20 text-primary border-none">{localArticles.length} ARTICLES</Badge>
               </div>
-              <div className="grid gap-4">
+              <div className="grid gap-6">
                 {localArticles.map((article, index) => (
                   <a
                     key={`local-${index}-${article.title}`}
@@ -418,27 +420,28 @@ export default function NewsPage() {
                     rel="noopener noreferrer"
                     className="group"
                   >
-                    <Card className="transition-colors hover:bg-accent/50">
-                      <CardContent className="p-4">
+                    <div className="bg-card rounded-2xl border border-transparent hover:border-border transition-all overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.2)]">
+                      <div className="p-6">
                         <div>
-                          <div className="flex items-start justify-between gap-3">
-                            <h3 className="font-semibold mb-2 group-hover:text-primary transition-colors line-clamp-2 flex-1">
-                              {article.title}
-                            </h3>
-                            <Badge variant="outline" className="flex-shrink-0">
+                          <div className="flex items-start justify-between gap-3 mb-3">
+                            <Badge variant="secondary" className="text-label-caps tracking-widest border-none">LOCAL UPDATE</Badge>
+                            <Badge variant="outline" className="flex-shrink-0 text-[10px] font-mono border-border text-muted-foreground">
                               {article.source}
                             </Badge>
                           </div>
+                          <h3 className="text-2xl font-semibold mb-3 group-hover:text-primary transition-colors line-clamp-2 leading-tight">
+                            {article.title}
+                          </h3>
                           {article.contentSnippet && (
-                            <p className="text-sm text-muted-foreground line-clamp-3 mb-3">
+                            <p className="text-sm text-muted-foreground line-clamp-3 mb-6 leading-relaxed">
                               {article.contentSnippet}
                             </p>
                           )}
-                          <div className="flex items-center justify-between pt-3 border-t border-border">
-                            <span className="text-xs text-muted-foreground">
+                          <div className="flex items-center justify-between pt-4 border-t border-border/50">
+                            <span className="text-xs text-muted-foreground font-mono">
                               {formatDate(article.pubDate)}
                             </span>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-3">
                               <SentimentButton
                                 isAnalyzing={analyzingArticles.has(article.title)}
                                 onAnalyze={(e) => handleSentimentAnalysis(article.title, e)}
@@ -447,8 +450,8 @@ export default function NewsPage() {
                             </div>
                           </div>
                         </div>
-                      </CardContent>
-                    </Card>
+                      </div>
+                    </div>
                   </a>
                 ))}
               </div>

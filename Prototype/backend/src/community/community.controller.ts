@@ -212,7 +212,11 @@ export class CommunityController {
     @Req()
     req: AuthenticatedRequest & {
       isMultipart: () => boolean;
-      file: () => Promise<any>;
+      file: () => Promise<{
+        toBuffer: () => Promise<Buffer>;
+        filename: string;
+        mimetype: string;
+      } | null>;
     },
   ) {
     if (!req.isMultipart || !req.isMultipart()) {

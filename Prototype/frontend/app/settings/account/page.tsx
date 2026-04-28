@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -157,64 +157,67 @@ export default function AccountSettingsPage() {
   return (
     <div className="space-y-6">
       {/* Change Name */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Change Name</CardTitle>
-          <CardDescription>
+      <div className="bg-card rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.2)] border border-transparent hover:border-primary/20 transition-colors overflow-hidden">
+        <div className="p-6 border-b border-border/50">
+          <h2 className="text-2xl font-bold tracking-tight">Change Name</h2>
+          <p className="text-sm text-muted-foreground mt-2">
             Update your display name. This will be visible across the application.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={nameForm.handleSubmit(handleNameSubmit)} className="space-y-4">
+          </p>
+        </div>
+        <div className="p-6">
+          <form onSubmit={nameForm.handleSubmit(handleNameSubmit)} className="space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="newName">Full Name</Label>
+              <Label htmlFor="newName" className="text-label-caps text-muted-foreground block">FULL NAME</Label>
               <Input
                 id="newName"
                 type="text"
                 placeholder="Your name"
+                className="bg-muted border-b-2 border-border border-x-0 border-t-0 focus:ring-0 focus:border-primary outline-none font-mono text-base rounded-t-md rounded-b-none"
                 {...nameForm.register("newName")}
               />
             </div>
-            <Separator />
+            <Separator className="my-6 opacity-50" />
             <div className="space-y-2">
-              <Label htmlFor="nameCurrentPassword">Current Password</Label>
+              <Label htmlFor="nameCurrentPassword" className="text-label-caps text-muted-foreground block">CURRENT PASSWORD</Label>
               <Input
                 id="nameCurrentPassword"
                 type="password"
                 placeholder="Enter your current password"
                 autoComplete="current-password"
+                className="bg-muted border-b-2 border-border border-x-0 border-t-0 focus:ring-0 focus:border-primary outline-none font-mono text-base rounded-t-md rounded-b-none"
                 {...nameForm.register("currentPassword")}
               />
-              <p className="text-sm text-muted-foreground">
+              <p className="text-xs font-mono text-muted-foreground mt-1">
                 Required to confirm changes
               </p>
             </div>
-            <div className="flex justify-end">
-              <Button type="submit" disabled={isNameLoading}>
-                {isNameLoading ? "Updating..." : "Update Name"}
+            <div className="flex justify-end pt-2">
+              <Button type="submit" disabled={isNameLoading} className="text-label-caps">
+                {isNameLoading ? "UPDATING..." : "UPDATE NAME"}
               </Button>
             </div>
           </form>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Change Email */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Change Email</CardTitle>
-          <CardDescription>
+      <div className="bg-card rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.2)] border border-transparent hover:border-primary/20 transition-colors overflow-hidden">
+        <div className="p-6 border-b border-border/50">
+          <h2 className="text-2xl font-bold tracking-tight">Change Email</h2>
+          <p className="text-sm text-muted-foreground mt-2">
             Update your email address. This is used for login and notifications.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={emailForm.handleSubmit(handleEmailSubmit)} className="space-y-4">
+          </p>
+        </div>
+        <div className="p-6">
+          <form onSubmit={emailForm.handleSubmit(handleEmailSubmit)} className="space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="newEmail">Email Address</Label>
+              <Label htmlFor="newEmail" className="text-label-caps text-muted-foreground block">EMAIL ADDRESS</Label>
               <Input
                 id="newEmail"
                 type="email"
                 placeholder="your@email.com"
                 autoComplete="email"
+                className="bg-muted border-b-2 border-border border-x-0 border-t-0 focus:ring-0 focus:border-primary outline-none font-mono text-base rounded-t-md rounded-b-none"
                 {...emailForm.register("newEmail", {
                   pattern: {
                     value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
@@ -223,62 +226,65 @@ export default function AccountSettingsPage() {
                 })}
               />
               {emailForm.formState.errors.newEmail && (
-                <p className="text-sm text-destructive">
+                <p className="text-xs text-[#eb5757]">
                   {emailForm.formState.errors.newEmail.message}
                 </p>
               )}
             </div>
-            <Separator />
+            <Separator className="my-6 opacity-50" />
             <div className="space-y-2">
-              <Label htmlFor="emailCurrentPassword">Current Password</Label>
+              <Label htmlFor="emailCurrentPassword" className="text-label-caps text-muted-foreground block">CURRENT PASSWORD</Label>
               <Input
                 id="emailCurrentPassword"
                 type="password"
                 placeholder="Enter your current password"
                 autoComplete="current-password"
+                className="bg-muted border-b-2 border-border border-x-0 border-t-0 focus:ring-0 focus:border-primary outline-none font-mono text-base rounded-t-md rounded-b-none"
                 {...emailForm.register("currentPassword")}
               />
-              <p className="text-sm text-muted-foreground">
+              <p className="text-xs font-mono text-muted-foreground mt-1">
                 Required to confirm changes
               </p>
             </div>
-            <div className="flex justify-end">
-              <Button type="submit" disabled={isEmailLoading}>
-                {isEmailLoading ? "Updating..." : "Update Email"}
+            <div className="flex justify-end pt-2">
+              <Button type="submit" disabled={isEmailLoading} className="text-label-caps">
+                {isEmailLoading ? "UPDATING..." : "UPDATE EMAIL"}
               </Button>
             </div>
           </form>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Change Password */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Change Password</CardTitle>
-          <CardDescription>
+      <div className="bg-card rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.2)] border border-transparent hover:border-primary/20 transition-colors overflow-hidden">
+        <div className="p-6 border-b border-border/50">
+          <h2 className="text-2xl font-bold tracking-tight">Change Password</h2>
+          <p className="text-sm text-muted-foreground mt-2">
             Update your password. Use a strong password with at least 8 characters.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={passwordForm.handleSubmit(handlePasswordSubmit)} className="space-y-4">
+          </p>
+        </div>
+        <div className="p-6">
+          <form onSubmit={passwordForm.handleSubmit(handlePasswordSubmit)} className="space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="currentPasswordField">Current Password</Label>
+              <Label htmlFor="currentPasswordField" className="text-label-caps text-muted-foreground block">CURRENT PASSWORD</Label>
               <Input
                 id="currentPasswordField"
                 type="password"
                 placeholder="Enter your current password"
                 autoComplete="current-password"
+                className="bg-muted border-b-2 border-border border-x-0 border-t-0 focus:ring-0 focus:border-primary outline-none font-mono text-base rounded-t-md rounded-b-none"
                 {...passwordForm.register("currentPassword")}
               />
             </div>
-            <Separator />
+            <Separator className="my-6 opacity-50" />
             <div className="space-y-2">
-              <Label htmlFor="newPasswordField">New Password</Label>
+              <Label htmlFor="newPasswordField" className="text-label-caps text-muted-foreground block">NEW PASSWORD</Label>
               <Input
                 id="newPasswordField"
                 type="password"
                 placeholder="Enter your new password"
                 autoComplete="new-password"
+                className="bg-muted border-b-2 border-border border-x-0 border-t-0 focus:ring-0 focus:border-primary outline-none font-mono text-base rounded-t-md rounded-b-none"
                 {...passwordForm.register("newPassword", {
                   minLength: {
                     value: 8,
@@ -287,29 +293,30 @@ export default function AccountSettingsPage() {
                 })}
               />
               {passwordForm.formState.errors.newPassword && (
-                <p className="text-sm text-destructive">
+                <p className="text-xs text-[#eb5757]">
                   {passwordForm.formState.errors.newPassword.message}
                 </p>
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="confirmPasswordField">Confirm New Password</Label>
+              <Label htmlFor="confirmPasswordField" className="text-label-caps text-muted-foreground block">CONFIRM NEW PASSWORD</Label>
               <Input
                 id="confirmPasswordField"
                 type="password"
                 placeholder="Confirm your new password"
                 autoComplete="new-password"
+                className="bg-muted border-b-2 border-border border-x-0 border-t-0 focus:ring-0 focus:border-primary outline-none font-mono text-base rounded-t-md rounded-b-none"
                 {...passwordForm.register("confirmPassword")}
               />
             </div>
-            <div className="flex justify-end">
-              <Button type="submit" disabled={isPasswordLoading}>
-                {isPasswordLoading ? "Updating..." : "Update Password"}
+            <div className="flex justify-end pt-2">
+              <Button type="submit" disabled={isPasswordLoading} className="text-label-caps">
+                {isPasswordLoading ? "UPDATING..." : "UPDATE PASSWORD"}
               </Button>
             </div>
           </form>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

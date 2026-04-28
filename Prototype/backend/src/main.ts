@@ -28,7 +28,7 @@ const ALLOWED_ORIGINS = [
  *  app.enableCors() only covers Fastify REST routes — polling WS transports
  *  need CORS configured directly on the Socket.IO ServerOptions. */
 class CorsIoAdapter extends IoAdapter {
-  createIOServer(port: number, options?: ServerOptions): any {
+  createIOServer(port: number, options?: ServerOptions): unknown {
     return super.createIOServer(port, {
       ...options,
       cors: {
@@ -52,13 +52,15 @@ async function bootstrap() {
   // Ensure uploads directory exists and serve it as static files
   const uploadsDir = join(process.cwd(), 'uploads');
   if (!existsSync(uploadsDir)) mkdirSync(uploadsDir, { recursive: true });
-  await app.register(fastifyStatic as any, {
+  // @ts-ignore
+  await app.register(fastifyStatic as unknown as Record<string, unknown>, {
     root: uploadsDir,
     prefix: '/uploads/',
   });
 
   // Register fastify multipart feature (10 MB limit)
-  await app.register(multipart as any, {
+  // @ts-ignore
+  await app.register(multipart as unknown as Record<string, unknown>, {
     limits: { fileSize: 10 * 1024 * 1024 },
   });
 

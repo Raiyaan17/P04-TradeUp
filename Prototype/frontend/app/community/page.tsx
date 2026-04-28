@@ -450,16 +450,16 @@ try {
   };
 
   return (
-    <Card className="overflow-hidden">
-      <CardContent className="pt-5 pb-3 space-y-3">
+    <div className="bg-card rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.2)] border border-transparent hover:border-primary/20 transition-all overflow-hidden">
+      <div className="p-6 pb-4 space-y-4">
         {/* Author row */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Avatar className="h-9 w-9">
+            <Avatar className="h-10 w-10">
               {post.author.profileImageUrl ? (
                 <AvatarImage src={post.author.profileImageUrl} />
               ) : null}
-              <AvatarFallback className="bg-secondary text-secondary-foreground text-sm">
+              <AvatarFallback className="bg-primary/20 text-primary font-bold text-sm">
                 {getInitials(post.author.name, post.author.username)}
               </AvatarFallback>
             </Avatar>
@@ -478,9 +478,9 @@ try {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <Badge className={cn("text-xs font-normal", getTagColor(post.tag))}>
-              {post.tag.charAt(0) + post.tag.slice(1).toLowerCase()}
+          <div className="flex items-center gap-3">
+            <Badge className={cn("text-label-caps border-none tracking-widest", getTagColor(post.tag))}>
+              {post.tag}
             </Badge>
             {/* Dropdown: delete own / block others */}
             <DropdownMenu>
@@ -512,12 +512,12 @@ try {
 
         {/* Title + content */}
         <div>
-          <h3 className="text-base font-semibold text-foreground">{post.title}</h3>
-          <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">
+          <h3 className="text-2xl font-bold text-foreground mb-2">{post.title}</h3>
+          <p className="text-base text-muted-foreground leading-relaxed whitespace-pre-wrap">
             {post.content}
           </p>
           {post.imageUrl && (
-<div className="mt-3 rounded-lg overflow-hidden border border-border">
+            <div className="mt-4 rounded-xl overflow-hidden border border-border/50">
               <Image src={post.imageUrl} alt={post.title} width={800} height={400} className="w-full max-h-96 object-cover" unoptimized />
             </div>
           )}
@@ -599,7 +599,7 @@ try {
           <Button
             variant="ghost"
             size="sm"
-            className="h-8 px-2 text-xs text-muted-foreground gap-1 ml-auto"
+            className="h-9 px-3 text-label-caps text-muted-foreground hover:text-foreground gap-2 ml-auto hover:bg-muted/50 rounded-lg"
             onClick={handleToggleComments}
           >
             <MessageSquare className="h-4 w-4" />
@@ -616,7 +616,7 @@ try {
             variant="ghost"
             size="sm"
             className={cn(
-              "h-8 px-2 text-xs gap-1",
+              "h-9 px-3 text-xs gap-2 hover:bg-muted/50 rounded-lg",
               isSaved
                 ? "text-primary"
                 : "text-muted-foreground"
@@ -729,8 +729,8 @@ setCommentImageUrl("");
             </div>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 

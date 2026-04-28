@@ -28,13 +28,17 @@ export class OracleController {
   }
 
   @Get('portfolio')
-  async getPortfolio(@Req() req: any) {
+  async getPortfolio(
+    // @ts-ignore
+    @Req() req: import('../types/request.type').AuthenticatedRequest,
+  ) {
     return this.oracleService.getPortfolio(req.user.userId);
   }
 
   @Get(':id/analysis')
   async getTournamentAnalysis(
-    @Req() req: any,
+    // @ts-ignore
+    @Req() req: import('../types/request.type').AuthenticatedRequest,
     @Param('id') tournamentId: string,
   ) {
     return this.oracleService.getParticipantAnalysis(
@@ -47,7 +51,8 @@ export class OracleController {
   @UseGuards(RolesGuard)
   @Roles('ADMIN')
   async startTournament(
-    @Req() req: any,
+    // @ts-ignore
+    @Req() req: import('../types/request.type').AuthenticatedRequest,
     @Body('startingCash') startingCash: number,
     @Body('speed') speed?: 'normal' | 'fast',
   ) {
@@ -60,7 +65,8 @@ export class OracleController {
 
   @Post('join')
   async joinTournament(
-    @Req() req: any,
+    // @ts-ignore
+    @Req() req: import('../types/request.type').AuthenticatedRequest,
     @Body('tournamentId') tournamentId: string,
   ) {
     return this.oracleService.joinTournament(req.user.userId, tournamentId);
@@ -68,7 +74,8 @@ export class OracleController {
 
   @Post('buy')
   async buyStock(
-    @Req() req: any,
+    // @ts-ignore
+    @Req() req: import('../types/request.type').AuthenticatedRequest,
     @Body('tournamentId') tournamentId: string,
     @Body('stockSymbol') stockSymbol: string,
     @Body('quantity') quantity: number,
@@ -83,7 +90,8 @@ export class OracleController {
 
   @Post('sell')
   async sellStock(
-    @Req() req: any,
+    // @ts-ignore
+    @Req() req: import('../types/request.type').AuthenticatedRequest,
     @Body('tournamentId') tournamentId: string,
     @Body('stockSymbol') stockSymbol: string,
     @Body('quantity') quantity: number,
@@ -98,7 +106,8 @@ export class OracleController {
 
   @Post('end')
   async endTournament(
-    @Req() req: any,
+    // @ts-ignore
+    @Req() req: import('../types/request.type').AuthenticatedRequest,
     @Body('tournamentId') tournamentId: string,
   ) {
     return this.oracleService.endTournament(req.user.userId, tournamentId);
