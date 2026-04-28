@@ -7,8 +7,8 @@ import React, {
   useEffect,
   ReactNode,
 } from 'react';
+import Image from 'next/image';
 import { debounce } from '@/lib/utils';
-import { User, X } from 'lucide-react';
 
 export interface MentionSuggestion {
   id: number;
@@ -33,10 +33,9 @@ export const MentionAutocomplete = React.forwardRef<
   MentionAutocompleteProps
 >(
   (
-    {
+{
       onMention,
       placeholder = 'Write something...',
-      maxMentions = 10,
       children,
       value: externalValue,
       onChange: onExternalChange,
@@ -72,7 +71,8 @@ export const MentionAutocomplete = React.forwardRef<
       return afterAt;
     }, []);
 
-    // Debounced search function
+// Debounced search function
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     const searchMentions = useCallback(
       debounce(async (query: string) => {
         // Get token from localStorage
@@ -302,11 +302,13 @@ export const MentionAutocomplete = React.forwardRef<
                   }`}
               >
                 {/* User avatar */}
-                <div className="flex-shrink-0 w-8 h-8">
+<div className="flex-shrink-0 w-8 h-8">
                   {user.profileImageUrl ? (
-                    <img
+                    <Image
                       src={user.profileImageUrl}
                       alt={user.username}
+                      width={32}
+                      height={32}
                       className="w-full h-full rounded-full object-cover"
                     />
                   ) : (
@@ -346,7 +348,7 @@ export const MentionAutocomplete = React.forwardRef<
                        border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3 z-50"
           >
             <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
-              No users found for "{mentionQuery}"
+              No users found for &quot;{mentionQuery}&quot;
             </p>
           </div>
         )}

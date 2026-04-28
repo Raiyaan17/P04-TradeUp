@@ -1,0 +1,50 @@
+"use client"
+
+import React, { useEffect, useRef, useState } from "react"
+import { motion } from "framer-motion"
+
+interface PriceFlashCellProps {
+  value: number
+  displayValue: string | React.ReactNode
+  className?: string
+}
+
+export function PriceFlashCell({ value, displayValue, className }: PriceFlashCellProps) {
+  const [flashColor, setFlashColor] = useState<"green" | "red" | "transparent">("transparent")
+  const prevValueRef = useRef(value)
+
+  useEffect(() => {
+    const prev = prevValueRef.current
+    if (value !== prev && isFinite(value) && isFinite(prev)) {
+      setFlashColor(value > prev ? "green" : "red")
+    }
+    prevValueRef.current = value
+  }, [value])
+
+  useEffect(() => {
+    if (flashColor !== "transparent") {
+      const timer = setTimeout(() => {
+        setFlashColor("transparent")
+      }, 400)
+      return () => clearTimeout(timer)
+    }
+  }, [flashColor])
+
+  const backgroundColor =
+    flashColor === "green"
+      ? "rgba(111, 207, 151, 0.2)"
+      : flashColor === "red"
+      ? "rgba(235, 87, 87, 0.2)"
+      : "transparent"
+
+  return (
+    <motion.div
+      initial={{ backgroundColor: "transparent" }}
+      animate={{ backgroundColor }}
+      transition={{ duration: 0.4 }}
+      className={className}
+    >
+      {displayValue}
+    </motion.div>
+  )
+}

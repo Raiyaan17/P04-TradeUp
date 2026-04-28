@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { Search, UserPlus, UserCheck, UserX, Users, X } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -133,14 +133,14 @@ export function FriendsSection() {
     };
 
     return (
-        <Card className="w-full">
-            <CardHeader className="pb-3">
-                <CardTitle className="text-lg flex items-center gap-2">
-                    <Users className="h-5 w-5" />
-                    Friends
-                </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
+        <div className="w-full bg-card rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.2)] border border-transparent hover:border-primary/20 transition-colors overflow-hidden">
+            <div className="p-6 border-b border-border/50">
+                <h2 className="text-label-caps flex items-center gap-2 text-foreground">
+                    <Users className="h-4 w-4 text-primary" />
+                    FRIENDS
+                </h2>
+            </div>
+            <div className="p-6 space-y-6">
                 <Tabs
                     tabs={[
                         { id: 'friends', label: 'Friends' },
@@ -284,7 +284,7 @@ export function FriendsSection() {
                                 placeholder="Search by username..."
                                 value={searchQuery}
                                 onChange={(e) => handleSearch(e.target.value)}
-                                className="pl-9"
+                                className="pl-9 bg-muted border-b-2 border-border border-x-0 border-t-0 focus:ring-0 focus:border-primary outline-none font-mono text-base rounded-t-md rounded-b-none"
                             />
                         </div>
                         <div className="space-y-2">
@@ -330,7 +330,7 @@ export function FriendsSection() {
                         </div>
                     </div>
                 )}
-            </CardContent>
-        </Card >
+            </div>
+        </div>
     );
 }

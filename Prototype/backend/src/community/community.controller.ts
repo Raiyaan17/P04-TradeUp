@@ -198,10 +198,7 @@ export class CommunityController {
     @Req() req: AuthenticatedRequest,
     @Param('id', ParseIntPipe) postId: number,
   ) {
-    const isSaved = await this.community.isPostSaved(
-      req.user.userId,
-      postId,
-    );
+    const isSaved = await this.community.isPostSaved(req.user.userId, postId);
     return { isSaved };
   }
 
@@ -212,7 +209,15 @@ export class CommunityController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Upload community image' })
   async uploadImage(
-    @Req() req: AuthenticatedRequest & { isMultipart: () => boolean, file: () => Promise<any> },
+    @Req()
+    req: AuthenticatedRequest & {
+      isMultipart: () => boolean;
+      file: () => Promise<{
+        toBuffer: () => Promise<Buffer>;
+        filename: string;
+        mimetype: string;
+      } | null>;
+    },
   ) {
     if (!req.isMultipart || !req.isMultipart()) {
       throw new Error('Request is not multipart');

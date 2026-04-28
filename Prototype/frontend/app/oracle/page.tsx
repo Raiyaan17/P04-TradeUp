@@ -4,14 +4,8 @@ import React, { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { useUser } from "@/context/UserContext";
 import { AppShell } from "@/components/layout";
-import { PageHeader } from "@/components/common";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
+import { NeonIndicator } from "@/components/common";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { http } from "@/lib/http";
@@ -37,9 +31,54 @@ interface LeaderboardEntry {
 }
 
 interface TournamentNewsItem {
-  minute: number;
+  day: number;
   headline: string;
   sentiment: 'positive' | 'negative' | 'neutral';
+}
+
+interface TournamentParticipant {
+  userId: number;
+  username: string;
+  balance: number;
+}
+
+interface Tournament {
+  id: number;
+  participants?: TournamentParticipant[];
+  startingCash: number;
+  speed: string;
+}
+
+interface TournamentTick {
+  day: number;
+  status?: string;
+  PSX: number;
+  HBL: number;
+  UBL: number;
+  MCB: number;
+  HUBC: number;
+  FFC: number;
+}
+
+interface TournamentNews {
+  day: number;
+  headline: string;
+  sentiment: 'positive' | 'negative' | 'neutral';
+}
+
+interface Holding {
+  stockSymbol: string;
+  quantity: number;
+  avgPrice: number;
+}
+
+interface TournamentPortfolio {
+  balance: number;
+  holdings: Holding[];
+}
+
+interface ApiError {
+  message: string;
 }
 
 const STOCKS = ["PSX", "HBL", "UBL", "MCB", "HUBC", "FFC"];
@@ -52,16 +91,20 @@ const COLORS = [
   "#ec4899", // FFC
 ];
 
-function PercentageChart({ history, currentMinute }: { history: Record<string, number>[], currentMinute: number }) {
+function PercentageChart({ history, stocksToRender, colors }: { history: Record<string, number>[], stocksToRender: string[], colors: string[] }) {
   if (history.length === 0) return <div className="h-full flex items-center justify-center text-muted-foreground">Waiting for market open...</div>;
 
   const firstPoint = history[0];
-  const data = history.map(point => {
-    let percentages: Record<string, number> = {};
-    STOCKS.forEach(s => {
+const data = history.map((point) => {
+    const percentages: Record<string, number> = {};
+    stocksToRender.forEach(s => {
       const startPrice = firstPoint[s];
       const currentPrice = point[s];
-      percentages[s] = ((currentPrice - startPrice) / startPrice) * 100;
+      if (startPrice) {
+        percentages[s] = ((currentPrice - startPrice) / startPrice) * 100;
+      } else {
+        percentages[s] = 0;
+      }
     });
     return percentages;
   });
@@ -69,29 +112,29 @@ function PercentageChart({ history, currentMinute }: { history: Record<string, n
   let minPct = 0;
   let maxPct = 0;
   data.forEach(d => {
-    STOCKS.forEach(s => {
+    stocksToRender.forEach(s => {
       if (d[s] < minPct) minPct = d[s];
       if (d[s] > maxPct) maxPct = d[s];
     });
   });
 
-  minPct -= 0.5;
-  maxPct += 0.5;
+  minPct -= 0.2;
+  maxPct += 0.2;
 
   const width = 800;
   const height = 400;
   const paddingY = 40;
 
-  // Total ticks is 60. We graph continuously up to 60.
-  const getX = (index: number) => (index / 60) * width;
+  // Total ticks is 30. We graph continuously up to 30.
+  const getX = (index: number) => (index / 30) * width;
   const getY = (value: number) => {
     const range = maxPct - minPct;
-    const normalized = (value - minPct) / range;
+    const normalized = range === 0 ? 0.5 : (value - minPct) / range;
     return height - paddingY - (normalized * (height - 2 * paddingY));
   };
 
   return (
-    <div className="w-full h-full relative font-mono" style={{ minHeight: '400px' }}>
+    <div className="w-full h-full relative font-mono min-h-[250px]">
       <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="w-full h-full overflow-visible">
         {/* Grid lines and percentage labels */}
         {[maxPct, maxPct / 2, 0, minPct / 2, minPct].map((val, i) => {
@@ -106,13 +149,13 @@ function PercentageChart({ history, currentMinute }: { history: Record<string, n
         })}
 
         {/* Lines */}
-        {STOCKS.map((stock, i) => {
+        {stocksToRender.map((stock, i) => {
           const points = data.map((d, index) => `${getX(index)},${getY(d[stock])}`).join(" ");
           return (
             <polyline
               key={`line-${stock}`}
               fill="none"
-              stroke={COLORS[i]}
+              stroke={colors[i]}
               strokeWidth="2.5"
               points={points}
               style={{ strokeLinejoin: "round", strokeLinecap: "round" }}
@@ -136,15 +179,16 @@ export default function OraclePage() {
   const [speed, setSpeed] = useState<"normal" | "fast">("normal");
 
   // Game Data
-  const [activeTournaments, setActiveTournaments] = useState<any[]>([]);
-  const [tournament, setTournament] = useState<any>(null);
-  const [portfolio, setPortfolio] = useState<{ balance: number, holdings: any[] }>({ balance: 0, holdings: [] });
+const [activeTournaments, setActiveTournaments] = useState<Tournament[]>([]);
+  const [tournament, setTournament] = useState<Tournament | null>(null);
+  const [portfolio, setPortfolio] = useState<TournamentPortfolio>({ balance: 0, holdings: [] });
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [currentPrices, setCurrentPrices] = useState<Record<string, number>>({});
   const [priceHistory, setPriceHistory] = useState<Record<string, number>[]>([]);
   const [news, setNews] = useState<TournamentNewsItem[]>([]);
-  const [tickMinute, setTickMinute] = useState(0);
+  const [tickDay, setTickDay] = useState(0);
   const [isGameOver, setIsGameOver] = useState(false);
+  const [analysis, setAnalysis] = useState<string | null>(null);
 
   // Trading form
   const [selectedStock, setSelectedStock] = useState("HBL");
@@ -153,61 +197,74 @@ export default function OraclePage() {
   // End of feed ref
   const newsEndRef = useRef<HTMLDivElement>(null);
 
-  // Load Initial state
+// Load Initial state
   useEffect(() => {
     checkTournament();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   useEffect(() => {
     newsEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [news]);
 
-  const fetchPortfolio = async () => {
+useEffect(() => {
+    if (isGameOver && tournament?.id) {
+      http.get(`/oracle/tournament/${tournament.id}/analysis`)
+        .then((res) => {
+          if (res && typeof res === 'object' && 'analysis' in res) {
+            setAnalysis((res as { analysis: string }).analysis);
+          }
+        })
+        .catch(err => console.error("Failed to fetch analysis", err));
+    }
+  }, [isGameOver, tournament]);
+
+const fetchPortfolio = async () => {
     try {
-      const res: any = await http.get("/oracle/tournament/portfolio");
+      const res = await http.get("/oracle/tournament/portfolio");
       if (res) {
-        setPortfolio(res);
+        setPortfolio(res as TournamentPortfolio);
       }
     } catch (e) {
       console.error(e);
     }
   };
 
-  const checkTournament = async () => {
+const checkTournament = async () => {
     if (!user) return;
     try {
       setLoading(true);
-      const res: any = await http.get("/oracle/tournament/list");
+      const res = await http.get("/oracle/tournament/list");
       if (Array.isArray(res)) {
-        setActiveTournaments(res);
+        setActiveTournaments(res as Tournament[]);
       }
-    } catch (e) {
+    } catch {
       console.log("Failed to fetch tournaments");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleJoinGame = async (t: any) => {
+  const handleJoinGame = async (t: Tournament) => {
     try {
       setLoading(true);
       await http.post("/oracle/tournament/join", { tournamentId: t.id });
       setTournament(t);
-      connectWS();
+connectWS();
       fetchPortfolio();
       toast.success("Joined Tournament!");
-    } catch (e) {
+    } catch {
       toast.error("Failed to join");
     } finally {
       setLoading(false);
     }
   };
 
-  const startTournament = async () => {
+const startTournament = async () => {
     try {
       setLoading(true);
-      const res: any = await http.post("/oracle/tournament/start", { startingCash, speed });
-      setTournament(res);
+      const res = await http.post("/oracle/tournament/start", { startingCash, speed });
+      setTournament(res as Tournament);
       connectWS();
       fetchPortfolio();
       toast.success("Joined Tournament!");
@@ -216,35 +273,26 @@ export default function OraclePage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const joinTournament = async (id: string) => {
-    try {
-      await http.post("/oracle/tournament/join", { tournamentId: id });
-      toast.success("Joined Tournament!");
-    } catch {
-      toast.error("Failed to join");
-    }
-  };
+};
 
   const connectWS = () => {
     const isLocalhost = typeof window !== 'undefined' && window.location.hostname === 'localhost';
-    const WS_URL = process.env.NEXT_PUBLIC_WS_URL || (isLocalhost ? "http://localhost:3001" : "");
+    const WS_URL = process.env.NEXT_PUBLIC_WS_URL || (isLocalhost ? "http://localhost:3001" : "https://tradeup-syai.onrender.com");
 
     const socket = io.connect(`${WS_URL}/tournament`, {
       withCredentials: true,
     });
 
-    socket.on("connect", () => {
+socket.on("connect", () => {
       console.log("Connected to Tournament Live Feed");
     });
 
-    socket.on("tournamentTick", (data: { tick: any, news: any, leaderboard: LeaderboardEntry[] }) => {
-      if (!data.tick || Object.keys(data.tick).length === 0 || data.tick.status === 'completed' || data.tick.minute > 60) {
+    socket.on("tournamentTick", (data: { tick: TournamentTick, news: TournamentNews[], leaderboard: LeaderboardEntry[] }) => {
+      if (!data.tick || Object.keys(data.tick).length === 0 || data.tick.status === 'completed' || data.tick.day > 30) {
         return;
       }
 
-      setTickMinute(data.tick.minute);
+      setTickDay(data.tick.day);
       setLeaderboard(data.leaderboard);
 
       const prices: Record<string, number> = {
@@ -260,7 +308,21 @@ export default function OraclePage() {
       setPriceHistory(prev => [...prev, prices]);
 
       if (data.news && data.news.length > 0) {
-        setNews(prev => [...prev, ...data.news]);
+        data.news.forEach((n: TournamentNews) => {
+          toast(n.headline, {
+            description: `DAY ${n.day} • ${n.sentiment.toUpperCase()}`,
+            duration: 3000,
+            icon: <Newspaper className="w-4 h-4 text-primary" />
+          });
+        });
+        
+        setTimeout(() => {
+          setNews(prev => {
+            const existing = new Set(prev.map(p => p.headline));
+            const newItems = data.news.filter((n: TournamentNews) => !existing.has(n.headline));
+            return [...prev, ...newItems];
+          });
+        }, 3000);
       }
 
       // Auto refetch portfolio to catch dynamic leaderboard balance, though we can skip doing this on every tick.
@@ -278,7 +340,8 @@ export default function OraclePage() {
     };
   };
 
-  const handleTrade = async (action: "buy" | "sell") => {
+const handleTrade = async (action: "buy" | "sell") => {
+    if (!tournament?.id) return;
     try {
       await http.post(`/oracle/tournament/${action}`, {
         tournamentId: tournament.id,
@@ -287,20 +350,23 @@ export default function OraclePage() {
       });
       toast.success(`Successfully ${action === 'buy' ? 'bought' : 'sold'} ${tradeQuantity} ${selectedStock}`);
       fetchPortfolio();
-    } catch (e: any) {
-      toast.error(e.message || "Trade failed");
+    } catch (e) {
+      const error = e as ApiError;
+      toast.error(error.message || "Trade failed");
     }
   };
 
   const handleEndTournament = async () => {
+    if (!tournament?.id) return;
     try {
       await http.post("/oracle/tournament/end", { tournamentId: tournament.id });
       toast.success("Tournament Ended prematurely. Please wait for the final whistle.");
-    } catch (e: any) {
-      if (e?.message === "Tournament not active" || e?.message?.includes("not active")) {
+    } catch (e) {
+      const error = e as ApiError;
+      if (error?.message === "Tournament not active" || error?.message?.includes("not active")) {
         toast.error("Tournament already ended. Returning to lobby.");
       } else {
-        toast.error(e.message || "Failed to end tournament");
+        toast.error(error.message || "Failed to end tournament");
       }
     } finally {
       // Always reset back to lobby if we are trying to abort an untracked/stuck tournament
@@ -328,103 +394,112 @@ export default function OraclePage() {
   if (!tournament) {
     return (
       <AppShell>
-        <PageHeader title="Tournament Oracle" description="Global 1-Hour Real-Time Market Competition" />
+        <div className="py-12 text-center space-y-4">
+          <h1 className="text-7xl font-bold tracking-tighter text-primary">ORACLE_NO</h1>
+          <p className="text-xl text-muted-foreground font-mono tracking-widest uppercase">Global 1-Month Real-Time Market Competition</p>
+        </div>
 
         <div className="max-w-4xl mx-auto mt-8 space-y-12">
 
-          <div className="space-y-4">
-            <h2 className="text-2xl font-bold flex items-center gap-2">
-              <Radio className="w-6 h-6 text-primary animate-pulse" /> Ongoing Games
+          <div className="space-y-6">
+            <h2 className="text-label-caps flex items-center gap-3">
+              <NeonIndicator className="bg-primary" /> ONGOING GAMES
             </h2>
             {activeTournaments.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {activeTournaments.map(t => {
-                  const isParticipant = t.participants?.some((p: any) => p.userId === user?.id);
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+{activeTournaments.map(t => {
+                  const isParticipant = t.participants?.some((p: TournamentParticipant) => p.userId === user?.id);
                   return (
-                    <Card key={t.id} className="bg-card shadow-lg border-primary/20 hover:border-primary/50 transition-colors">
-                      <CardHeader>
-                        <CardTitle className="text-xl flex justify-between items-center">
-                          Global Tournament
-                          <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20">Active</Badge>
-                        </CardTitle>
-                        <CardDescription>Join in progress!</CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Players:</span>
-                          <span className="font-bold">{t.participants?.length || 0}</span>
+                    <div key={t.id} className="bg-card border border-primary rounded-2xl p-6 shadow-[0_0_20px_rgba(74,142,255,0.15)] flex flex-col justify-between">
+                      <div className="space-y-2 mb-6">
+                        <div className="flex justify-between items-center">
+                          <h3 className="text-2xl font-bold">Global Tournament</h3>
+                          <Badge variant="secondary" className="bg-primary/20 text-primary border-none text-[10px] tracking-widest font-bold">ACTIVE</Badge>
                         </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Starting Cash:</span>
-                          <span className="font-bold">{formatDecimal(t.startingCash)} PKR</span>
+                        <p className="text-sm text-muted-foreground">Join in progress!</p>
+                      </div>
+                      <div className="space-y-6">
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-label-caps text-muted-foreground">PLAYERS</span>
+                            <span className="font-bold font-mono text-lg">{t.participants?.length || 0}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-label-caps text-muted-foreground">STARTING CASH</span>
+                            <span className="font-bold font-mono text-lg">{formatDecimal(t.startingCash)} PKR</span>
+                          </div>
                         </div>
                         <Button
-                          className={cn("w-full font-bold", isParticipant ? "bg-primary" : "bg-emerald-600 hover:bg-emerald-700")}
+                          className={cn("w-full text-label-caps", isParticipant ? "bg-primary hover:bg-[#5a9aff] shadow-[0_0_12px_rgba(74,142,255,0.4)] text-primary-foreground" : "bg-[#27ae60] hover:bg-[#2ecc71] shadow-[0_0_10px_rgba(39,174,96,0.3)] text-white")}
                           onClick={() => handleJoinGame(t)}
                         >
-                          <Play className="mr-2 w-4 h-4 fill-current" /> {isParticipant ? "Enter Game" : "Join Game"}
+                          <Play className="mr-2 w-4 h-4 fill-current" /> {isParticipant ? "ENTER GAME" : "JOIN GAME"}
                         </Button>
-                      </CardContent>
-                    </Card>
+                      </div>
+                    </div>
                   );
                 })}
               </div>
             ) : (
-              <Card className="bg-muted/30 border-dashed">
-                <CardContent className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+              <div className="bg-muted/30 border-2 border-dashed border-border/50 rounded-2xl">
+                <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
                   <Activity className="w-12 h-12 mb-4 opacity-20" />
-                  <p>No ongoing games found.</p>
-                </CardContent>
-              </Card>
+                  <p className="text-label-caps">NO ONGOING GAMES FOUND</p>
+                </div>
+              </div>
             )}
           </div>
 
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-muted" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-4 text-muted-foreground font-semibold">Or</span>
-            </div>
-          </div>
-
-          <Card className="max-w-md mx-auto bg-card/60 backdrop-blur shadow-2xl border-primary/20">
-            <CardHeader>
-              <CardTitle>Start New Tournament</CardTitle>
-              <CardDescription>Initialize your own global trading simulation.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div>
-                <label className="text-sm font-semibold mb-2 block">Starting Cash (PKR)</label>
-                <input
-                  type="number"
-                  value={startingCash}
-                  onChange={e => setStartingCash(Number(e.target.value))}
-                  className="w-full bg-background border px-3 py-2 rounded focus:ring-2 ring-primary outline-none"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-semibold mb-2 block">Simulation Speed</label>
-                <div className="flex bg-muted rounded-md p-1">
-                  <button
-                    onClick={() => setSpeed("normal")}
-                    className={cn("flex-1 py-1.5 text-sm rounded transition", speed === "normal" ? "bg-background shadow font-semibold" : "opacity-70")}
-                  >
-                    Normal (60 mins)
-                  </button>
-                  <button
-                    onClick={() => setSpeed("fast")}
-                    className={cn("flex-1 py-1.5 text-sm rounded transition", speed === "fast" ? "bg-background shadow font-semibold text-primary" : "opacity-70")}
-                  >
-                    Fast (5 mins)
-                  </button>
+          {user?.role === 'ADMIN' && (
+            <>
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-muted" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-4 text-muted-foreground font-semibold">Or</span>
                 </div>
               </div>
-              <Button size="lg" className="w-full font-semibold" onClick={startTournament}>
-                <Play className="mr-2 w-5 h-5 fill-current" /> Initialize Global Tournament
-              </Button>
-            </CardContent>
-          </Card>
+
+              <div className="bg-card/60 backdrop-blur shadow-2xl border border-primary/20 rounded-2xl max-w-md mx-auto p-6">
+                <div className="mb-6">
+                  <h3 className="text-2xl font-bold mb-2">Start New Tournament</h3>
+                  <p className="text-sm text-muted-foreground">Initialize your own global trading simulation.</p>
+                </div>
+                <div className="space-y-6">
+                  <div>
+                    <label className="text-label-caps mb-3 block text-muted-foreground">STARTING CASH (PKR)</label>
+                    <input
+                      type="number"
+                      value={startingCash}
+                      onChange={e => setStartingCash(Number(e.target.value))}
+                      className="w-full bg-muted border-b-2 border-border border-x-0 border-t-0 px-3 py-2 focus:ring-0 focus:border-primary outline-none font-mono text-lg rounded-t-md rounded-b-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-label-caps mb-3 block text-muted-foreground">SIMULATION SPEED</label>
+                    <div className="flex bg-muted rounded-md p-1">
+                      <button
+                        onClick={() => setSpeed("normal")}
+                        className={cn("flex-1 py-2 text-label-caps rounded transition-colors", speed === "normal" ? "bg-background shadow font-bold text-primary" : "text-muted-foreground hover:text-foreground")}
+                      >
+                        NORMAL (1M = 60m)
+                      </button>
+                      <button
+                        onClick={() => setSpeed("fast")}
+                        className={cn("flex-1 py-2 text-label-caps rounded transition-colors", speed === "fast" ? "bg-background shadow font-bold text-primary" : "text-muted-foreground hover:text-foreground")}
+                      >
+                        FAST (1M = 5m)
+                      </button>
+                    </div>
+                  </div>
+                  <Button size="lg" className="w-full text-label-caps hover:bg-[#5a9aff] shadow-[0_0_12px_rgba(74,142,255,0.4)]" onClick={startTournament}>
+                    <Play className="mr-2 w-4 h-4 fill-current" /> INITIALIZE GLOBAL TOURNAMENT
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
 
         </div>
       </AppShell>
@@ -468,6 +543,19 @@ export default function OraclePage() {
             </div>
           </Card>
 
+          {analysis && (
+            <Card className="border-4 border-primary/20 bg-card overflow-hidden">
+              <div className="bg-muted px-6 py-4 flex items-center justify-between border-b">
+                <div className="flex items-center gap-2 font-bold text-lg">
+                  <Briefcase className="w-5 h-5 text-primary" /> AI Performance Analysis
+                </div>
+              </div>
+              <div className="p-6 prose prose-invert max-w-none text-foreground/90 whitespace-pre-wrap leading-relaxed">
+                {analysis}
+              </div>
+            </Card>
+          )}
+
           <div className="flex justify-center">
             <Button size="lg" variant="outline" onClick={handleRestart}>
               Return To Lobby
@@ -481,65 +569,130 @@ export default function OraclePage() {
   // Active Simulation View
   return (
     <AppShell>
-      <PageHeader
-        title="Tournament Oracle"
-        description="Global 1-Hour Real-Time Market Competition"
-      />
+      <div className="py-8 flex justify-between items-center border-b border-border/50">
+        <div>
+          <h1 className="text-4xl font-bold tracking-tighter text-primary">ORACLE_NO</h1>
+          <p className="text-sm text-muted-foreground font-mono tracking-widest uppercase mt-1">SIMULATION ACTIVE</p>
+        </div>
+        <div className="flex items-center gap-4">
+          <NeonIndicator className="bg-emerald-500" />
+          <span className="text-label-caps text-emerald-500 font-bold tracking-widest">LIVE CONNECTION</span>
+        </div>
+      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mt-6">
+      <div className="flex flex-col gap-6 mt-6">
 
-        {/* Left Col: Chart & Terminals */}
-        <div className="col-span-1 lg:col-span-3 space-y-6">
-          <Card className="border-2 border-primary/20 shadow-xl shadow-primary/5 bg-card/95">
-            <CardHeader className="flex flex-col sm:flex-row sm:justify-between items-start sm:items-center bg-muted/40 pb-4 border-b">
-              <div className="mb-4 sm:mb-0">
-                <CardTitle className="flex items-center gap-2 text-xl">
-                  <Activity className="text-primary w-5 h-5 animate-pulse" /> Live Performance View
-                </CardTitle>
-                <CardDescription>Tracking percentage change from Minute 1 | Time remaining: {60 - tickMinute} mins</CardDescription>
-              </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                {STOCKS.map((s, idx) => {
-                  const startPrice = priceHistory[0]?.[s] || 0;
-                  const curPrice = currentPrices[s] || 0;
-                  const pctChange = startPrice ? (((curPrice - startPrice) / startPrice) * 100) : 0;
-                  return (
-                    <Badge key={s} variant="outline" className="px-2 py-1 flex items-center gap-1" style={{ borderColor: COLORS[idx] }}>
-                      <span style={{ color: COLORS[idx] }} className="font-bold">{s}</span>
-                      <span className="text-muted-foreground">{currentPrices[s] ? formatDecimal(currentPrices[s]) : "---"}</span>
-                      <span className={cn("text-xs ml-1", pctChange >= 0 ? "text-emerald-400" : "text-red-400")}>
-                        ({pctChange > 0 ? '+' : ''}{pctChange.toFixed(2)}%)
-                      </span>
-                    </Badge>
-                  );
-                })}
-              </div>
-            </CardHeader>
-            <CardContent className="pt-6 relative">
-              <PercentageChart history={priceHistory} currentMinute={tickMinute} />
-            </CardContent>
-          </Card>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card className="bg-card/50 shadow-lg relative overflow-hidden">
-              <div className="absolute top-0 right-0 p-4">
-                <div className="text-right">
-                  <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Available Cash</p>
-                  <p className="text-xl font-bold text-emerald-500">{formatDecimal(portfolio.balance)}</p>
+        {/* Top Section: Charts & Leaderboard */}
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Left Col: Charts */}
+          <div className="col-span-1 lg:col-span-3 space-y-6">
+            <div className="border border-primary bg-card rounded-2xl overflow-hidden shadow-[0_0_20px_rgba(74,142,255,0.15)] flex flex-col">
+              <div className="flex flex-col sm:flex-row sm:justify-between items-start sm:items-center bg-muted/40 p-6 border-b border-border/50">
+                <div className="mb-4 sm:mb-0">
+                  <h2 className="flex items-center gap-3 text-label-caps mb-2 text-foreground">
+                    <Activity className="text-primary w-5 h-5 animate-pulse" /> LIVE PERFORMANCE
+                  </h2>
+                  <p className="text-xs text-muted-foreground font-mono">TIME REMAINING: {30 - tickDay} DAYS</p>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {STOCKS.map((s, idx) => {
+                    const startPrice = priceHistory[0]?.[s] || 0;
+                    const curPrice = currentPrices[s] || 0;
+                    const pctChange = startPrice ? (((curPrice - startPrice) / startPrice) * 100) : 0;
+                    return (
+                      <div key={s} className="px-3 py-1.5 flex items-center gap-2 rounded-lg border border-border bg-background">
+                        <span style={{ color: COLORS[idx] }} className="text-label-caps font-bold">{s}</span>
+                        <span className="text-muted-foreground font-mono text-sm">{currentPrices[s] ? formatDecimal(currentPrices[s]) : "---"}</span>
+                        <span className={cn("text-xs font-mono font-bold ml-1", pctChange >= 0 ? "text-[#27ae60]" : "text-[#eb5757]")}>
+                          ({pctChange > 0 ? '+' : ''}{pctChange.toFixed(2)}%)
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 mb-2"><Radio className="w-5 h-5 text-primary" /> Trading Terminal</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+              <div className="p-6 relative flex flex-col gap-8 flex-1">
+                <div className="w-full relative min-h-[280px]">
+                  <div className="absolute -top-4 left-0 z-10 px-3 py-1 bg-background border-none">
+                    <h3 className="text-label-caps text-foreground flex items-center gap-2">
+                       <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: "#3b82f6" }}></span> KSE 100 BENCHMARK
+                    </h3>
+                  </div>
+                  <PercentageChart history={priceHistory} stocksToRender={["PSX"]} colors={["#3b82f6"]} />
+                </div>
+                
+                <div className="w-full h-[1px] bg-border/50"></div>
+
+                <div className="w-full relative min-h-[280px]">
+                  <div className="absolute -top-4 left-0 z-10 px-3 py-1 bg-background border-none">
+                    <h3 className="text-label-caps text-foreground">COMPONENT STOCKS</h3>
+                  </div>
+                  <PercentageChart history={priceHistory} stocksToRender={["HBL", "UBL", "MCB", "HUBC", "FFC"]} colors={["#10b981", "#f59e0b", "#eb5757", "#8b5cf6", "#ec4899"]} />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Col: Leaderboard */}
+          <div className="col-span-1 flex flex-col gap-6">
+            <div className="flex-1 flex flex-col overflow-hidden max-h-[660px] bg-secondary rounded-2xl border-none">
+              <div className="bg-muted px-6 py-4 border-b border-border/50 flex items-center justify-between">
+                <div className="flex items-center gap-2 text-label-caps">
+                  <Users className="w-4 h-4 text-primary" /> LEADERBOARD
+                </div>
+                <Badge variant="secondary" className="font-mono bg-primary/10 text-primary border-none text-[10px]">{leaderboard.length} PLAYERS</Badge>
+              </div>
+              <div className="divide-y divide-border/30 overflow-y-auto flex-1">
+                {leaderboard.length === 0 ? (
+                  <p className="p-8 text-center text-muted-foreground text-label-caps">WAITING FOR PLAYERS...</p>
+                ) : (
+                  leaderboard.map((entry) => (
+                    <div key={entry.userId} className={cn(
+                      "p-5 flex flex-col gap-2 transition-colors relative",
+                      entry.userId === user?.id ? "bg-primary/10 border-l-4 border-primary" : "hover:bg-muted/30 border-l-4 border-transparent"
+                    )}>
+                      <div className="flex justify-between items-center">
+                        <span className="font-bold text-foreground">#{entry.rank} {entry.username} {entry.userId === user?.id && <span className="text-primary ml-1">(YOU)</span>}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="text-label-caps text-muted-foreground">PNL</span>
+                        <span className={cn("font-bold font-mono text-sm tracking-tight", entry.pnl >= 0 ? "text-[#27ae60]" : "text-[#eb5757]")}>
+                          {entry.pnl > 0 ? "+" : ""}{formatDecimal(entry.pnl)}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+            <div className="flex justify-center pt-2">
+              <Button variant="ghost" size="sm" onClick={handleEndTournament} className="text-muted-foreground text-xs hover:text-red-500 transition-colors">Abort Simulation</Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom Section: Trading Panel & Huge News Feed */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pb-12">
+          
+          {/* Col 1: Terminal & Portfolio */}
+          <div className="col-span-1 space-y-6">
+            <div className="bg-card border border-primary/30 rounded-2xl overflow-hidden shadow-lg relative">
+              <div className="p-6 pb-2 border-b border-border/50 flex justify-between items-center">
+                <h3 className="flex items-center gap-3 text-label-caps"><Radio className="w-4 h-4 text-primary" /> TRADING TERMINAL</h3>
+                <div className="text-right">
+                  <p className="text-[10px] text-muted-foreground tracking-widest uppercase font-bold mb-1">AVAILABLE CASH</p>
+                  <p className="text-lg font-mono font-bold text-[#27ae60]">{formatDecimal(portfolio.balance)}</p>
+                </div>
+              </div>
+              <div className="p-6">
+                <div className="space-y-6">
+                  <div className="space-y-4">
                     <div className="space-y-2">
-                      <label className="text-sm font-semibold text-muted-foreground">Select Asset</label>
+                      <label className="text-label-caps text-muted-foreground block">SELECT ASSET</label>
                       <select
                         value={selectedStock}
                         onChange={e => setSelectedStock(e.target.value)}
-                        className="w-full bg-background border px-3 py-2 rounded-md outline-none focus:ring-2 focus:ring-primary/50 transition"
+                        className="w-full bg-muted border-b-2 border-border border-x-0 border-t-0 px-3 py-3 focus:ring-0 focus:border-primary outline-none text-lg font-bold rounded-t-md rounded-b-none transition-colors"
                       >
                         {STOCKS.filter(s => s !== "PSX").map(s => (
                           <option key={s} value={s}>{s}</option>
@@ -547,122 +700,98 @@ export default function OraclePage() {
                       </select>
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-semibold text-muted-foreground">Quantity</label>
+                      <label className="text-label-caps text-muted-foreground block">QUANTITY</label>
                       <input
                         type="number"
                         value={tradeQuantity}
                         min="1"
                         onChange={e => setTradeQuantity(Number(e.target.value))}
-                        className="w-full bg-background border px-3 py-2 rounded-md outline-none focus:ring-2 focus:ring-primary/50 transition font-mono"
+                        className="w-full bg-muted border-b-2 border-border border-x-0 border-t-0 px-3 py-3 focus:ring-0 focus:border-primary outline-none font-mono text-lg rounded-t-md rounded-b-none transition-colors"
                       />
                     </div>
                   </div>
-                  <div className="flex gap-3 pt-2">
-                    <Button className="flex-1 bg-emerald-600/90 hover:bg-emerald-600 font-bold tracking-wide" onClick={() => handleTrade("buy")}>BUY POSITION</Button>
-                    <Button className="flex-1 bg-red-600/90 hover:bg-red-600 font-bold tracking-wide" onClick={() => handleTrade("sell")}>SELL POSITION</Button>
+                  <div className="flex gap-4 pt-4">
+                    <Button className="flex-1 bg-[#27ae60] hover:bg-[#2ecc71] shadow-[0_0_12px_rgba(39,174,96,0.3)] text-white text-label-caps py-6" onClick={() => handleTrade("buy")}>BUY</Button>
+                    <Button className="flex-1 bg-[#eb5757] hover:bg-[#ff7675] shadow-[0_0_12px_rgba(235,87,87,0.3)] text-white text-label-caps py-6" onClick={() => handleTrade("sell")}>SELL</Button>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
 
-            <Card className="bg-card border-muted/60">
-              <CardHeader className="py-4 border-b bg-muted/20">
-                <CardTitle className="flex items-center gap-2 text-base"><Briefcase className="w-4 h-4 text-primary" /> Your Active Portfolio</CardTitle>
-              </CardHeader>
+            <div className="bg-secondary border-none rounded-2xl overflow-hidden">
+              <div className="py-5 px-6 border-b border-border/50 flex items-center gap-3">
+                <Briefcase className="w-4 h-4 text-primary" /> <span className="text-label-caps">ACTIVE PORTFOLIO</span>
+              </div>
               <div className="p-0 overflow-y-auto max-h-[220px]">
                 {portfolio.holdings.length === 0 ? (
-                  <p className="text-center p-6 text-muted-foreground text-sm flex flex-col items-center gap-2">
+                  <p className="text-center p-8 text-muted-foreground text-label-caps flex flex-col items-center gap-4">
                     <Activity className="w-8 h-8 opacity-20" />
-                    You have no stock holdings yet.
+                    NO HOLDINGS YET
                   </p>
                 ) : (
                   <table className="w-full text-sm">
-                    <thead className="bg-muted text-muted-foreground text-xs uppercase tracking-wider">
+                    <thead className="bg-muted text-muted-foreground text-label-caps">
                       <tr>
-                        <th className="text-left px-4 py-2 font-medium">Asset</th>
-                        <th className="text-right px-4 py-2 font-medium">Qty</th>
-                        <th className="text-right px-4 py-2 font-medium">Avg Price</th>
+                        <th className="text-left px-6 py-3 font-bold">ASSET</th>
+                        <th className="text-right px-6 py-3 font-bold">QTY</th>
+                        <th className="text-right px-6 py-3 font-bold">AVG PRICE</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y">
+                    <tbody className="divide-y divide-border/50">
                       {portfolio.holdings.map(h => (
                         <tr key={h.stockSymbol} className="hover:bg-muted/30">
-                          <td className="px-4 py-2.5 font-bold transition-colors">{h.stockSymbol}</td>
-                          <td className="px-4 py-2.5 text-right font-mono">{h.quantity}</td>
-                          <td className="px-4 py-2.5 text-right font-mono">{formatDecimal(h.avgPrice)}</td>
+                          <td className="px-6 py-4 font-bold text-lg">{h.stockSymbol}</td>
+                          <td className="px-6 py-4 text-right font-mono text-base">{h.quantity}</td>
+                          <td className="px-6 py-4 text-right font-mono text-base text-primary">{formatDecimal(h.avgPrice)}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 )}
               </div>
-            </Card>
+            </div>
           </div>
-        </div>
 
-        {/* Right Col: Leaderboard & News */}
-        <div className="col-span-1 flex flex-col gap-6">
-          <Card className="flex-1 flex flex-col overflow-hidden max-h-[400px]">
-            <div className="bg-muted px-4 py-3 border-b flex items-center justify-between font-semibold">
-              <div className="flex items-center gap-2">
-                <Users className="w-4 h-4 text-primary" /> Leaderboard
+          {/* Col 2 & 3: Giant Live Market Feed */}
+          <div className="col-span-1 lg:col-span-2 flex flex-col">
+            <div className="flex-1 flex flex-col bg-card rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.2)] border border-transparent hover:border-primary/20 transition-colors overflow-hidden min-h-[500px]">
+              <div className="bg-muted px-6 py-5 border-b border-border/50 flex items-center justify-between">
+                <div className="flex items-center gap-3 text-label-caps text-foreground">
+                  <Radio className="w-5 h-5 text-primary animate-pulse" /> LIVE MARKET FEED
+                </div>
+                <Badge variant="secondary" className="bg-primary/10 text-primary border-none font-mono text-[10px]">{news.length} UPDATES</Badge>
               </div>
-              <Badge variant="secondary" className="text-xs">{leaderboard.length} Players</Badge>
-            </div>
-            <div className="divide-y overflow-y-auto flex-1">
-              {leaderboard.length === 0 ? (
-                <p className="p-6 text-center text-muted-foreground text-sm">Waiting for players...</p>
-              ) : (
-                leaderboard.map((entry, idx) => (
-                  <div key={entry.userId} className={cn(
-                    "p-4 flex flex-col gap-1 transition-colors relative",
-                    entry.userId === user?.id ? "bg-primary/10" : "hover:bg-muted/50"
-                  )}>
-                    {idx === 0 && <div className="absolute top-0 right-0 w-1 h-full bg-emerald-500" />}
-                    <div className="flex justify-between items-center">
-                      <span className="font-semibold text-sm">#{entry.rank} {entry.username} {entry.userId === user?.id && <span className="text-primary">(You)</span>}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-muted-foreground text-xs font-mono">PNL</span>
-                      <span className={cn("font-bold font-mono tracking-tight", entry.pnl >= 0 ? "text-emerald-500" : "text-red-500")}>
-                        {entry.pnl > 0 ? "+" : ""}{formatDecimal(entry.pnl)}
-                      </span>
-                    </div>
+              <div className="flex-1 p-6 space-y-6 bg-background overflow-y-auto" style={{ maxHeight: '420px' }}>
+                {news.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center pt-16 text-muted-foreground">
+                     <Activity className="w-12 h-12 mb-6 opacity-20" />
+                     <p className="text-label-caps">AWAITING MARKET EVENTS...</p>
                   </div>
-                ))
-              )}
-            </div>
-          </Card>
-
-          <Card className="flex-1 flex flex-col overflow-hidden max-h-[300px]">
-            <div className="bg-muted px-4 py-3 border-b flex items-center gap-2 font-semibold shadow-sm z-10">
-              <Newspaper className="w-4 h-4 text-primary" /> Live Market Feed
-            </div>
-            <div className="overflow-y-auto flex-1 p-3 space-y-3 bg-muted/10">
-              {news.length === 0 ? (
-                <p className="text-center text-muted-foreground text-sm my-4">Awaiting market news...</p>
-              ) : (
-                news.map((item, idx) => (
-                  <div key={idx} className="bg-background border rounded-lg p-3 text-sm shadow-sm animate-in slide-in-from-left-2 fade-in duration-300">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-xs font-mono font-bold text-muted-foreground">MIN {item.minute}</span>
-                      <Badge variant="outline" className={cn(
-                        "text-[10px] uppercase px-1.5 py-0 h-4 border",
-                        item.sentiment === 'positive' && "bg-emerald-500/10 text-emerald-500 border-emerald-500/50",
-                        item.sentiment === 'negative' && "bg-red-500/10 text-red-500 border-red-500/50",
-                      )}>{item.sentiment}</Badge>
+                ) : (
+                  news.map((item, idx) => (
+                    <div key={idx} className="bg-secondary border border-transparent hover:border-primary/30 rounded-xl p-6 transition-all">
+                      <div className="flex justify-between items-start mb-4">
+                        <div className="flex items-center gap-3">
+                          <Badge variant="secondary" className="font-mono text-[10px] font-bold text-muted-foreground bg-muted px-2 py-0.5 border-none">DAY {item.day}</Badge>
+                          <Badge variant="outline" className={cn(
+                            "text-[10px] tracking-widest font-bold border-none",
+                            item.sentiment === 'positive' && "bg-[#27ae60]/10 text-[#27ae60]",
+                            item.sentiment === 'negative' && "bg-[#eb5757]/10 text-[#eb5757]",
+                            item.sentiment === 'neutral' && "bg-slate-500/10 text-slate-500"
+                          )}>{item.sentiment.toUpperCase()}</Badge>
+                        </div>
+                      </div>
+                      <p className="text-xl font-medium leading-relaxed text-foreground tracking-tight">
+                        {item.headline}
+                      </p>
                     </div>
-                    <p className="font-medium leading-snug">{item.headline}</p>
-                  </div>
-                ))
-              )}
-              <div ref={newsEndRef} />
+                  ))
+                )}
+                <div ref={newsEndRef} />
+              </div>
             </div>
-          </Card>
-
-          <div className="flex justify-center pt-2">
-            <Button variant="ghost" size="sm" onClick={handleEndTournament} className="text-muted-foreground text-xs hover:text-red-500 transition-colors">Abort Simulation</Button>
           </div>
+
         </div>
 
       </div>

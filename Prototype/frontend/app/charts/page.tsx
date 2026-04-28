@@ -6,7 +6,7 @@ import { createChart, IChartApi, ISeriesApi, UTCTimestamp, ColorType, CrosshairM
 import { Activity, Building2, LineChart, Plus, Minus, TrendingUp, TrendingDown } from "lucide-react";
 import { AppShell } from "@/components/layout";
 import { PageHeader } from "@/components/common";
-import { Card, CardContent } from "@/components/ui/card";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -78,7 +78,9 @@ interface PortfolioData {
 }
 
 const isLocalhost = typeof window !== 'undefined' && window.location.hostname === 'localhost';
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || (isLocalhost ? 'http://localhost:3001/api' : '/api');
+
+// WS_URL must point to the socket server root (no /api prefix — Socket.IO namespaces are separate from REST routes)
+const WS_URL = process.env.NEXT_PUBLIC_WS_URL || (isLocalhost ? 'http://localhost:3001' : 'https://tradeup-syai.onrender.com');
 const CANDLE_INTERVAL = 1 * 60 * 1000;
 const MARKET_CLOSED_TIMEOUT = 5000;
 
@@ -474,7 +476,7 @@ export default function Charts() {
       socketRef.current.close();
     }
 
-    const socket: Socket = io(`${API_BASE_URL}/ws`, {
+    const socket: Socket = io(`${WS_URL}/ws`, {
       withCredentials: true,
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
@@ -756,50 +758,47 @@ export default function Charts() {
         {/* Top Header Banner */}
         <div className="flex flex-col gap-4">
           <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold tracking-tight">{stock}</h1>
-            <Badge variant="secondary" className="font-mono bg-muted/50 rounded-sm">REG</Badge>
+            <h1 className="text-label-caps text-4xl">{stock}</h1>
+            <Badge variant="secondary" className="font-mono bg-muted/50 rounded-sm border-none tracking-widest text-[10px]">REGULAR MARKET</Badge>
           </div>
 
           <div className="flex flex-col sm:flex-row items-baseline gap-6 border-b border-border pb-6">
-            <div className="flex items-baseline gap-3">
-              <span className="text-4xl font-semibold tabular-nums tracking-tight">
+            <div className="flex items-baseline gap-4">
+              <span className="text-5xl font-bold font-mono text-primary">
                 {currentPrice > 0 ? formatDecimal(currentPrice) : '---'}
               </span>
               <div className="flex items-center gap-2">
-                <Badge
-                  variant="outline"
-                  className={cn(
-                    "font-mono rounded-sm border-transparent px-2 py-0.5 text-sm",
-                    isPositive ? "bg-emerald-500/10 text-emerald-500" : "bg-rose-500/10 text-rose-500"
-                  )}
-                >
-                  {formatPercent(changePct)}
-                </Badge>
                 <span className={cn(
-                  "text-sm font-medium tabular-nums",
-                  isPositive ? "text-emerald-500" : "text-rose-500"
+                  "text-2xl font-bold font-mono",
+                  isPositive ? "text-[#6fcf97]" : "text-[#eb5757]"
                 )}>
                   {isPositive ? '+' : ''}{formatDecimal(changeAmt)}
+                </span>
+                <span className={cn(
+                  "text-xl font-bold font-mono px-3 py-1 rounded-sm",
+                  isPositive ? "bg-[#6fcf97]/10 text-[#6fcf97]" : "bg-[#eb5757]/10 text-[#eb5757]"
+                )}>
+                  {formatPercent(changePct)}
                 </span>
               </div>
             </div>
 
             <div className="flex flex-wrap gap-8 sm:ml-auto">
-              <div>
-                <p className="text-xs text-muted-foreground font-medium mb-1 uppercase tracking-wider">24h High</p>
-                <p className="font-mono text-sm">{high24h > 0 ? formatDecimal(high24h) : '---'}</p>
+              <div className="flex flex-col gap-1">
+                <p className="text-label-caps text-muted-foreground">24H HIGH</p>
+                <p className="font-mono font-bold text-lg">{high24h > 0 ? formatDecimal(high24h) : '---'}</p>
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground font-medium mb-1 uppercase tracking-wider">24h Low</p>
-                <p className="font-mono text-sm">{low24h > 0 ? formatDecimal(low24h) : '---'}</p>
+              <div className="flex flex-col gap-1">
+                <p className="text-label-caps text-muted-foreground">24H LOW</p>
+                <p className="font-mono font-bold text-lg">{low24h > 0 ? formatDecimal(low24h) : '---'}</p>
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground font-medium mb-1 uppercase tracking-wider">24h Vol</p>
-                <p className="font-mono text-sm">{vol24h > 0 ? formatVolume(vol24h) : '---'}</p>
+              <div className="flex flex-col gap-1">
+                <p className="text-label-caps text-muted-foreground">24H VOLUME</p>
+                <p className="font-mono font-bold text-lg">{vol24h > 0 ? formatVolume(vol24h) : '---'}</p>
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground font-medium mb-1 uppercase tracking-wider">24h Value</p>
-                <p className="font-mono text-sm">{value24h > 0 ? formatVolume(value24h) : '---'}</p>
+              <div className="flex flex-col gap-1">
+                <p className="text-label-caps text-muted-foreground">24H VALUE</p>
+                <p className="font-mono font-bold text-lg">{value24h > 0 ? formatVolume(value24h) : '---'}</p>
               </div>
             </div>
           </div>
@@ -807,53 +806,48 @@ export default function Charts() {
 
         {/* Navigation Blocks */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card
+          <div
             className={cn(
-              "cursor-pointer transition-colors hover:bg-muted/50",
-              activeModule === 'chart' ? "border-primary shadow-sm" : "border-transparent bg-secondary/30"
+              "cursor-pointer transition-colors rounded-2xl p-6 flex flex-col items-center justify-center gap-2",
+              activeModule === 'chart' ? "bg-primary/20 border-2 border-primary" : "bg-secondary border-2 border-transparent hover:border-primary/50"
             )}
             onClick={() => setActiveModule('chart')}
           >
-            <CardContent className="flex flex-col items-center justify-center p-6 gap-2">
-              <LineChart className={cn("h-6 w-6", activeModule === 'chart' ? "text-primary" : "text-muted-foreground")} />
-              <div className="text-center">
-                <p className={cn("font-medium", activeModule === 'chart' ? "text-foreground" : "text-muted-foreground")}>Chart</p>
-                <p className="text-xs text-muted-foreground">{timeframe} Timeframe</p>
-              </div>
-            </CardContent>
-          </Card>
+            <LineChart className={cn("h-6 w-6", activeModule === 'chart' ? "text-primary" : "text-muted-foreground")} />
+            <div className="text-center">
+              <p className={cn("text-label-caps", activeModule === 'chart' ? "text-primary-foreground" : "text-foreground")}>CHART</p>
+              <p className="text-xs font-mono text-muted-foreground">{timeframe} TIMEFRAME</p>
+            </div>
+          </div>
 
-          <Card
+          <div
             className={cn(
-              "cursor-pointer transition-colors hover:bg-muted/50",
-              activeModule === 'company' ? "border-primary shadow-sm" : "border-transparent bg-secondary/30"
+              "cursor-pointer transition-colors rounded-2xl p-6 flex flex-col items-center justify-center gap-2",
+              activeModule === 'company' ? "bg-primary/20 border-2 border-primary" : "bg-secondary border-2 border-transparent hover:border-primary/50"
             )}
             onClick={() => setActiveModule('company')}
           >
-            <CardContent className="flex flex-col items-center justify-center p-6 gap-2">
-              <Building2 className={cn("h-6 w-6", activeModule === 'company' ? "text-primary" : "text-muted-foreground")} />
-              <div className="text-center">
-                <p className={cn("font-medium", activeModule === 'company' ? "text-foreground" : "text-muted-foreground")}>Company</p>
-                <p className="text-xs text-muted-foreground">Profile Available</p>
-              </div>
-            </CardContent>
-          </Card>
+            <Building2 className={cn("h-6 w-6", activeModule === 'company' ? "text-primary" : "text-muted-foreground")} />
+            <div className="text-center">
+              <p className={cn("text-label-caps", activeModule === 'company' ? "text-primary-foreground" : "text-foreground")}>COMPANY</p>
+              <p className="text-xs font-mono text-muted-foreground">PROFILE AVAILABLE</p>
+            </div>
+          </div>
 
           {/* Buy Card */}
-          <Card className="border-emerald-500/20 bg-emerald-500/5 transition-colors hover:bg-emerald-500/10">
-            <CardContent className="flex flex-col items-center justify-between p-4 h-full gap-3">
+          <div className="bg-[#27ae60]/10 rounded-2xl transition-colors hover:bg-[#27ae60]/20 flex flex-col justify-between p-4 gap-3">
               <div className="flex flex-col w-full gap-2 mb-1">
                 <div className="flex items-center w-full justify-between">
-                  <span className="font-semibold text-emerald-500 flex items-center gap-1">
-                    <TrendingUp className="w-4 h-4" /> Buy {stock}
+                  <span className="text-label-caps text-[#27ae60] flex items-center gap-1">
+                    <TrendingUp className="w-4 h-4" /> BUY {stock}
                   </span>
-                  <Badge variant="outline" className="text-emerald-500 border-emerald-500/30 bg-emerald-500/10 text-[10px] px-1.5 font-mono">
+                  <span className="text-xs font-mono text-[#27ae60] font-bold">
                     {currentPrice > 0 ? formatDecimal(currentPrice) : '---'}
-                  </Badge>
+                  </span>
                 </div>
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>Buying Power</span>
-                  <span className="font-mono text-emerald-500">PKR {portfolioData ? formatDecimal(parseFloat(portfolioData.balance)) : '---'}</span>
+                  <span className="text-label-caps">BUYING POWER</span>
+                  <span className="font-mono text-[#27ae60] font-bold">PKR {portfolioData ? formatDecimal(parseFloat(portfolioData.balance)) : '---'}</span>
                 </div>
               </div>
 
@@ -861,7 +855,7 @@ export default function Charts() {
                 <Button
                   variant="outline"
                   size="icon"
-                  className="h-8 w-8 border-emerald-500/30 text-emerald-500 hover:bg-emerald-500 hover:text-white transition-colors"
+                  className="h-8 w-8 border-[#27ae60]/30 text-[#27ae60] hover:bg-[#27ae60] hover:text-white transition-colors bg-transparent"
                   onClick={() => setBuyQuantity(Math.max(1, buyQuantity - 1))}
                 >
                   <Minus className="h-3 w-3" />
@@ -871,12 +865,12 @@ export default function Charts() {
                   min={1}
                   value={buyQuantity}
                   onChange={(e) => setBuyQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                  className="h-8 text-center font-mono border-emerald-500/30 focus-visible:ring-emerald-500"
+                  className="h-8 text-center font-mono border-none bg-background focus-visible:ring-1 focus-visible:ring-[#27ae60]"
                 />
                 <Button
                   variant="outline"
                   size="icon"
-                  className="h-8 w-8 border-emerald-500/30 text-emerald-500 hover:bg-emerald-500 hover:text-white transition-colors"
+                  className="h-8 w-8 border-[#27ae60]/30 text-[#27ae60] hover:bg-[#27ae60] hover:text-white transition-colors bg-transparent"
                   onClick={() => setBuyQuantity(buyQuantity + 1)}
                 >
                   <Plus className="h-3 w-3" />
@@ -884,37 +878,35 @@ export default function Charts() {
               </div>
 
               <Button
-                className="w-full h-8 bg-emerald-500 hover:bg-emerald-600 text-white font-medium shadow-none transition-colors"
+                className="w-full h-8 bg-[#27ae60] hover:bg-[#2ecc71] text-white text-label-caps shadow-[0_0_10px_rgba(39,174,96,0.3)] transition-all"
                 onClick={handleBuySubmit}
                 disabled={isSubmittingBuy}
               >
-                {isSubmittingBuy ? "Processing..." : "Execute Buy"}
+                {isSubmittingBuy ? "PROCESSING..." : "EXECUTE BUY"}
               </Button>
-            </CardContent>
-          </Card>
+          </div>
 
           {/* Sell Card */}
-          <Card className="border-rose-500/20 bg-rose-500/5 transition-colors hover:bg-rose-500/10">
-            <CardContent className="flex flex-col items-center justify-between p-4 h-full gap-3">
+          <div className="bg-[#eb5757]/10 rounded-2xl transition-colors hover:bg-[#eb5757]/20 flex flex-col justify-between p-4 gap-3">
               <div className="flex flex-col w-full gap-2 mb-1">
                 <div className="flex items-center w-full justify-between">
-                  <span className="font-semibold text-rose-500 flex items-center gap-1">
-                    <TrendingDown className="w-4 h-4" /> Sell {stock}
+                  <span className="text-label-caps text-[#eb5757] flex items-center gap-1">
+                    <TrendingDown className="w-4 h-4" /> SELL {stock}
                   </span>
-                  <Badge variant="outline" className="text-rose-500 border-rose-500/30 bg-rose-500/10 text-[10px] px-1.5 font-mono">
+                  <span className="text-xs font-mono text-[#eb5757] font-bold">
                     {currentPrice > 0 ? formatDecimal(currentPrice) : '---'}
-                  </Badge>
+                  </span>
                 </div>
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>Available</span>
+                  <span className="text-label-caps">AVAILABLE</span>
                   <button
                     onClick={() => {
                       const avail = portfolioData?.portfolio.find(p => p.symbol === stock)?.quantity || 0;
                       if (avail > 0) setSellQuantity(avail);
                     }}
-                    className="font-mono text-rose-500 hover:underline transition-all"
+                    className="font-mono text-[#eb5757] hover:underline transition-all font-bold"
                   >
-                    {portfolioData?.portfolio.find(p => p.symbol === stock)?.quantity || 0} Shares
+                    {portfolioData?.portfolio.find(p => p.symbol === stock)?.quantity || 0} SHARES
                   </button>
                 </div>
               </div>
@@ -923,7 +915,7 @@ export default function Charts() {
                 <Button
                   variant="outline"
                   size="icon"
-                  className="h-8 w-8 border-rose-500/30 text-rose-500 hover:bg-rose-500 hover:text-white transition-colors"
+                  className="h-8 w-8 border-[#eb5757]/30 text-[#eb5757] hover:bg-[#eb5757] hover:text-white transition-colors bg-transparent"
                   onClick={() => setSellQuantity(Math.max(1, sellQuantity - 1))}
                 >
                   <Minus className="h-3 w-3" />
@@ -933,12 +925,12 @@ export default function Charts() {
                   min={1}
                   value={sellQuantity}
                   onChange={(e) => setSellQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                  className="h-8 text-center font-mono border-rose-500/30 focus-visible:ring-rose-500"
+                  className="h-8 text-center font-mono border-none bg-background focus-visible:ring-1 focus-visible:ring-[#eb5757]"
                 />
                 <Button
                   variant="outline"
                   size="icon"
-                  className="h-8 w-8 border-rose-500/30 text-rose-500 hover:bg-rose-500 hover:text-white transition-colors"
+                  className="h-8 w-8 border-[#eb5757]/30 text-[#eb5757] hover:bg-[#eb5757] hover:text-white transition-colors bg-transparent"
                   onClick={() => setSellQuantity(sellQuantity + 1)}
                 >
                   <Plus className="h-3 w-3" />
@@ -946,7 +938,7 @@ export default function Charts() {
               </div>
 
               <Button
-                className="w-full h-8 bg-rose-500 hover:bg-rose-600 text-white font-medium shadow-none transition-colors"
+                className="w-full h-8 bg-[#eb5757] hover:bg-[#ff7675] text-white text-label-caps shadow-[0_0_10px_rgba(235,87,87,0.3)] transition-all"
                 onClick={() => {
                   setSellReason(null);
                   setSellNote('');
@@ -954,10 +946,9 @@ export default function Charts() {
                 }}
                 disabled={isSubmittingSell}
               >
-                Sell
+                EXECUTE SELL
               </Button>
-            </CardContent>
-          </Card>
+          </div>
 
           {/* Sell Confirmation & Journaling Dialog */}
           <Dialog open={sellDialogOpen} onOpenChange={setSellDialogOpen}>
@@ -994,19 +985,19 @@ export default function Charts() {
         </div>
 
         {/* Main Content Area */}
-        <Card className={cn("flex flex-col overflow-hidden border-border bg-card", activeModule !== 'chart' && "hidden")}>
+        <div className={cn("flex flex-col overflow-hidden bg-secondary rounded-2xl", activeModule !== 'chart' && "hidden")}>
           {/* Chart Toolbar */}
-          <div className="flex items-center justify-between p-2 border-b border-border/50 bg-secondary/20 overflow-x-auto">
-            <div className="flex items-center gap-1 shrink-0">
+          <div className="flex items-center justify-between p-4 border-b border-border/50 bg-background overflow-x-auto">
+            <div className="flex items-center gap-2 shrink-0">
               {TIMEFRAMES.map((tf) => (
                 <button
                   key={tf.value}
                   onClick={() => setTimeframe(tf.value)}
                   className={cn(
-                    "px-3 py-1.5 text-sm font-medium transition-colors rounded-md",
+                    "px-4 py-2 text-label-caps transition-colors rounded-lg",
                     timeframe === tf.value
-                      ? "text-primary bg-primary/10"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                      ? "text-primary bg-primary/10 border border-primary/20"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted border border-transparent"
                   )}
                 >
                   {tf.label}
@@ -1016,34 +1007,36 @@ export default function Charts() {
 
             <div className="flex items-center gap-4 shrink-0 mx-4">
               <div
-                className="flex items-center space-x-2 border-l border-border/50 pl-4"
+                className="flex items-center space-x-3 border-l border-border/50 pl-6"
                 title="Price above 50 SMA = short-term uptrend"
               >
                 <Checkbox
                   id="sma50"
                   checked={showSMA50}
                   onCheckedChange={(c: boolean | "indeterminate") => setShowSMA50(c === true)}
+                  className="border-blue-500 data-[state=checked]:bg-blue-500"
                 />
                 <label
                   htmlFor="sma50"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-blue-500 cursor-pointer"
+                  className="text-label-caps text-blue-500 cursor-pointer"
                 >
                   50 SMA
                 </label>
               </div>
 
               <div
-                className="flex items-center space-x-2"
+                className="flex items-center space-x-3"
                 title="200 SMA acts as a long-term baseline"
               >
                 <Checkbox
                   id="sma200"
                   checked={showSMA200}
                   onCheckedChange={(c: boolean | "indeterminate") => setShowSMA200(c === true)}
+                  className="border-orange-500 data-[state=checked]:bg-orange-500"
                 />
                 <label
                   htmlFor="sma200"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-orange-500 cursor-pointer"
+                  className="text-label-caps text-orange-500 cursor-pointer"
                 >
                   200 SMA
                 </label>
@@ -1052,102 +1045,94 @@ export default function Charts() {
           </div>
 
           {/* Chart Container */}
-          <CardContent className="p-0 relative">
+          <div className="p-0 relative">
             {isLoadingHistory && historicalData.length === 0 && (
-              <div className="absolute inset-0 z-10 flex flex-col gap-4 items-center justify-center bg-card/80 backdrop-blur-sm">
+              <div className="absolute inset-0 z-10 flex flex-col gap-4 items-center justify-center bg-background/80 backdrop-blur-sm">
                 <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-                <p className="text-muted-foreground font-medium">Loading chart data...</p>
+                <p className="text-label-caps text-muted-foreground">LOADING CHART DATA...</p>
               </div>
             )}
             <div
               ref={setChartContainerEl}
               className="w-full h-[500px]"
             />
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
         <div className={cn("flex flex-col gap-6", activeModule !== 'company' && "hidden")}>
           {isLoadingCompany ? (
-            <Card className="border-border">
-              <CardContent className="p-12 flex items-center justify-center text-muted-foreground flex-col gap-4">
-                <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-                <p>Loading company profile for {stock}...</p>
-              </CardContent>
-            </Card>
+            <div className="bg-secondary rounded-2xl p-12 flex items-center justify-center text-muted-foreground flex-col gap-4">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+              <p className="text-label-caps">LOADING PROFILE FOR {stock}...</p>
+            </div>
           ) : (
             <>
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Left Column: Description & People */}
                 <div className="lg:col-span-2 flex flex-col gap-6">
-                  <Card className="border-border">
-                    <CardContent className="p-6">
-                      <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                        <Building2 className="w-5 h-5 text-primary" />
-                        About {stock}
-                      </h2>
-                      {companyData ? (
-                        <p className="text-muted-foreground leading-relaxed text-sm">
-                          {companyData.businessDescription}
-                        </p>
-                      ) : (
-                        <p className="text-muted-foreground italic text-sm">No business description available.</p>
-                      )}
-                    </CardContent>
-                  </Card>
+                  <div className="bg-secondary rounded-2xl p-8">
+                    <h2 className="text-label-caps mb-6 flex items-center gap-2">
+                      <Building2 className="w-5 h-5 text-primary" />
+                      ABOUT {stock}
+                    </h2>
+                    {companyData ? (
+                      <p className="text-muted-foreground leading-relaxed text-sm">
+                        {companyData.businessDescription}
+                      </p>
+                    ) : (
+                      <p className="text-muted-foreground italic text-sm">No business description available.</p>
+                    )}
+                  </div>
 
-                  <Card className="border-border">
-                    <CardContent className="p-6">
-                      <h2 className="text-xl font-semibold mb-4">Executive Leadership</h2>
-                      {companyData?.keyPeople && companyData.keyPeople.length > 0 ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {companyData.keyPeople.map((person, idx) => (
-                            <div key={idx} className="flex flex-col p-3 bg-secondary/20 rounded-lg border border-border/50">
-                              <span className="font-medium text-foreground">{person.name}</span>
-                              <span className="text-xs text-muted-foreground mt-0.5">{person.position}</span>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-muted-foreground italic text-sm">Leadership details not available.</p>
-                      )}
-                    </CardContent>
-                  </Card>
+                  <div className="bg-secondary rounded-2xl p-8">
+                    <h2 className="text-label-caps mb-6">EXECUTIVE LEADERSHIP</h2>
+                    {companyData?.keyPeople && companyData.keyPeople.length > 0 ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {companyData.keyPeople.map((person, idx) => (
+                          <div key={idx} className="flex flex-col p-4 bg-background rounded-xl border-none">
+                            <span className="font-bold text-foreground">{person.name}</span>
+                            <span className="text-label-caps text-muted-foreground mt-1">{person.position}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-muted-foreground italic text-sm">Leadership details not available.</p>
+                    )}
+                  </div>
                 </div>
 
                 {/* Right Column: Fundamentals */}
                 <div className="flex flex-col gap-6">
-                  <Card className="border-border h-full">
-                    <CardContent className="p-6 flex flex-col h-full">
-                      <h2 className="text-xl font-semibold mb-4 line-clamp-1">Fundamentals</h2>
-                      {fundamentalsData ? (
-                        <div className="grid grid-cols-1 gap-y-4 flex-grow">
-                          <div className="flex justify-between items-center py-2 border-b border-border/50">
-                            <span className="text-sm text-muted-foreground">Market Cap</span>
-                            <span className="text-sm font-medium font-mono">{fundamentalsData.marketCap || '---'}</span>
-                          </div>
-                          <div className="flex justify-between items-center py-2 border-b border-border/50">
-                            <span className="text-sm text-muted-foreground">Outstanding Shares</span>
-                            <span className="text-sm font-medium font-mono">{companyData?.financialStats?.shares?.raw || '---'}</span>
-                          </div>
-                          <div className="flex justify-between items-center py-2 border-b border-border/50">
-                            <span className="text-sm text-muted-foreground">P/E Ratio</span>
-                            <span className="text-sm font-medium font-mono">
-                              {fundamentalsData.peRatio ? formatDecimal(fundamentalsData.peRatio) : '---'}
-                            </span>
-                          </div>
-                          <div className="flex justify-between items-center py-2">
-                            <span className="text-sm text-muted-foreground">Free Float</span>
-                            <span className="text-sm font-medium font-mono">{fundamentalsData.freeFloat || '---'}</span>
-                          </div>
+                  <div className="bg-secondary rounded-2xl p-8 h-full flex flex-col">
+                    <h2 className="text-label-caps mb-6">FUNDAMENTALS</h2>
+                    {fundamentalsData ? (
+                      <div className="grid grid-cols-1 gap-y-4 flex-grow">
+                        <div className="flex justify-between items-center py-3 border-b border-border/50">
+                          <span className="text-label-caps text-muted-foreground">MARKET CAP</span>
+                          <span className="text-sm font-bold font-mono">{fundamentalsData.marketCap || '---'}</span>
                         </div>
-                      ) : (
-                        <div className="flex flex-col items-center justify-center flex-grow text-muted-foreground gap-2">
-                          <Activity className="w-8 h-8 opacity-20" />
-                          <p className="text-sm italic">Fundamentals unavailable</p>
+                        <div className="flex justify-between items-center py-3 border-b border-border/50">
+                          <span className="text-label-caps text-muted-foreground">OUTSTANDING SHARES</span>
+                          <span className="text-sm font-bold font-mono">{companyData?.financialStats?.shares?.raw || '---'}</span>
                         </div>
-                      )}
-                    </CardContent>
-                  </Card>
+                        <div className="flex justify-between items-center py-3 border-b border-border/50">
+                          <span className="text-label-caps text-muted-foreground">P/E RATIO</span>
+                          <span className="text-sm font-bold font-mono">
+                            {fundamentalsData.peRatio ? formatDecimal(fundamentalsData.peRatio) : '---'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center py-3">
+                          <span className="text-label-caps text-muted-foreground">FREE FLOAT</span>
+                          <span className="text-sm font-bold font-mono">{fundamentalsData.freeFloat || '---'}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center flex-grow text-muted-foreground gap-4">
+                        <Activity className="w-8 h-8 opacity-20" />
+                        <p className="text-label-caps">FUNDAMENTALS UNAVAILABLE</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </>

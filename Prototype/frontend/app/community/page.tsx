@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import Image from "next/image";
 import { toast } from "sonner";
 import {
   MessageSquare,
@@ -26,7 +27,7 @@ import {
 import { useUser } from "@/context/UserContext";
 import { AppShell } from "@/components/layout";
 import { PageHeader, PageState, usePageState } from "@/components/common";
-import { MentionAutocomplete, MentionSuggestion } from "@/components/common/MentionAutocomplete";
+import { MentionAutocomplete } from "@/components/common/MentionAutocomplete";
 import { useMentions } from "@/hooks/useMentions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -60,9 +61,8 @@ import {
   blockUser,
   unblockUser,
   getBlockedUsers,
-  savePost,
+savePost,
   getSavedPosts,
-  isPostSaved,
   uploadCommunityImage,
 } from "@/lib/communityService";
 import type {
@@ -135,41 +135,68 @@ function getInitials(name: string | null, username: string): string {
 
 interface CommentItemProps {
   comment: PostComment;
+  postId: number;
   currentUserId: number;
-  onReply: (commentId: number) => void;
   onDelete: (commentId: number) => void;
   onBlock: (userId: number, username: string) => void;
-  replyingTo: number | null;
-  replyContent: string;
-  onReplyContentChange: (value: string) => void;
-  onSubmitReply: () => void;
-  submittingReply: boolean;
+  onCommentAdded: () => void;
   depth?: number;
-  replyMentions?: any[];
-  onReplyMention?: (user: MentionSuggestion) => void;
 }
 
 function CommentItem({
   comment,
+  postId,
   currentUserId,
-  onReply,
   onDelete,
   onBlock,
-  replyingTo,
-  replyContent,
-  onReplyContentChange,
-  onSubmitReply,
-  submittingReply,
+  onCommentAdded,
   depth = 0,
-  replyMentions,
-  onReplyMention,
 }: CommentItemProps) {
   const isOwn = comment.author.id === currentUserId;
+  const [showReply, setShowReply] = useState(false);
+  const [replyContent, setReplyContent] = useState("");
+  const [replyImageUrl, setReplyImageUrl] = useState("");
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const { mentions, addMention, clearMentions } = useMentions();
+  const imageInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingImage(true);
+    try {
+      const url = await uploadCommunityImage(file);
+      setReplyImageUrl(url);
+    } catch {
+      toast.error("Failed to upload image");
+    } finally {
+      setUploadingImage(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!replyContent.trim()) return;
+    setSubmitting(true);
+    try {
+      await createComment(postId, replyContent.trim(), comment.id, replyImageUrl || undefined);
+      setReplyContent("");
+      setReplyImageUrl("");
+      clearMentions();
+      setShowReply(false);
+      onCommentAdded();
+    } catch (e) {
+      toast.error((e as Error).message || "Failed to add reply");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
-    <div className={cn("space-y-2", depth > 0 && "ml-8 border-l-2 border-border pl-4")}>
+    <div className={cn("space-y-2", depth > 0 && "ml-6 border-l-2 border-border pl-3")}>
       <div className="flex items-start gap-3 group">
-        <Avatar className="h-7 w-7 mt-0.5">
+        <Avatar className="h-7 w-7 mt-0.5 shrink-0">
           {comment.author.profileImageUrl ? (
             <AvatarImage src={comment.author.profileImageUrl} />
           ) : null}
@@ -191,25 +218,19 @@ function CommentItem({
           </div>
           <p className="text-sm text-foreground mt-0.5">{comment.content}</p>
           {comment.imageUrl && (
-            <div className="mt-2 rounded-lg overflow-hidden border border-border">
-              <img
-                src={comment.imageUrl}
-                alt="Comment image"
-                className="max-w-xs max-h-64 object-cover"
-              />
+<div className="mt-2 rounded-lg overflow-hidden border border-border">
+              <Image src={comment.imageUrl} alt="Comment image" width={256} height={256} className="max-w-xs max-h-64 object-cover" unoptimized />
             </div>
           )}
           <div className="flex items-center gap-2 mt-1">
-            {depth === 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
-                onClick={() => onReply(comment.id)}
-              >
-                <Reply className="h-3 w-3 mr-1" /> Reply
-              </Button>
-            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+              onClick={() => { setShowReply((v) => !v); setReplyContent(""); setReplyImageUrl(""); clearMentions(); }}
+            >
+              <Reply className="h-3 w-3 mr-1" /> Reply
+            </Button>
             {isOwn && (
               <Button
                 variant="ghost"
@@ -235,63 +256,80 @@ function CommentItem({
       </div>
 
       {/* Reply input */}
-      {replyingTo === comment.id && (
+      {showReply && (
         <div className="ml-10 space-y-2">
           <MentionAutocomplete
             value={replyContent}
-            onChange={onReplyContentChange}
-            onMention={onReplyMention || (() => {})}
+            onChange={setReplyContent}
+            onMention={addMention}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                onSubmitReply();
-              }
+              if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSubmit(); }
             }}
-            placeholder="Write a reply... Type @ to mention someone"
+            placeholder="Write a reply… Type @ to mention someone"
           >
             <div className="flex items-center gap-2">
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleImageChange}
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 px-2 text-muted-foreground"
+                onClick={() => imageInputRef.current?.click()}
+                disabled={uploadingImage}
+                title="Attach image"
+              >
+                <ImageIcon className="h-4 w-4" />
+              </Button>
               <Button
                 size="sm"
                 className="h-8"
-                onClick={onSubmitReply}
-                disabled={!replyContent.trim() || submittingReply}
+                onClick={handleSubmit}
+                disabled={!replyContent.trim() || submitting}
               >
                 <Send className="h-3 w-3" />
               </Button>
             </div>
           </MentionAutocomplete>
-          
-          {/* Mentioned users display for reply */}
-          {replyMentions && replyMentions.length > 0 && (
-            <div className="mt-1">
-              <p className="text-xs font-medium text-muted-foreground">
-                Mentioned: {replyMentions.map((u) => `@${u.username}`).join(", ")}
-              </p>
+          {replyImageUrl && (
+<div className="relative inline-block">
+              <Image src={replyImageUrl} alt="preview" width={96} height={96} className="max-h-24 rounded border border-border object-cover" unoptimized />
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute -top-2 -right-2 h-5 w-5 p-0 rounded-full bg-background border border-border"
+                onClick={() => setReplyImageUrl("")}
+              >
+                <X className="h-3 w-3" />
+              </Button>
             </div>
+          )}
+          {mentions.length > 0 && (
+            <p className="text-xs text-muted-foreground">
+              Mentioned: {mentions.map((u) => `@${u.username}`).join(", ")}
+            </p>
           )}
         </div>
       )}
 
-      {/* Nested replies */}
-      {comment.replies &&
-        comment.replies.map((reply) => (
-          <CommentItem
-            key={reply.id}
-            comment={reply}
-            currentUserId={currentUserId}
-            onReply={onReply}
-            onDelete={onDelete}
-            onBlock={onBlock}
-            replyingTo={replyingTo}
-            replyContent={replyContent}
-            onReplyContentChange={onReplyContentChange}
-            onSubmitReply={onSubmitReply}
-            submittingReply={submittingReply}
-            depth={depth + 1}
-            replyMentions={replyMentions}
-            onReplyMention={onReplyMention}
-          />
-        ))}
+      {/* Nested replies — unlimited depth */}
+      {comment.replies?.map((reply) => (
+        <CommentItem
+          key={reply.id}
+          comment={reply}
+          postId={postId}
+          currentUserId={currentUserId}
+          onDelete={onDelete}
+          onBlock={onBlock}
+          onCommentAdded={onCommentAdded}
+          depth={depth + 1}
+        />
+      ))}
     </div>
   );
 }
@@ -312,25 +350,19 @@ function PostCard({ post, currentUserId, onDelete, onReaction, onBlock, onSave }
   const [comments, setComments] = useState<PostComment[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
   const [commentContent, setCommentContent] = useState("");
-  const [commentImageUrl, setCommentImageUrl] = useState("");
-  const [commentImageFile, setCommentImageFile] = useState<File | null>(null);
+const [commentImageUrl, setCommentImageUrl] = useState("");
   const [uploadingCommentImage, setUploadingCommentImage] = useState(false);
   const [submittingComment, setSubmittingComment] = useState(false);
-  const [replyingTo, setReplyingTo] = useState<number | null>(null);
-  const [replyContent, setReplyContent] = useState("");
-  const [submittingReply, setSubmittingReply] = useState(false);
   const [showReactions, setShowReactions] = useState(false);
   const [isSaved, setIsSaved] = useState(post.isSaved ?? false);
   const [savingPost, setSavingPost] = useState(false);
+  const [localCommentCount, setLocalCommentCount] = useState(post.commentCount);
+  const hideReactionsTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   // Mention state for comments
   const { mentions: commentMentions, addMention: addCommentMention, clearMentions: clearCommentMentions } = useMentions();
-  const commentTextareaRef = useRef<HTMLTextAreaElement>(null);
+const commentTextareaRef = useRef<HTMLTextAreaElement>(null);
   const commentImageInputRef = useRef<HTMLInputElement>(null);
-
-  // Mention state for replies
-  const { mentions: replyMentions, addMention: addReplyMention, clearMentions: clearReplyMentions } = useMentions();
-  const replyTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   const isOwn = post.author.id === currentUserId;
 
@@ -357,12 +389,12 @@ function PostCard({ post, currentUserId, onDelete, onReaction, onBlock, onSave }
     if (!commentContent.trim()) return;
     setSubmittingComment(true);
     try {
-      await createComment(post.id, commentContent.trim(), undefined, commentImageUrl || undefined);
+await createComment(post.id, commentContent.trim(), undefined, commentImageUrl || undefined);
       setCommentContent("");
       setCommentImageUrl("");
-      setCommentImageFile(null);
       clearCommentMentions();
       toast.success("Comment added");
+      setLocalCommentCount((c) => c + 1);
       loadComments();
     } catch (e) {
       toast.error((e as Error).message || "Failed to add comment");
@@ -371,22 +403,6 @@ function PostCard({ post, currentUserId, onDelete, onReaction, onBlock, onSave }
     }
   };
 
-  const handleSubmitReply = async () => {
-    if (!replyContent.trim() || replyingTo === null) return;
-    setSubmittingReply(true);
-    try {
-      await createComment(post.id, replyContent.trim(), replyingTo);
-      setReplyContent("");
-      clearReplyMentions();
-      setReplyingTo(null);
-      toast.success("Reply added");
-      loadComments();
-    } catch (e) {
-      toast.error((e as Error).message || "Failed to add reply");
-    } finally {
-      setSubmittingReply(false);
-    }
-  };
 
   const handleDeleteComment = async (commentId: number) => {
     try {
@@ -415,10 +431,9 @@ function PostCard({ post, currentUserId, onDelete, onReaction, onBlock, onSave }
 
   const handleCommentImageUpload = async (file: File) => {
     setUploadingCommentImage(true);
-    try {
+try {
       const uploadedUrl = await uploadCommunityImage(file);
       setCommentImageUrl(uploadedUrl);
-      setCommentImageFile(file);
       toast.success("Image uploaded");
     } catch (e) {
       toast.error((e as Error).message || "Failed to upload image");
@@ -435,16 +450,16 @@ function PostCard({ post, currentUserId, onDelete, onReaction, onBlock, onSave }
   };
 
   return (
-    <Card className="overflow-hidden">
-      <CardContent className="pt-5 pb-3 space-y-3">
+    <div className="bg-card rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.2)] border border-transparent hover:border-primary/20 transition-all overflow-hidden">
+      <div className="p-6 pb-4 space-y-4">
         {/* Author row */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Avatar className="h-9 w-9">
+            <Avatar className="h-10 w-10">
               {post.author.profileImageUrl ? (
                 <AvatarImage src={post.author.profileImageUrl} />
               ) : null}
-              <AvatarFallback className="bg-secondary text-secondary-foreground text-sm">
+              <AvatarFallback className="bg-primary/20 text-primary font-bold text-sm">
                 {getInitials(post.author.name, post.author.username)}
               </AvatarFallback>
             </Avatar>
@@ -463,9 +478,9 @@ function PostCard({ post, currentUserId, onDelete, onReaction, onBlock, onSave }
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <Badge className={cn("text-xs font-normal", getTagColor(post.tag))}>
-              {post.tag.charAt(0) + post.tag.slice(1).toLowerCase()}
+          <div className="flex items-center gap-3">
+            <Badge className={cn("text-label-caps border-none tracking-widest", getTagColor(post.tag))}>
+              {post.tag}
             </Badge>
             {/* Dropdown: delete own / block others */}
             <DropdownMenu>
@@ -497,17 +512,13 @@ function PostCard({ post, currentUserId, onDelete, onReaction, onBlock, onSave }
 
         {/* Title + content */}
         <div>
-          <h3 className="text-base font-semibold text-foreground">{post.title}</h3>
-          <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">
+          <h3 className="text-2xl font-bold text-foreground mb-2">{post.title}</h3>
+          <p className="text-base text-muted-foreground leading-relaxed whitespace-pre-wrap">
             {post.content}
           </p>
           {post.imageUrl && (
-            <div className="mt-3 rounded-lg overflow-hidden border border-border">
-              <img
-                src={post.imageUrl}
-                alt={post.title}
-                className="w-full max-h-96 object-cover"
-              />
+            <div className="mt-4 rounded-xl overflow-hidden border border-border/50">
+              <Image src={post.imageUrl} alt={post.title} width={800} height={400} className="w-full max-h-96 object-cover" unoptimized />
             </div>
           )}
         </div>
@@ -526,8 +537,8 @@ function PostCard({ post, currentUserId, onDelete, onReaction, onBlock, onSave }
                   : "text-muted-foreground",
               )}
               onClick={() => onReaction(post.id, "LIKE")}
-              onMouseEnter={() => setShowReactions(true)}
-              onMouseLeave={() => setShowReactions(false)}
+              onMouseEnter={() => { clearTimeout(hideReactionsTimer.current); setShowReactions(true); }}
+              onMouseLeave={() => { hideReactionsTimer.current = setTimeout(() => setShowReactions(false), 120); }}
             >
               <ThumbsUp className="h-4 w-4" />
               {post.totalReactions > 0 && (
@@ -539,8 +550,8 @@ function PostCard({ post, currentUserId, onDelete, onReaction, onBlock, onSave }
             {showReactions && (
               <div
                 className="absolute bottom-full left-0 mb-1 flex items-center gap-0.5 bg-card border border-border rounded-full px-2 py-1 shadow-lg z-10"
-                onMouseEnter={() => setShowReactions(true)}
-                onMouseLeave={() => setShowReactions(false)}
+                onMouseEnter={() => { clearTimeout(hideReactionsTimer.current); setShowReactions(true); }}
+                onMouseLeave={() => { hideReactionsTimer.current = setTimeout(() => setShowReactions(false), 120); }}
               >
                 {REACTION_CONFIG.map((r) => (
                   <Button
@@ -588,11 +599,11 @@ function PostCard({ post, currentUserId, onDelete, onReaction, onBlock, onSave }
           <Button
             variant="ghost"
             size="sm"
-            className="h-8 px-2 text-xs text-muted-foreground gap-1 ml-auto"
+            className="h-9 px-3 text-label-caps text-muted-foreground hover:text-foreground gap-2 ml-auto hover:bg-muted/50 rounded-lg"
             onClick={handleToggleComments}
           >
             <MessageSquare className="h-4 w-4" />
-            <span className="tabular-nums">{post.commentCount}</span>
+            <span className="tabular-nums">{localCommentCount}</span>
             {showComments ? (
               <ChevronUp className="h-3 w-3" />
             ) : (
@@ -605,7 +616,7 @@ function PostCard({ post, currentUserId, onDelete, onReaction, onBlock, onSave }
             variant="ghost"
             size="sm"
             className={cn(
-              "h-8 px-2 text-xs gap-1",
+              "h-9 px-3 text-xs gap-2 hover:bg-muted/50 rounded-lg",
               isSaved
                 ? "text-primary"
                 : "text-muted-foreground"
@@ -638,21 +649,11 @@ function PostCard({ post, currentUserId, onDelete, onReaction, onBlock, onSave }
                   <CommentItem
                     key={c.id}
                     comment={c}
+                    postId={post.id}
                     currentUserId={currentUserId}
-                    onReply={(id) => {
-                      setReplyingTo(replyingTo === id ? null : id);
-                      setReplyContent("");
-                      clearReplyMentions();
-                    }}
                     onDelete={handleDeleteComment}
                     onBlock={onBlock}
-                    replyingTo={replyingTo}
-                    replyContent={replyContent}
-                    onReplyContentChange={setReplyContent}
-                    onSubmitReply={handleSubmitReply}
-                    submittingReply={submittingReply}
-                    replyMentions={replyMentions}
-                    onReplyMention={addReplyMention}
+                    onCommentAdded={loadComments}
                   />
                 ))}
               </>
@@ -703,17 +704,12 @@ function PostCard({ post, currentUserId, onDelete, onReaction, onBlock, onSave }
               
               {/* Image preview */}
               {commentImageUrl && (
-                <div className="rounded-lg overflow-hidden border border-border relative">
-                  <img
-                    src={commentImageUrl}
-                    alt="Comment image preview"
-                    className="max-h-40 w-full object-cover"
-                  />
+<div className="rounded-lg overflow-hidden border border-border relative">
+                  <Image src={commentImageUrl} alt="Comment image preview" width={400} height={160} className="max-h-40 w-full object-cover" unoptimized />
                   <button
                     type="button"
                     onClick={() => {
-                      setCommentImageUrl("");
-                      setCommentImageFile(null);
+setCommentImageUrl("");
                     }}
                     className="absolute top-2 right-2 bg-background/80 hover:bg-background rounded-full p-1"
                   >
@@ -733,8 +729,8 @@ function PostCard({ post, currentUserId, onDelete, onReaction, onBlock, onSave }
             </div>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
@@ -765,13 +761,13 @@ export default function CommunityPage() {
   const [newTitle, setNewTitle] = useState("");
   const [newContent, setNewContent] = useState("");
   const [newTag, setNewTag] = useState<PostTag>("GENERAL");
-  const [newImageUrl, setNewImageUrl] = useState("");
-  const [newImageFile, setNewImageFile] = useState<File | null>(null);
+const [newImageUrl, setNewImageUrl] = useState("");
+  const [, setNewImageFile] = useState<File | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   // Mention state
-  const { mentions, mentionedUserIds, addMention, clearMentions } = useMentions();
+  const { mentions, addMention, clearMentions } = useMentions();
   const newPostTextareaRef = useRef<HTMLTextAreaElement>(null);
   const postImageInputRef = useRef<HTMLInputElement>(null);
 
@@ -1346,16 +1342,9 @@ export default function CommunityPage() {
                 </div>
               </div>
               {newImageUrl && (
-                <div className="mt-3 rounded-lg overflow-hidden border border-border relative">
-                  <img
-                    src={newImageUrl}
-                    alt="Preview"
-                    className="max-h-48 w-full object-cover"
-                    onError={() => {
-                      toast.error("Invalid image URL");
-                      setNewImageUrl("");
-                    }}
-                  />
+<div className="mt-3 rounded-lg overflow-hidden border border-border relative">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={newImageUrl} alt="Preview" className="max-h-48 w-full object-cover" />
                   <button
                     type="button"
                     onClick={() => {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { BarChart3, PieChartIcon, ArrowLeftRight, TrendingUp } from 'lucide-react';
+import { TrendingUp, PieChart as PieChartIcon, ArrowLeftRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs } from '@/components/ui/tabs';
 import { AllocationChart } from './AllocationChart';

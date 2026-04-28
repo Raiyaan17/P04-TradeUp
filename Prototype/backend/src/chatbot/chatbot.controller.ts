@@ -36,7 +36,9 @@ export class ChatbotController {
    */
   @Post('session')
   async getOrCreateSession(@Req() req: AuthenticatedRequest) {
-    const session = await this.chatbotService.getOrCreateSession(req.user.userId);
+    const session = await this.chatbotService.getOrCreateSession(
+      req.user.userId,
+    );
     return { sessionId: session.id, createdAt: session.createdAt };
   }
 
@@ -49,7 +51,10 @@ export class ChatbotController {
     @Req() req: AuthenticatedRequest,
     @Param('sessionId', ParseIntPipe) sessionId: number,
   ) {
-    const messages = await this.chatbotService.getSessionHistory(sessionId, req.user.userId);
+    const messages = await this.chatbotService.getSessionHistory(
+      sessionId,
+      req.user.userId,
+    );
     return { messages };
   }
 
@@ -59,10 +64,7 @@ export class ChatbotController {
    * Body: { sessionId: number, message: string }
    */
   @Post('chat')
-  async chat(
-    @Req() req: AuthenticatedRequest,
-    @Body() body: ChatRequestDto,
-  ) {
+  async chat(@Req() req: AuthenticatedRequest, @Body() body: ChatRequestDto) {
     this.logger.log(
       `Chat from user ${req.user.userId} in session ${body.sessionId}: "${body.message}"`,
     );

@@ -53,9 +53,9 @@ export function Chatbot() {
           const sessionRes = await http.post<{ sessionId: number }>('/chatbot/session', {})
           setSessionId(sessionRes.sessionId)
           
-          const historyRes = await http.get<{ messages: any[] }>(`/chatbot/history/${sessionRes.sessionId}`)
+const historyRes = await http.get<{ messages: { role: string; content: string }[] }>(`/chatbot/history/${sessionRes.sessionId}`)
           if (historyRes.messages && historyRes.messages.length > 0) {
-            const mappedHistory: Message[] = historyRes.messages.map((m: any) => ({
+            const mappedHistory: Message[] = historyRes.messages.map(m => ({
               role: (m.role.toLowerCase() === 'user' ? 'user' : 'bot') as 'user' | 'bot',
               content: m.content
             }))

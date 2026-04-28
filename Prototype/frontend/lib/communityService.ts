@@ -1,5 +1,5 @@
 import API_BASE_URL from './api';
-import { uploadFile, ApiException } from '@/lib/http';
+import { uploadFile } from '@/lib/http';
 import type {
   CommunityPost,
   PostsResponse,
@@ -221,6 +221,7 @@ export const savePost = async (postId: number): Promise<void> => {
     {
       method: 'POST',
       headers: getAuthHeaders(),
+      body: JSON.stringify({}),
     },
   );
 

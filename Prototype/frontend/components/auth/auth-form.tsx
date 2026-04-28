@@ -1,6 +1,4 @@
-
 "use client";
-import { RoleChip } from "./role-chip";
 
 import React, { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -12,12 +10,13 @@ import { Label } from "../ui/label";
 import { useUser } from "@/context/UserContext";
 import { http, ApiException } from "@/lib/http";
 
-type AuthFormFields = {
+
+interface AuthFormFields {
   email: string;
   username: string;
   password: string;
   confirm: string;
-};
+}
 
 export function AuthForm() {
   const [mode, setMode] = useState<"signin" | "signup">("signin");
@@ -30,8 +29,8 @@ export function AuthForm() {
     setValue,
     watch,
   } = useForm<AuthFormFields>({ mode: "onBlur" });
-  const [showPw, setShowPw] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [showPw, setShowPw] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [message, setMessage] = useState<{
     type: "error" | "success";
     text: string;
@@ -46,8 +45,6 @@ export function AuthForm() {
     router.push("/dashboard");
   }
 
-
-
   async function onSubmit(data: AuthFormFields) {
     setMessage(null);
     if (mode === "signup" && data.password !== data.confirm) {
@@ -61,7 +58,7 @@ export function AuthForm() {
     setIsLoading(true);
     try {
       const url = mode === "signin" ? "/auth/login" : "/auth/signup";
-      const body: { email: string; password: string; username?: string; role?: string; gender?: string } = { email: data.email, password: data.password };
+      const body: Record<string, string> = { email: data.email, password: data.password };
       if (mode === "signup") {
         body.username = data.username;
         body.role = role;
@@ -74,12 +71,9 @@ export function AuthForm() {
         const token = result?.access_token;
         if (typeof token === "string" && token.length > 0) {
           localStorage.setItem("access_token", token);
-          // Hydrate user context before navigating so auth-gated pages render correctly
           try {
             await refreshUser();
-          } catch {
-            // Profile fetch failed but signin succeeded; proceed anyway
-          }
+          } catch {}
         }
         setMessage({ type: "success", text: "Signed in successfully." });
         router.push("/dashboard");
@@ -104,46 +98,39 @@ export function AuthForm() {
   }
 
   return (
-    <section className="relative w-full m-10 rounded-l-3xl bg-black/50 backdrop-blur-md border border-white/10 shadow-lg overflow-y-auto">
-      <header className="px-6 pt-6 pb-2">
-        <h1 className="text-2xl font-semibold tracking-tight text-white">
-          {mode === "signin" ? "Welcome back" : "Create your account"}
+    <section className="w-full flex flex-col gap-8">
+      <header className="flex flex-col gap-2 items-center text-center">
+        <span className="text-primary text-label-caps font-bold">↗ TRADEUP</span>
+        <h1>
+          {mode === "signin" ? "WELCOME BACK" : "CREATE ACCOUNT"}
         </h1>
-        <p className="mt-1 text-sm text-gray-300">
+        <p className="text-muted-foreground text-body-md">
           {mode === "signin"
             ? "Sign in to continue."
             : "It takes less than a minute."}
         </p>
       </header>
 
-      <div className="px-6 pt-2">
-        <div className="inline-flex rounded-full bg-black/20 border border-white/10 p-1">
-          <button
-            onClick={() => setMode("signin")}
-            aria-pressed={mode === "signin"}
-            className={`cursor-pointer px-4 py-1.5 text-sm rounded-full transition-all ${mode === "signin"
-              ? "bg-white/10 shadow text-white"
-              : "text-gray-300 hover:text-white"
-              }`}
-          >
-            Sign in
-          </button>
-          <button
-            onClick={() => setMode("signup")}
-            aria-pressed={mode === "signup"}
-            className={`cursor-pointer px-4 py-1.5 text-sm rounded-full transition-all ${mode === "signup"
-              ? "bg-white/10 shadow text-white"
-              : "text-gray-300 hover:text-white"
-              }`}
-          >
-            Sign up
-          </button>
-        </div>
+      <div className="flex justify-center gap-4">
+        <Button
+          variant={mode === "signin" ? "default" : "secondary"}
+          onClick={() => setMode("signin")}
+          aria-pressed={mode === "signin"}
+        >
+          Sign in
+        </Button>
+        <Button
+          variant={mode === "signup" ? "default" : "secondary"}
+          onClick={() => setMode("signup")}
+          aria-pressed={mode === "signup"}
+        >
+          Sign up
+        </Button>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="px-6 pt-4 pb-6 space-y-4">
-        <div>
-          <Label htmlFor="email">Email</Label>
+      <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-6">
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="email" className="text-label-caps text-muted-foreground">EMAIL</Label>
           <Input
             id="email"
             type="email"
@@ -156,18 +143,17 @@ export function AuthForm() {
               },
             })}
             placeholder="you@example.com"
-            className="bg-black/20 border-white/20 text-white placeholder:text-gray-400"
           />
           {errors.email && (
-            <span className="text-red-400 text-xs mt-1">
+            <span className="text-destructive text-xs">
               {errors.email.message}
             </span>
           )}
         </div>
 
         {mode === "signup" && (
-          <div>
-            <Label htmlFor="username">Username</Label>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="username" className="text-label-caps text-muted-foreground">USERNAME</Label>
             <Input
               id="username"
               type="text"
@@ -188,25 +174,22 @@ export function AuthForm() {
                 },
               })}
               placeholder="your_username"
-              className="bg-black/20 border-white/20 text-white placeholder:text-gray-400"
             />
             {errors.username && (
-              <span className="text-red-400 text-xs mt-1">
+              <span className="text-destructive text-xs">
                 {errors.username.message}
               </span>
             )}
           </div>
         )}
 
-        <div>
-          <Label htmlFor="password">Password</Label>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="password" className="text-label-caps text-muted-foreground">PASSWORD</Label>
           <div className="relative">
             <Input
               id="password"
               type={showPw ? "text" : "password"}
-              autoComplete={
-                mode === "signin" ? "current-password" : "new-password"
-              }
+              autoComplete={mode === "signin" ? "current-password" : "new-password"}
               {...register("password", {
                 required: "Password is required",
                 minLength: {
@@ -214,68 +197,19 @@ export function AuthForm() {
                   message: "Password should be at least 8 characters long",
                 },
               })}
-              placeholder={
-                mode === "signin" ? "Your password" : "At least 8 characters"
-              }
-              className="bg-black/20 border-white/20 text-white placeholder:text-gray-400"
+              placeholder={mode === "signin" ? "Your password" : "At least 8 characters"}
             />
             <button
               type="button"
               onClick={() => setShowPw((s) => !s)}
               aria-label={showPw ? "Hide password" : "Show password"}
-              className="absolute inset-y-0 right-0 px-3 text-gray-300 hover:text-white"
+              className="absolute inset-y-0 right-0 px-3 text-muted-foreground hover:text-foreground"
             >
-              {showPw ? (
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    d="M3 3l18 18"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                  />
-                  <path
-                    d="M10.58 10.58a3 3 0 004.24 4.24"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                  />
-                  <path
-                    d="M9.88 5.08A10.4 10.4 0 0121 12s-2.5 4.5-9 4.5c-.73 0-1.43-.06-2.08-.17M6.12 8.01A10.5 10.5 0 003 12s2.5 4.5 9 4.5c.36 0 .71-.01 1.05-.04"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                  />
-                </svg>
-              ) : (
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    d="M12 7.5a4.5 4.5 0 100 9 4.5 4.5 0 000-9z"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                  />
-                  <path
-                    d="M3 12s2.5-6 9-6 9 6 9 6-2.5 6-9 6-9-6-9-6z"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                  />
-                </svg>
-              )}
+              {showPw ? "HIDE" : "SHOW"}
             </button>
           </div>
           {errors.password && (
-            <span className="text-red-400 text-xs mt-1">
+            <span className="text-destructive text-xs">
               {errors.password.message}
             </span>
           )}
@@ -283,8 +217,8 @@ export function AuthForm() {
 
         {mode === "signup" && (
           <>
-            <div>
-              <Label htmlFor="confirm">Confirm password</Label>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="confirm" className="text-label-caps text-muted-foreground">CONFIRM PASSWORD</Label>
               <Input
                 id="confirm"
                 type={showPw ? "text" : "password"}
@@ -294,48 +228,55 @@ export function AuthForm() {
                     value === watch("password") || "Passwords do not match",
                 })}
                 placeholder="Repeat password"
-                className="bg-black/20 border-white/20 text-white placeholder:text-gray-400"
               />
               {errors.confirm && (
-                <span className="text-red-400 text-xs mt-1">
+                <span className="text-destructive text-xs">
                   {errors.confirm.message}
                 </span>
               )}
             </div>
-            <div>
-              <Label>Gender</Label>
-              <div className="flex gap-2 mt-1">
-                <button
+
+            <div className="flex flex-col gap-2">
+              <Label className="text-label-caps text-muted-foreground">GENDER</Label>
+              <div className="flex gap-2">
+                <Button
                   type="button"
+                  variant={gender === "MALE" ? "default" : "secondary"}
                   onClick={() => setGender("MALE")}
                   aria-pressed={gender === "MALE"}
-                  className={`px-3 py-1.5 rounded-xl text-xs border transition ${gender === "MALE"
-                    ? "bg-white/10 text-white border-white/20"
-                    : "bg-black/20 border-white/10 text-gray-300 hover:border-white/50 hover:text-white"
-                    }`}
                 >
-                  Male
-                </button>
-                <button
+                  MALE
+                </Button>
+                <Button
                   type="button"
+                  variant={gender === "FEMALE" ? "default" : "secondary"}
                   onClick={() => setGender("FEMALE")}
                   aria-pressed={gender === "FEMALE"}
-                  className={`px-3 py-1.5 rounded-xl text-xs border transition ${gender === "FEMALE"
-                    ? "bg-white/10 text-white border-white/20"
-                    : "bg-black/20 border-white/10 text-gray-300 hover:border-white/50 hover:text-white"
-                    }`}
                 >
-                  Female
-                </button>
+                  FEMALE
+                </Button>
               </div>
             </div>
-            <div>
-              <Label>Role</Label>
-              <div className="flex gap-2 mt-1">
-                {/* @ts-expect-error - RoleChip props type issue */}
-                <RoleChip value="TRADER" current={role} onPick={setRole} />
-                {/* @ts-expect-error - RoleChip props type issue */}
-                <RoleChip value="ADMIN" current={role} onPick={setRole} />
+
+            <div className="flex flex-col gap-2">
+              <Label className="text-label-caps text-muted-foreground">ROLE</Label>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant={role === "TRADER" ? "default" : "secondary"}
+                  onClick={() => setRole("TRADER")}
+                  aria-pressed={role === "TRADER"}
+                >
+                  TRADER
+                </Button>
+                <Button
+                  type="button"
+                  variant={role === "ADMIN" ? "default" : "secondary"}
+                  onClick={() => setRole("ADMIN")}
+                  aria-pressed={role === "ADMIN"}
+                >
+                  ADMIN
+                </Button>
               </div>
             </div>
           </>
@@ -344,10 +285,11 @@ export function AuthForm() {
         {message && (
           <div
             role={message.type === "error" ? "alert" : "status"}
-            className={`text-sm rounded-xl px-3 py-2 border ${message.type === "error"
-              ? "bg-red-900/30 text-red-300 border-red-500/30"
-              : "bg-green-900/30 text-green-300 border-green-500/30"
-              }`}
+            className={`text-sm rounded-md px-4 py-3 ${
+              message.type === "error"
+                ? "bg-destructive/20 text-destructive-foreground border border-destructive/50"
+                : "bg-primary/20 text-primary-foreground border border-primary/50"
+            }`}
           >
             {message.text}
           </div>
@@ -358,74 +300,26 @@ export function AuthForm() {
             <Spinner />
           ) : (
             <>
-              {mode === "signin" ? "Sign in" : "Create account"}
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-                className="opacity-90 ml-2"
-              >
-                <path
-                  d="M5 12h14"
-                  stroke="currentColor"
-                  strokeWidth="1.7"
-                  strokeLinecap="round"
-                />
-                <path
-                  d="M13 6l6 6-6 6"
-                  stroke="currentColor"
-                  strokeWidth="1.7"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
+              {mode === "signin" ? "SIGN IN →" : "CREATE ACCOUNT →"}
             </>
           )}
         </Button>
 
-        <div className="pt-2">
-          <Button
-            type="button"
-            onClick={browseAsGuest}
-            variant="outline"
-            className="w-full bg-black border-white/20 text-white hover:bg-black/40"
-          >
-            Browse stocks as guest
-          </Button>
-          <p className="mt-1 text-center text-xs text-gray-400">
-            You can view prices but must sign in to save to watchlist.
-          </p>
+        <div className="flex items-center gap-4 py-2">
+          <div className="h-px bg-border flex-1"></div>
+          <span className="text-muted-foreground text-label-caps">OR</span>
+          <div className="h-px bg-border flex-1"></div>
         </div>
 
-        <p className="text-center text-sm text-gray-300 pt-1">
-          {mode === "signin" ? (
-            <>
-              Don&apos;t have an account?{" "}
-              <button
-                type="button"
-                onClick={() => setMode("signup")}
-                className="cursor-pointer underline hover:text-white"
-              >
-                Sign up
-              </button>
-            </>
-          ) : (
-            <>
-              Already have an account?{" "}
-              <button
-                type="button"
-                onClick={() => setMode("signin")}
-                className="underline hover:text-white"
-              >
-                Sign in
-              </button>
-            </>
-          )}
-        </p>
+        <Button
+          type="button"
+          onClick={browseAsGuest}
+          variant="outline"
+          className="w-full"
+        >
+          BROWSE AS GUEST
+        </Button>
       </form>
     </section>
   );
 }
-

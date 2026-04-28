@@ -1,4 +1,5 @@
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
+import { GoogleGenAI } from '@google/genai';
 import * as dotenv from 'dotenv';
 dotenv.config();
 import { ConfigService } from '@nestjs/config';
@@ -8,14 +9,11 @@ import { TradesService } from '../trades/trades.service';
 import { WatchlistService } from '../watchlist/watchlist.service';
 import { subDays } from 'date-fns';
 
-
-
 @Injectable()
 export class ChatbotService implements OnModuleInit {
   private readonly logger = new Logger(ChatbotService.name);
+  private readonly ai: GoogleGenAI;
   private readonly apiKey: string;
-  private readonly apiUrl =
-    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
   private marketBaseline: string = '';
 
   constructor(
@@ -26,11 +24,14 @@ export class ChatbotService implements OnModuleInit {
     private readonly watchlistService: WatchlistService,
   ) {
     this.apiKey = this.configService.get<string>('GEMINI_API_KEY') || '';
+    this.ai = new GoogleGenAI({ apiKey: this.apiKey });
   }
 
   async onModuleInit() {
     if (!this.apiKey) {
-      this.logger.error('GEMINI_API_KEY is not defined in environment variables');
+      this.logger.error(
+        'GEMINI_API_KEY is not defined in environment variables',
+      );
     }
     await this.trainBaselineModel();
   }
@@ -75,7 +76,12 @@ export class ChatbotService implements OnModuleInit {
 
   async getChatResponse(userId: number, sessionId: number, message: string) {
     // 1. Verify session belongs to this user
-    let session: any;
+    let session: {
+      id: number;
+      userId: number;
+      lastActiveAt: Date;
+      createdAt: Date;
+    } | null = null;
     try {
       session = await this.prisma.chatSession.findFirst({
         where: { id: sessionId, userId },
@@ -84,11 +90,17 @@ export class ChatbotService implements OnModuleInit {
       this.logger.error('Failed to verify chat session:', err);
     }
     if (!session) {
-      return "It looks like your chat session has expired. Please close and reopen the chat to start a new session.";
+      return 'It looks like your chat session has expired. Please close and reopen the chat to start a new session.';
     }
 
     // 2. Load conversation history (non-critical — continue with empty if fails)
-    let history: any[] = [];
+    let history: {
+      id: number;
+      sessionId: number;
+      role: string;
+      content: string;
+      createdAt: Date;
+    }[] = [];
     try {
       history = await this.prisma.chatMessage.findMany({
         where: { sessionId },
@@ -96,7 +108,10 @@ export class ChatbotService implements OnModuleInit {
         take: 20,
       });
     } catch (err) {
-      this.logger.warn('Failed to load chat history, continuing without it:', err);
+      this.logger.warn(
+        'Failed to load chat history, continuing without it:',
+        err,
+      );
     }
 
     // 3. Build user context (fully resilient — won't throw)
@@ -104,7 +119,10 @@ export class ChatbotService implements OnModuleInit {
     try {
       contextSnapshot = await this.buildUserContext(userId);
     } catch (err) {
-      this.logger.warn('Failed to build user context, continuing with minimal context:', err);
+      this.logger.warn(
+        'Failed to build user context, continuing with minimal context:',
+        err,
+      );
       contextSnapshot = `USER ID: ${userId}\nNote: Could not load detailed user data.`;
     }
 
@@ -153,11 +171,19 @@ export class ChatbotService implements OnModuleInit {
   private getStaticFallbackResponse(userMessage: string): string {
     const lowerMsg = userMessage.toLowerCase();
 
-    if (lowerMsg.includes('hi') || lowerMsg.includes('hello') || lowerMsg.includes('hey')) {
+    if (
+      lowerMsg.includes('hi') ||
+      lowerMsg.includes('hello') ||
+      lowerMsg.includes('hey')
+    ) {
       return "👋 **Hello!** Welcome to TradeUp AI!\n\nI'm your trading coach for the Pakistan Stock Exchange (PSX). I can help you with:\n\n• 📊 **Stock analysis** — ask me about any PSX stock\n• 📈 **Trading strategies** — learn about value investing, momentum trading, and more\n• 💼 **Portfolio advice** — I'll review your trades and suggest improvements\n• 📚 **Trading basics** — perfect if you're just getting started\n\nWhat would you like to explore?";
     }
 
-    if (lowerMsg.includes('trade') || lowerMsg.includes('buy') || lowerMsg.includes('sell')) {
+    if (
+      lowerMsg.includes('trade') ||
+      lowerMsg.includes('buy') ||
+      lowerMsg.includes('sell')
+    ) {
       return "📈 **Trading on TradeUp**\n\nHere are the basics:\n\n1. **Browse stocks** — Check out the featured PSX stocks on your dashboard\n2. **Add to watchlist** — Keep an eye on stocks you're interested in\n3. **Buy shares** — Use your simulated balance to practice buying\n4. **Sell shares** — Sell when you think the price is right\n5. **Track P&L** — Monitor your profit and loss in your portfolio\n\n💡 **Tip:** Start with small quantities to learn how price movements affect your portfolio!\n\nWould you like me to explain any of these steps in more detail?";
     }
 
@@ -169,26 +195,33 @@ export class ChatbotService implements OnModuleInit {
   // ─────────────────────────────────────────────
 
   async generatePeriodicReview(userId: number, period: 'weekly' | 'monthly') {
-    const since = period === 'weekly' ? subDays(new Date(), 7) : subDays(new Date(), 30);
+    const since =
+      period === 'weekly' ? subDays(new Date(), 7) : subDays(new Date(), 30);
 
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    const allTransactions = await this.tradesService.getTransactions(userId, 100);
+    const allTransactions = await this.tradesService.getTransactions(
+      userId,
+      100,
+    );
     const portfolioData = await this.tradesService.getPortfolio(userId);
 
     // Helper to safely convert Decimal/number/string to a displayable number
-    const safeNum = (val: any, decimals = 2): string => {
+    const safeNum = (val: unknown, decimals = 2): string => {
       if (val === null || val === undefined) return '0';
-      const n = typeof val === 'object' && val.toNumber ? val.toNumber() : Number(val);
+      const n =
+        // @ts-ignore
+        typeof val === 'object' && val.toNumber ? val.toNumber() : Number(val);
       return isNaN(n) ? '0' : n.toFixed(decimals);
     };
 
-    // Filter transactions within the period
     const periodTransactions = allTransactions.transactions.filter(
-      (t: any) => new Date(t.createdAt) >= since,
+      (t: Record<string, unknown>) =>
+        new Date(t.createdAt as string | number | Date) >= since,
     );
 
-    const tradeLines = periodTransactions.map((t: any) =>
-      `• ${t.type} ${t.symbol} x${t.quantity} @ ${safeNum(t.price)} PKR on ${new Date(t.createdAt).toLocaleDateString('en-PK')}`,
+    const tradeLines = periodTransactions.map(
+      (t: Record<string, unknown>) =>
+        `• ${String(t.type)} ${String(t.symbol)} x${Number(t.quantity)} @ ${safeNum(t.price)} PKR on ${new Date(t.createdAt as string | number | Date).toLocaleDateString('en-PK')}`,
     );
 
     const reviewPrompt = `
@@ -223,7 +256,11 @@ export class ChatbotService implements OnModuleInit {
       [Concrete, actionable advice for the Pakistani Stock Exchange (PSX)]
     `;
 
-    return await this.callGemini(this.buildBaseSystemPrompt(), [], reviewPrompt);
+    return await this.callGemini(
+      this.buildBaseSystemPrompt(),
+      [],
+      reviewPrompt,
+    );
   }
 
   // ─────────────────────────────────────────────
@@ -243,14 +280,18 @@ export class ChatbotService implements OnModuleInit {
         return;
       }
 
-      const summaries = tournaments.map((s) => {
-        const trajectory = s.trajectoryJson as any[];
-        if (!trajectory || trajectory.length === 0) return '';
-        const startPSX = trajectory[0]?.PSX || 62000;
-        const endPSX = trajectory[trajectory.length - 1]?.PSX || 62000;
-        const change = ((endPSX - startPSX) / startPSX) * 100;
-        return `• PSX Tournament trend: ${startPSX.toFixed(2)} → ${endPSX.toFixed(2)} (${change.toFixed(2)}%)`;
-      }).filter(s => s !== '');
+      const summaries = tournaments
+        .map((s) => {
+          const trajectory = s.trajectoryJson as Record<string, unknown>[];
+          if (!trajectory || trajectory.length === 0) return '';
+          const startPSX = Number(trajectory[0]?.PSX || 62000);
+          const endPSX = Number(
+            trajectory[trajectory.length - 1]?.PSX || 62000,
+          );
+          const change = ((endPSX - startPSX) / startPSX) * 100;
+          return `• PSX Tournament trend: ${startPSX.toFixed(2)} → ${endPSX.toFixed(2)} (${change.toFixed(2)}%)`;
+        })
+        .filter((s) => s !== '');
 
       this.marketBaseline = `SIMULATION HISTORY (PSX Patterns):\n${summaries.join('\n')}`;
       this.logger.log('Market baseline loaded.');
@@ -266,7 +307,13 @@ export class ChatbotService implements OnModuleInit {
 
   private async buildUserContext(userId: number): Promise<string> {
     // Fetch user info — this is critical, but handle gracefully
-    let user: any = null;
+    let user: {
+      id: number;
+      name: string | null;
+      username: string;
+      email: string;
+      balance: unknown;
+    } | null = null;
     try {
       user = await this.prisma.user.findUnique({ where: { id: userId } });
     } catch (err) {
@@ -274,7 +321,7 @@ export class ChatbotService implements OnModuleInit {
     }
 
     // Fetch portfolio — safe default for new users with no trades
-    let portfolioData: any = {
+    let portfolioData: Record<string, unknown> = {
       balance: user?.balance ?? 0,
       totalAccountValue: user?.balance ?? 0,
       totalInvested: 0,
@@ -289,16 +336,19 @@ export class ChatbotService implements OnModuleInit {
     }
 
     // Fetch transactions — safe default: empty list
-    let transactions: any[] = [];
+    let transactions: Record<string, unknown>[] = [];
     try {
-      const transactionData = await this.tradesService.getTransactions(userId, 20);
+      const transactionData = await this.tradesService.getTransactions(
+        userId,
+        20,
+      );
       transactions = transactionData?.transactions || [];
     } catch (err) {
       this.logger.warn(`Failed to fetch transactions for user ${userId}:`, err);
     }
 
     // Fetch watchlist — safe default: empty list
-    let watchlistItems: any[] = [];
+    let watchlistItems: Record<string, unknown>[] = [];
     try {
       watchlistItems = await this.watchlistService.list(userId);
     } catch (err) {
@@ -306,7 +356,7 @@ export class ChatbotService implements OnModuleInit {
     }
 
     // Fetch featured/live stocks — safe default: empty list
-    let featuredStocks: any[] = [];
+    let featuredStocks: Record<string, unknown>[] = [];
     try {
       featuredStocks = await this.stocksService.listFeaturedWithTicks();
     } catch (err) {
@@ -315,37 +365,56 @@ export class ChatbotService implements OnModuleInit {
 
     // Detect new user state
     const isNewUser =
+      // @ts-ignore
       (portfolioData.portfolio || []).length === 0 && transactions.length === 0;
 
     // Helper to safely convert Decimal/number/string to a displayable number
-    const safeNum = (val: any, decimals = 2): string => {
+    const safeNum = (val: unknown, decimals = 2): string => {
       if (val === null || val === undefined) return '0';
-      const n = typeof val === 'object' && val.toNumber ? val.toNumber() : Number(val);
+      const n =
+        // @ts-ignore
+        typeof val === 'object' && val.toNumber ? val.toNumber() : Number(val);
       return isNaN(n) ? '0' : n.toFixed(decimals);
     };
 
     // Format holdings as readable bullet points
-    const holdingLines = (portfolioData.portfolio || []).map((h: any) => {
-      const pnl = typeof h.unrealizedPnl === 'object' && h.unrealizedPnl?.toNumber
-        ? h.unrealizedPnl.toNumber() : Number(h.unrealizedPnl || 0);
+    const holdingLines = (
+      (portfolioData.portfolio as Record<string, unknown>[]) || []
+    ).map((h: Record<string, unknown>) => {
+      const pnl =
+        typeof h.unrealizedPnl === 'object' &&
+        h.unrealizedPnl &&
+        typeof (h.unrealizedPnl as unknown as Record<string, unknown>)
+          .toNumber === 'function'
+          ? // @ts-ignore
+            (h.unrealizedPnl as unknown as Record<string, unknown>).toNumber()
+          : Number(h.unrealizedPnl || 0);
       const pnlSign = pnl >= 0 ? '+' : '';
-      return `  • ${h.symbol} (${h.quantity} shares) — Avg: ${safeNum(h.avgPrice)} | Now: ${safeNum(h.currentPrice)} | P&L: ${pnlSign}${safeNum(h.pnlPercentage, 1)}%`;
+      return `  • ${String(h.symbol)} (${Number(h.quantity)} shares) — Avg: ${safeNum(h.avgPrice)} | Now: ${safeNum(h.currentPrice)} | P&L: ${pnlSign}${safeNum(h.pnlPercentage, 1)}%`;
     });
 
     // Format recent trades as readable bullet points
-    const tradeLines = transactions.map((t: any) => {
-      const date = new Date(t.createdAt).toLocaleDateString('en-PK');
-      return `  • ${t.type} ${t.symbol} x${t.quantity} @ ${safeNum(t.price)} PKR on ${date}`;
+    const tradeLines = transactions.map((t: Record<string, unknown>) => {
+      const date = new Date(
+        t.createdAt as string | number | Date,
+      ).toLocaleDateString('en-PK');
+      return `  • ${String(t.type)} ${String(t.symbol)} x${Number(t.quantity)} @ ${safeNum(t.price)} PKR on ${date}`;
     });
 
     // Format watchlist
-    const watchlistLines = watchlistItems.map((w: any) => `  • ${w.symbol}`);
+    const watchlistLines = watchlistItems.map(
+      (w: Record<string, unknown>) => `  • ${String(w.symbol)}`,
+    );
 
     // Format live featured stocks
-    const stockLines = (featuredStocks || []).map((s: any) => {
-      const change = s.tick?.percentChange != null ? safeNum(s.tick.percentChange) : 'N/A';
-      return `  • ${s.symbol}: ${s.tick?.price != null ? safeNum(s.tick.price) : 'N/A'} PKR (${change}%)`;
-    });
+    const stockLines = (featuredStocks || []).map(
+      (s: Record<string, unknown>) => {
+        const tick = s.tick as Record<string, unknown> | undefined;
+        const change =
+          tick?.percentChange != null ? safeNum(tick.percentChange) : 'N/A';
+        return `  • ${String(s.symbol)}: ${tick?.price != null ? safeNum(tick.price) : 'N/A'} PKR (${change}%)`;
+      },
+    );
 
     const contextString = `
 USER: ${user?.name || user?.username || 'Unknown'} (ID: ${userId})
@@ -370,7 +439,9 @@ ${stockLines.length > 0 ? (stockLines.every((l: string) => l.includes('N/A PKR')
 ${this.marketBaseline}
     `.trim();
 
-    this.logger.debug(`Built user context for user ${userId} (isNewUser=${isNewUser}, holdings=${(portfolioData.portfolio || []).length}, trades=${transactions.length}, watchlist=${watchlistItems.length})`);
+    this.logger.debug(
+      `Built user context for user ${userId} (isNewUser=${isNewUser}, holdings=${((portfolioData.portfolio as unknown[]) || []).length}, trades=${transactions.length}, watchlist=${watchlistItems.length})`,
+    );
     return contextString;
   }
 
@@ -426,39 +497,21 @@ ${contextSnapshot}
     conversationHistory: { role: string; parts: { text: string }[] }[],
     newMessage: string,
   ): Promise<string> {
-    const url = `${this.apiUrl}?key=${this.apiKey}`;
+    const contents: Record<string, unknown>[] = [
+      ...conversationHistory.map((h) => ({ role: h.role, parts: h.parts })),
+      { role: 'user', parts: [{ text: newMessage }] },
+    ];
 
-    const body = {
-      // system_instruction keeps the system prompt separate from conversation
-      system_instruction: {
-        parts: [{ text: systemPrompt }],
-      },
-      // contents = full conversation history + the new user message at the end
-      contents: [
-        ...conversationHistory,
-        { role: 'user', parts: [{ text: newMessage }] },
-      ],
-      generationConfig: {
+    const response = await this.ai.models.generateContent({
+      model: 'gemini-2.5-flash-lite',
+      contents,
+      config: {
+        systemInstruction: systemPrompt,
         temperature: 0.7,
         maxOutputTokens: 2048,
       },
-    };
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
     });
 
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Gemini API error ${response.status}: ${errText}`);
-    }
-
-    const data = await response.json();
-    return (
-      data.candidates?.[0]?.content?.parts?.[0]?.text ||
-      "I couldn't generate a response. Please try again."
-    );
+    return response.text || "I couldn't generate a response. Please try again.";
   }
 }

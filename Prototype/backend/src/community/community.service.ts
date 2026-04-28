@@ -221,28 +221,36 @@ export class CommunityService {
   async getComments(postId: number, userId: number) {
     const blockedIds = await this.getBlockedIdPair(userId);
 
-    // Fetch top-level comments (parentId === null)
-    const comments = await this.prisma.comment.findMany({
+    // Fetch all comments for the post, then build the tree in JS
+    const allComments = await this.prisma.comment.findMany({
       where: {
         postId,
-        parentId: null,
         ...(blockedIds.length > 0 ? { authorId: { notIn: blockedIds } } : {}),
       },
-      include: {
-        author: { select: AUTHOR_SELECT },
-        replies: {
-          where:
-            blockedIds.length > 0 ? { authorId: { notIn: blockedIds } } : {},
-          include: {
-            author: { select: AUTHOR_SELECT },
-          },
-          orderBy: { createdAt: 'asc' },
-        },
-      },
+      include: { author: { select: AUTHOR_SELECT } },
       orderBy: { createdAt: 'asc' },
     });
 
-    return comments;
+    type CommentNode = (typeof allComments)[number] & {
+      replies: CommentNode[];
+    };
+
+    const map = new Map<number, CommentNode>();
+    for (const c of allComments) map.set(c.id, { ...c, replies: [] });
+
+    const roots: CommentNode[] = [];
+    for (const c of allComments) {
+      const node = map.get(c.id)!;
+      if (c.parentId === null) {
+        roots.push(node);
+      } else {
+        const parent = map.get(c.parentId);
+        if (parent) parent.replies.push(node);
+        else roots.push(node); // orphan (parent blocked) — show at top level
+      }
+    }
+
+    return roots;
   }
 
   async deleteComment(commentId: number, userId: number) {
@@ -357,13 +365,9 @@ export class CommunityService {
 
   // ─── USER MENTIONS & SEARCH ──────────────────────────────────────────
 
-  async searchMentions(
-    userId: number,
-    query: string,
-    limit: number = 10,
-  ) {
+  async searchMentions(userId: number, query: string, limit: number = 10) {
     const searchTerm = query.toLowerCase().trim();
-    
+
     // Get list of blocked users
     const blockedIds = await this.getBlockedIdPair(userId);
 
@@ -393,8 +397,18 @@ export class CommunityService {
           ? [
               {
                 OR: [
-                  { username: { contains: searchTerm, mode: 'insensitive' as const } },
-                  { name: { contains: searchTerm, mode: 'insensitive' as const } },
+                  {
+                    username: {
+                      contains: searchTerm,
+                      mode: 'insensitive' as const,
+                    },
+                  },
+                  {
+                    name: {
+                      contains: searchTerm,
+                      mode: 'insensitive' as const,
+                    },
+                  },
                 ],
               },
             ]
@@ -532,7 +546,7 @@ export class CommunityService {
     try {
       console.log('Starting image upload for user:', userId);
       console.log('File size:', fileBuffer.length, 'bytes');
-      
+
       // Try Supabase first (if configured)
       if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
         try {
@@ -546,14 +560,17 @@ export class CommunityService {
             });
 
           if (error) {
-            console.warn('Supabase upload error, falling back to local storage:', error);
+            console.warn(
+              'Supabase upload error, falling back to local storage:',
+              error,
+            );
           } else {
             console.log('Supabase upload successful');
             // Generate signed URL for private bucket (valid for 1 year)
             const { data: signedData } = await supabase.storage
               .from('TradeUp-profile-images')
               .createSignedUrl(data.path, 60 * 60 * 24 * 365);
-            
+
             if (signedData?.signedUrl) {
               console.log('Signed URL generated:', signedData.signedUrl);
               return signedData.signedUrl;
@@ -567,7 +584,10 @@ export class CommunityService {
             }
           }
         } catch (supabaseError) {
-          console.warn('Supabase error, falling back to local storage:', supabaseError);
+          console.warn(
+            'Supabase error, falling back to local storage:',
+            supabaseError,
+          );
         }
       }
 
@@ -584,9 +604,7 @@ export class CommunityService {
     } catch (error) {
       console.error('Image upload exception:', error);
       const errorMsg = error instanceof Error ? error.message : String(error);
-      throw new Error(
-        `Image upload failed: ${errorMsg}`,
-      );
+      throw new Error(`Image upload failed: ${errorMsg}`);
     }
   }
 }

@@ -2,13 +2,13 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "sonner";
-import { Plus, Minus, Check, RefreshCcw, ChevronUp, ChevronDown, Search, Flame, TrendingUp, TrendingDown } from "lucide-react";
+import { RefreshCcw, ChevronUp, ChevronDown, Flame, TrendingUp, TrendingDown } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/context/UserContext";
 import { isBalanceUnset } from "@/lib/userService";
 import { formatUSD } from "@/lib/format";
 import { AppShell } from "@/components/layout";
-import { PageHeader, EmptyState } from "@/components/common";
+import { PageHeader, EmptyState, DataCard, PriceFlashCell } from "@/components/common";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,7 +22,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { http, ApiException } from "@/lib/http";
-import { formatDecimal, formatPercent, formatSigned, formatVolume, formatTimeAgo, getPnLClass } from "@/lib/format";
+import { formatDecimal, formatPercent, formatVolume, formatTimeAgo } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 interface Tick {
@@ -34,6 +34,8 @@ interface Tick {
   chgPct?: number;
   changePct?: number;
   pct?: number;
+  percentChange?: number;
+  changePercent?: number;
   pc?: number;
   prev?: number;
   previous?: number;
@@ -53,7 +55,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const [featured, setFeatured] = useState<StockData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   const [watchlist, setWatchlist] = useState<Set<string>>(new Set());
@@ -81,7 +83,6 @@ export default function DashboardPage() {
   const { user, refreshUser } = useUser() || {};
   const tokenRef = useRef<string | null>(null);
 
-  // Load token from localStorage once on mount
   useEffect(() => {
     tokenRef.current =
       (typeof window !== "undefined" && localStorage.getItem("access_token")) || null;
@@ -98,14 +99,13 @@ export default function DashboardPage() {
   }, []);
 
   const fetchFeatured = useCallback(async () => {
-    setError(null);
     try {
       const json = await http.get<StockData[]>("/stocks/featured", { noAuth: true });
       setFeatured(Array.isArray(json) ? json : []);
       setLastUpdated(new Date());
     } catch (e) {
       const message = e instanceof ApiException ? e.message : "Failed to load stocks";
-      setError(message);
+      // setError(message);
     } finally {
       setLoading(false);
     }
@@ -113,7 +113,7 @@ export default function DashboardPage() {
 
   const fetchInsights = useCallback(async () => {
     try {
-      const json = await http.get<{ gainers: any[]; losers: any[]; hot: any[] }>("/stocks/insights", { noAuth: true });
+      const json = await http.get<{ gainers: Record<string, unknown>[]; losers: Record<string, unknown>[]; hot: Record<string, unknown>[] }>("/stocks/insights", { noAuth: true });
       if (json) {
         setInsights({
           gainers: (json.gainers || []).map(x => normalizeStock(x)),
@@ -161,7 +161,6 @@ export default function DashboardPage() {
   }, [normalizeStock]);
 
   useEffect(() => {
-    // Show wallet popup for new users who haven't funded yet
     if (isBalanceUnset(user?.balance)) {
       setShowWalletPopup(true);
     }
@@ -213,9 +212,7 @@ export default function DashboardPage() {
       try {
         const raw = await http.get<Record<string, unknown>>(`/stocks/${encodeURIComponent(symbol)}`);
         normalized = normalizeStock(raw, symbol);
-      } catch {
-        // ignore; keep minimal fallback
-      }
+      } catch {}
 
       const next = new Set(watchlist);
       next.add(symbol);
@@ -256,9 +253,6 @@ export default function DashboardPage() {
       setRemoving(r2);
     }
   }, [removing, watchlist]);
-
-  // Note: refreshUser is already called by UserContext on mount,
-  // so we don't need to call it again here.
 
   const handleFundWallet = async (amount: number) => {
     try {
@@ -317,10 +311,9 @@ export default function DashboardPage() {
 
   return (
     <AppShell requireAuth={false}>
-      {/* Wallet Popup */}
       {showWalletPopup && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80">
-          <Card className="w-full max-w-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+          <Card className="w-full max-w-sm border-primary">
             <CardHeader>
               <CardTitle>Fund Your Wallet</CardTitle>
             </CardHeader>
@@ -333,17 +326,15 @@ export default function DashboardPage() {
                   if (amount > 0) handleFundWallet(amount);
                 }}
               >
-                <div className="grid gap-4">
-                  <div className="grid gap-2">
-                    <Input
-                      id="amount"
-                      name="amount"
-                      type="number"
-                      placeholder="Enter amount"
-                      required
-                      min="1"
-                    />
-                  </div>
+                <div className="flex flex-col gap-4">
+                  <Input
+                    id="amount"
+                    name="amount"
+                    type="number"
+                    placeholder="Enter amount"
+                    required
+                    min="1"
+                  />
                   <Button type="submit" className="w-full">
                     Add Funds
                   </Button>
@@ -358,13 +349,14 @@ export default function DashboardPage() {
         title="Market Snapshot"
         description="Live stock activity from Pakistan Stock Exchange"
         actions={
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             {lastUpdated && (
-              <span className="text-xs text-muted-foreground">
-                Updated {formatTimeAgo(lastUpdated)}
+              <span className="text-xs text-muted-foreground text-label-caps">
+                UPDATED {formatTimeAgo(lastUpdated)}
               </span>
             )}
             <Button
+              variant="outline"
               onClick={() => {
                 setLoading(true);
                 fetchFeatured();
@@ -372,100 +364,122 @@ export default function DashboardPage() {
               }}
             >
               <RefreshCcw className="mr-2 h-4 w-4" />
-              Refresh
+              REFRESH
             </Button>
           </div>
         }
       />
 
-      {/* Watchlist Section */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
+        {featured.slice(0, 4).map((stock) => {
+          const price = getPrice(stock.tick);
+          const { pct } = getChange(stock.tick);
+          return (
+            <DataCard 
+              key={stock.symbol}
+              title={stock.symbol}
+              value={formatDecimal(price)}
+              delta={{ value: `${formatPercent(pct)}`, isPositive: pct >= 0 }}
+            />
+          );
+        })}
+      </div>
+
+      <div className="mb-12">
+        <h2 className="mb-6">Market Heatmap</h2>
+        <div className="grid grid-cols-2 md:grid-cols-5 lg:grid-cols-10 gap-2">
+          {featured.slice(0, 20).map((stock) => {
+            const { pct } = getChange(stock.tick);
+            const isPositive = pct >= 0;
+            return (
+              <div
+                key={stock.symbol}
+                onClick={() => handleRowClick(stock.symbol)}
+                className={cn(
+                  "aspect-square rounded-md p-2 flex flex-col justify-between cursor-pointer transition-transform hover:scale-105 hover:z-10",
+                  isPositive ? "bg-primary/20 border border-primary/50 text-primary" : "bg-destructive/20 border border-destructive/50 text-destructive-foreground"
+                )}
+              >
+                <span className="text-label-caps">{stock.symbol}</span>
+                <span className="text-xs font-mono font-bold">{formatPercent(pct)}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       {tokenRef.current && (
-        <Card className="mb-6">
-          <CardHeader className="pb-4">
-            <div className="flex items-center justify-between">
-              <CardTitle>Your Watchlist</CardTitle>
-              {watchlistRows.length === 0 && (
-                <span className="text-sm text-muted-foreground">
-                  No stocks yet — add from the Market Snapshot list.
-                </span>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent>
+        <div className="mb-12">
+          <div className="flex items-center justify-between mb-6">
+            <h2>Your Watchlist</h2>
+          </div>
+          <Card className="bg-transparent border-none p-0">
             {watchlistRows.length > 0 ? (
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Symbol</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead className="text-right">Last</TableHead>
+                  <TableRow className="border-b border-border hover:bg-transparent">
+                    <TableHead className="text-label-caps">SYMBOL</TableHead>
+                    <TableHead className="text-label-caps">NAME</TableHead>
+                    <TableHead className="text-right text-label-caps">LAST</TableHead>
                     <TableHead 
-                      className="text-right cursor-pointer select-none hover:text-foreground transition-colors"
+                      className="text-right cursor-pointer select-none hover:text-foreground transition-colors text-label-caps"
                       onClick={() => toggleSort("pct")}
                     >
                       <div className="flex items-center justify-end gap-1">
-                        % Change
+                        % CHANGE
                         {sortConfig.key === "pct" && (
                           sortConfig.direction === "asc" ? <ChevronUp className="h-4 w-4" /> : 
                           sortConfig.direction === "desc" ? <ChevronDown className="h-4 w-4" /> : null
                         )}
                       </div>
                     </TableHead>
-                    <TableHead className="text-right">Volume</TableHead>
-                    <TableHead className="text-right">Action</TableHead>
+                    <TableHead className="text-right text-label-caps">VOLUME</TableHead>
+                    <TableHead className="text-right text-label-caps">ACTION</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {getSortedItems(watchlistRows).map((row, i) => {
                     const s = row?.symbol ?? `w-${i}`;
                     const price = getPrice(row?.tick);
-                    const { chg, pct } = getChange(row?.tick);
+                    const { pct } = getChange(row?.tick);
                     const vol = getVolume(row?.tick);
                     const isRemoving = removing.has(s);
 
                     return (
                       <TableRow 
                         key={s}
-                        className="cursor-pointer hover:bg-muted/50 transition-colors"
+                        className="cursor-pointer hover:bg-muted/50 transition-colors border-none"
                         onClick={() => handleRowClick(s)}
                       >
-                        <TableCell className="font-medium">{row?.symbol ?? "—"}</TableCell>
+                        <TableCell className="font-bold text-label-caps">{row?.symbol ?? "—"}</TableCell>
                         <TableCell className="text-muted-foreground">{row?.name ?? "—"}</TableCell>
                         <TableCell className="text-right tabular-nums font-medium">
-                          {formatDecimal(price)}
+                          <PriceFlashCell value={price} displayValue={formatDecimal(price)} />
                         </TableCell>
                         <TableCell className="text-right">
-                          <Badge
-                            variant="outline"
-                            className={cn(
-                              "font-mono rounded-sm border-transparent px-2 py-0.5",
-                              pct > 0 ? "bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20" :
-                              pct < 0 ? "bg-rose-500/10 text-rose-500 hover:bg-rose-500/20" :
-                              "bg-muted text-muted-foreground"
-                            )}
-                          >
-                            {formatPercent(pct)}
-                          </Badge>
+                          <span className={cn("font-mono font-bold", pct > 0 ? "text-[#6fcf97]" : pct < 0 ? "text-[#eb5757]" : "text-muted-foreground")}>
+                            {pct > 0 ? "+" : ""}{formatPercent(pct)}
+                          </span>
                         </TableCell>
                         <TableCell className="text-right tabular-nums">
                           {formatVolume(vol)}
                         </TableCell>
                         <TableCell className="text-right">
                           <Button
-                            variant="outline"
+                            variant="ghost"
                             size="sm"
                             onClick={(e) => {
                               e.stopPropagation();
                               removeSymbol(s);
                             }}
                             disabled={isRemoving}
+                            className="text-destructive hover:bg-destructive/10"
                           >
                             {isRemoving ? (
                               <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
                             ) : (
-                              <Minus className="h-3 w-3" />
+                              "REMOVE"
                             )}
-                            <span className="ml-1">Remove</span>
                           </Button>
                         </TableCell>
                       </TableRow>
@@ -476,104 +490,85 @@ export default function DashboardPage() {
             ) : (
               <EmptyState variant="watchlist" />
             )}
-          </CardContent>
-        </Card>
+          </Card>
+        </div>
       )}
 
-      {/* Market Snapshot Section */}
-      <Card>
-        <CardHeader className="pb-4">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-            <div className="flex items-center gap-3">
-              <CardTitle>Market Snapshot</CardTitle>
-              {error && <Badge variant="error">{error}</Badge>}
+      <div>
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <h2>Market Movers</h2>
+          </div>
+          <div className="flex flex-col sm:flex-row items-center gap-6 w-full xl:w-auto">
+            <div className="relative w-full sm:w-72">
+              <Input
+                type="search"
+                placeholder="SEARCH SYMBOLS..."
+                className="bg-muted text-label-caps border-b-2"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
             </div>
-            <div className="flex flex-col sm:flex-row items-center gap-4 w-full xl:w-auto">
-              <div className="relative w-full sm:w-72">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="search"
-                  placeholder="Search symbols..."
-                  className="pl-8 bg-secondary border-none"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
-              <div className="flex flex-wrap items-center gap-1 bg-muted/50 p-1 rounded-lg w-full sm:w-auto">
-                <button
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+              <Button
+                variant={activeTab === "all" ? "default" : "secondary"}
                 onClick={() => setActiveTab("all")}
-                className={cn(
-                  "px-4 py-1.5 text-sm font-medium rounded-md transition-all",
-                  activeTab === "all" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-                )}
               >
-                All
-              </button>
-              <button
+                ALL
+              </Button>
+              <Button
+                variant={activeTab === "hot" ? "default" : "secondary"}
                 onClick={() => setActiveTab("hot")}
-                title="Top 10 stocks with the highest total value traded (turnover) today."
-                className={cn(
-                  "px-4 py-1.5 text-sm font-medium rounded-md transition-all flex items-center gap-1.5",
-                  activeTab === "hot" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-                )}
               >
-                <Flame className="h-4 w-4 text-orange-500" /> Hot
-              </button>
-              <button
+                <Flame className="h-4 w-4 mr-2 text-orange-500" /> HOT
+              </Button>
+              <Button
+                variant={activeTab === "gainers" ? "default" : "secondary"}
                 onClick={() => setActiveTab("gainers")}
-                title="Top 10 highest percentage price increases today."
-                className={cn(
-                  "px-4 py-1.5 text-sm font-medium rounded-md transition-all flex items-center gap-1.5",
-                  activeTab === "gainers" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-                )}
               >
-                <TrendingUp className="h-4 w-4 text-emerald-500" /> Gainers
-              </button>
-              <button
+                <TrendingUp className="h-4 w-4 mr-2 text-emerald-500" /> GAINERS
+              </Button>
+              <Button
+                variant={activeTab === "losers" ? "default" : "secondary"}
                 onClick={() => setActiveTab("losers")}
-                title="Top 10 highest percentage price decreases today."
-                className={cn(
-                  "px-4 py-1.5 text-sm font-medium rounded-md transition-all flex items-center gap-1.5",
-                  activeTab === "losers" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-                )}
               >
-                <TrendingDown className="h-4 w-4 text-rose-500" /> Losers
-              </button>
+                <TrendingDown className="h-4 w-4 mr-2 text-rose-500" /> LOSERS
+              </Button>
             </div>
           </div>
-          </div>
-        </CardHeader>
-        <CardContent>
+        </div>
+        
+        <Card className="bg-transparent border-none p-0">
           {loading ? (
             <SkeletonTable />
           ) : filteredItems.length > 0 ? (
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>Symbol</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead className="text-right">Last</TableHead>
+                <TableRow className="border-b border-border hover:bg-transparent">
+                  <TableHead className="text-label-caps">SYMBOL</TableHead>
+                  <TableHead className="text-label-caps">NAME</TableHead>
+                  <TableHead className="text-right text-label-caps">LAST</TableHead>
                   <TableHead 
-                    className="text-right cursor-pointer select-none hover:text-foreground transition-colors"
+                    className="text-right cursor-pointer select-none hover:text-foreground transition-colors text-label-caps"
                     onClick={() => toggleSort("pct")}
                   >
                     <div className="flex items-center justify-end gap-1">
-                      % Change
+                      % CHANGE
                       {sortConfig.key === "pct" && (
                         sortConfig.direction === "asc" ? <ChevronUp className="h-4 w-4" /> : 
                         sortConfig.direction === "desc" ? <ChevronDown className="h-4 w-4" /> : null
                       )}
                     </div>
                   </TableHead>
-                  <TableHead className="text-right">Volume</TableHead>
-                  <TableHead className="text-right">Watch</TableHead>
+                  <TableHead className="text-right text-label-caps">VOLUME</TableHead>
+                  <TableHead className="text-right text-label-caps">WATCH</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredItems.map((row, i) => {
                   const s = row?.symbol ?? `${activeTab}-${i}`;
                   const price = getPrice(row?.tick);
-                  const { chg, pct } = getChange(row?.tick);
+                  const { pct } = getChange(row?.tick);
                   const vol = getVolume(row?.tick);
                   const isSaved = watchlist.has(s);
                   const isSaving = saving.has(s);
@@ -582,26 +577,18 @@ export default function DashboardPage() {
                   return (
                     <TableRow 
                       key={s}
-                      className="cursor-pointer hover:bg-muted/50 transition-colors"
+                      className="cursor-pointer hover:bg-muted/50 transition-colors border-none"
                       onClick={() => handleRowClick(s)}
                     >
-                      <TableCell className="font-medium">{row?.symbol ?? "—"}</TableCell>
+                      <TableCell className="font-bold text-label-caps">{row?.symbol ?? "—"}</TableCell>
                       <TableCell className="text-muted-foreground">{row?.name ?? "—"}</TableCell>
                       <TableCell className="text-right tabular-nums font-medium">
-                        {formatDecimal(price)}
+                        <PriceFlashCell value={price} displayValue={formatDecimal(price)} />
                       </TableCell>
                       <TableCell className="text-right">
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            "font-mono rounded-sm border-transparent px-2 py-0.5",
-                            pct > 0 ? "bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20" :
-                            pct < 0 ? "bg-rose-500/10 text-rose-500 hover:bg-rose-500/20" :
-                            "bg-muted text-muted-foreground"
-                          )}
-                        >
-                          {formatPercent(pct)}
-                        </Badge>
+                        <span className={cn("font-mono font-bold", pct > 0 ? "text-[#6fcf97]" : pct < 0 ? "text-[#eb5757]" : "text-muted-foreground")}>
+                          {pct > 0 ? "+" : ""}{formatPercent(pct)}
+                        </span>
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
                         {formatVolume(vol)}
@@ -609,25 +596,23 @@ export default function DashboardPage() {
                       <TableCell className="text-right">
                         {isSaved ? (
                           <Badge variant="success">
-                            <Check className="mr-1 h-3 w-3" /> Saved
+                            SAVED
                           </Badge>
                         ) : (
                           <Button
-                            variant="outline"
+                            variant="secondary"
                             size="sm"
                             onClick={(e) => {
                               e.stopPropagation();
                               saveSymbol(s);
                             }}
                             disabled={!canSave}
-                            title={tokenRef.current ? "Save to watchlist" : "Sign in to save"}
                           >
                             {isSaving ? (
                               <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
                             ) : (
-                              <Plus className="h-3 w-3" />
+                              "SAVE"
                             )}
-                            <span className="ml-1">Save</span>
                           </Button>
                         )}
                       </TableCell>
@@ -642,17 +627,12 @@ export default function DashboardPage() {
               description={`No stocks found matching "${searchQuery}"`}
             />
           )}
-        </CardContent>
-      </Card>
-
-      <p className="mt-4 text-center text-xs text-muted-foreground">
-        Early read-only view for prices. Live ticks can replace polling next.
-      </p>
+        </Card>
+      </div>
     </AppShell>
   );
 }
 
-/* ---------------- Skeleton ---------------- */
 function SkeletonTable() {
   return (
     <div className="space-y-3">
@@ -667,7 +647,6 @@ function SkeletonTable() {
   );
 }
 
-/* ---------------- Field mappers & formatting ---------------- */
 function getPrice(tick: Tick | null | undefined): number {
   if (!tick) return NaN;
   return num(tick.c ?? tick.price ?? tick.p);
@@ -677,7 +656,7 @@ function getChange(tick: Tick | null | undefined): { chg: number; pct: number } 
   if (!tick) return { chg: NaN, pct: NaN };
 
   const chg = num(tick.chg ?? tick.change);
-  let pct = num(tick.chgPct ?? tick.changePct ?? tick.pct);
+  let pct = num(tick.chgPct ?? tick.changePct ?? tick.pct ?? tick.percentChange ?? tick.changePercent);
 
   if (!isFinite(pct)) {
     const price = num(tick.c ?? tick.price ?? tick.p);

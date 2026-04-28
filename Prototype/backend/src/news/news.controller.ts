@@ -172,7 +172,6 @@ export class NewsController {
     `;
 
     try {
-      // Try different model names based on current Gemini API (Jan 2026)
       const possibleModels = [
         'gemini-2.5-flash', // Best price-performance for sentiment analysis
         'gemini-2.5-flash-lite', // Ultra fast and cost-efficient

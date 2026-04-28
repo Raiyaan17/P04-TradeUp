@@ -7,4 +7,4 @@ import { StocksController } from './stocks.controller';
   controllers: [StocksController],
   exports: [StocksService],
 })
-export class StocksModule { }
+export class StocksModule {}

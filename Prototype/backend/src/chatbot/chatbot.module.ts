@@ -8,7 +8,13 @@ import { TradesModule } from '../trades/trades.module';
 import { WatchlistModule } from '../watchlist/watchlist.module';
 
 @Module({
-  imports: [ConfigModule, PrismaModule, StocksModule, TradesModule, WatchlistModule],
+  imports: [
+    ConfigModule,
+    PrismaModule,
+    StocksModule,
+    TradesModule,
+    WatchlistModule,
+  ],
   controllers: [ChatbotController],
   providers: [ChatbotService],
   exports: [ChatbotService],

@@ -8,7 +8,7 @@ import { WatchlistService } from '../watchlist/watchlist.service';
 
 // ─── Mock global fetch ──────────────────────────────────────────────
 const mockFetch = jest.fn();
-global.fetch = mockFetch as any;
+global.fetch = mockFetch as unknown as typeof global.fetch;
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -35,7 +35,7 @@ function geminiFail(status = 500) {
 
 describe('ChatbotService', () => {
   let service: ChatbotService;
-  let prisma: Record<string, any>;
+  let prisma: Record<string, Record<string, jest.Mock>>;
   let tradesService: Partial<TradesService>;
   let watchlistService: Partial<WatchlistService>;
   let stocksService: Partial<StocksService>;
@@ -131,7 +131,12 @@ describe('ChatbotService', () => {
 
   describe('getOrCreateSession', () => {
     it('should return an existing session if one is active within 24h', async () => {
-      const existingSession = { id: 42, userId: 1, createdAt: new Date(), lastActiveAt: new Date() };
+      const existingSession = {
+        id: 42,
+        userId: 1,
+        createdAt: new Date(),
+        lastActiveAt: new Date(),
+      };
       prisma.chatSession.findFirst.mockResolvedValue(existingSession);
 
       const result = await service.getOrCreateSession(1);
@@ -147,7 +152,12 @@ describe('ChatbotService', () => {
 
     it('should create a new session if no recent session exists', async () => {
       prisma.chatSession.findFirst.mockResolvedValue(null);
-      const newSession = { id: 99, userId: 1, createdAt: new Date(), lastActiveAt: new Date() };
+      const newSession = {
+        id: 99,
+        userId: 1,
+        createdAt: new Date(),
+        lastActiveAt: new Date(),
+      };
       prisma.chatSession.create.mockResolvedValue(newSession);
 
       const result = await service.getOrCreateSession(1);
@@ -167,8 +177,20 @@ describe('ChatbotService', () => {
     it('should return messages for a valid session', async () => {
       prisma.chatSession.findFirst.mockResolvedValue({ id: 1, userId: 1 });
       const messages = [
-        { id: 1, sessionId: 1, role: 'user', content: 'hello', createdAt: new Date() },
-        { id: 2, sessionId: 1, role: 'assistant', content: 'hi!', createdAt: new Date() },
+        {
+          id: 1,
+          sessionId: 1,
+          role: 'user',
+          content: 'hello',
+          createdAt: new Date(),
+        },
+        {
+          id: 2,
+          sessionId: 1,
+          role: 'assistant',
+          content: 'hi!',
+          createdAt: new Date(),
+        },
       ];
       prisma.chatMessage.findMany.mockResolvedValue(messages);
 
@@ -186,7 +208,9 @@ describe('ChatbotService', () => {
     it('should throw an error if the session does not belong to the user', async () => {
       prisma.chatSession.findFirst.mockResolvedValue(null);
 
-      await expect(service.getSessionHistory(1, 999)).rejects.toThrow('Session not found');
+      await expect(service.getSessionHistory(1, 999)).rejects.toThrow(
+        'Session not found',
+      );
     });
   });
 
@@ -207,9 +231,15 @@ describe('ChatbotService', () => {
     it('should call Gemini and return the response on success', async () => {
       prisma.chatSession.findFirst.mockResolvedValue({ id: 1, userId: 1 });
       prisma.chatMessage.findMany.mockResolvedValue([]);
-      mockFetch.mockResolvedValue(geminiOk('Great question! Here is my analysis...'));
+      mockFetch.mockResolvedValue(
+        geminiOk('Great question! Here is my analysis...'),
+      );
 
-      const result = await service.getChatResponse(1, 1, 'analyze my portfolio');
+      const result = await service.getChatResponse(
+        1,
+        1,
+        'analyze my portfolio',
+      );
 
       expect(result).toBe('Great question! Here is my analysis...');
       expect(mockFetch).toHaveBeenCalledTimes(1);
@@ -217,7 +247,11 @@ describe('ChatbotService', () => {
       expect(prisma.chatMessage.createMany).toHaveBeenCalledWith({
         data: [
           { sessionId: 1, role: 'user', content: 'analyze my portfolio' },
-          { sessionId: 1, role: 'assistant', content: 'Great question! Here is my analysis...' },
+          {
+            sessionId: 1,
+            role: 'assistant',
+            content: 'Great question! Here is my analysis...',
+          },
         ],
       });
       // Verify session lastActiveAt was updated
@@ -247,7 +281,9 @@ describe('ChatbotService', () => {
       prisma.chatMessage.findMany.mockResolvedValue([]);
       mockFetch.mockResolvedValue(geminiOk('Here is your advice'));
       // Make persistence fail
-      prisma.chatMessage.createMany.mockRejectedValue(new Error('DB write failed'));
+      prisma.chatMessage.createMany.mockRejectedValue(
+        new Error('DB write failed'),
+      );
 
       const result = await service.getChatResponse(1, 1, 'give me advice');
 
@@ -274,7 +310,11 @@ describe('ChatbotService', () => {
     });
 
     it('should return a trading guide for messages about buying', async () => {
-      const result = await service.getChatResponse(1, 1, 'how do I buy stocks?');
+      const result = await service.getChatResponse(
+        1,
+        1,
+        'how do I buy stocks?',
+      );
       expect(result).toContain('Trading');
       expect(result).toContain('Buy');
     });
@@ -307,7 +347,8 @@ describe('ChatbotService', () => {
       });
 
       // Capture what prompt is sent to Gemini
-      mockFetch.mockImplementation(async (_url: string, options: any) => {
+      mockFetch.mockImplementation(async (_url: string, options: unknown) => {
+        // @ts-ignore
         const body = JSON.parse(options.body);
         const systemText = body.system_instruction.parts[0].text;
         expect(systemText).toContain('NEW USER');
@@ -340,12 +381,19 @@ describe('ChatbotService', () => {
       });
       (tradesService.getTransactions as jest.Mock).mockResolvedValue({
         transactions: [
-          { type: 'BUY', symbol: 'OGDC', quantity: 10, price: 120, createdAt: new Date() },
+          {
+            type: 'BUY',
+            symbol: 'OGDC',
+            quantity: 10,
+            price: 120,
+            createdAt: new Date(),
+          },
         ],
         total: 1,
       });
 
-      mockFetch.mockImplementation(async (_url: string, options: any) => {
+      mockFetch.mockImplementation(async (_url: string, options: unknown) => {
+        // @ts-ignore
         const body = JSON.parse(options.body);
         const systemText = body.system_instruction.parts[0].text;
         // Should NOT contain new user marker
@@ -364,10 +412,18 @@ describe('ChatbotService', () => {
       prisma.chatMessage.findMany.mockResolvedValue([]);
       // Make all sub-services fail
       prisma.user.findUnique.mockRejectedValue(new Error('DB down'));
-      (tradesService.getPortfolio as jest.Mock).mockRejectedValue(new Error('DB down'));
-      (tradesService.getTransactions as jest.Mock).mockRejectedValue(new Error('DB down'));
-      (watchlistService.list as jest.Mock).mockRejectedValue(new Error('DB down'));
-      (stocksService.listFeaturedWithTicks as jest.Mock).mockRejectedValue(new Error('DB down'));
+      (tradesService.getPortfolio as jest.Mock).mockRejectedValue(
+        new Error('DB down'),
+      );
+      (tradesService.getTransactions as jest.Mock).mockRejectedValue(
+        new Error('DB down'),
+      );
+      (watchlistService.list as jest.Mock).mockRejectedValue(
+        new Error('DB down'),
+      );
+      (stocksService.listFeaturedWithTicks as jest.Mock).mockRejectedValue(
+        new Error('DB down'),
+      );
 
       mockFetch.mockResolvedValue(geminiOk('I can still help you!'));
 
@@ -386,10 +442,7 @@ describe('ChatbotService', () => {
       prisma.tournament.findMany.mockResolvedValue([
         {
           id: '1',
-          trajectoryJson: [
-            { PSX: 60000 },
-            { PSX: 62000 },
-          ],
+          trajectoryJson: [{ PSX: 60000 }, { PSX: 62000 }],
           createdAt: new Date(),
         },
       ]);
@@ -397,7 +450,8 @@ describe('ChatbotService', () => {
       await service.trainBaselineModel();
 
       // Access private field via bracket notation for testing
-      const baseline = (service as any).marketBaseline as string;
+      const baseline = (service as unknown as Record<string, unknown>)
+        .marketBaseline as string;
       expect(baseline).toContain('SIMULATION HISTORY');
       expect(baseline).toContain('60000');
       expect(baseline).toContain('62000');
@@ -408,7 +462,8 @@ describe('ChatbotService', () => {
 
       await service.trainBaselineModel();
 
-      const baseline = (service as any).marketBaseline as string;
+      const baseline = (service as unknown as Record<string, unknown>)
+        .marketBaseline as string;
       expect(baseline).toBe('No historical simulation data available.');
     });
   });
@@ -422,7 +477,13 @@ describe('ChatbotService', () => {
       prisma.user.findUnique.mockResolvedValue({ id: 1, name: 'Test User' });
       (tradesService.getTransactions as jest.Mock).mockResolvedValue({
         transactions: [
-          { type: 'BUY', symbol: 'HBL', quantity: 5, price: 200, createdAt: new Date() },
+          {
+            type: 'BUY',
+            symbol: 'HBL',
+            quantity: 5,
+            price: 200,
+            createdAt: new Date(),
+          },
         ],
         total: 1,
       });
@@ -433,7 +494,8 @@ describe('ChatbotService', () => {
         balance: 80000,
       });
 
-      mockFetch.mockImplementation(async (_url: string, options: any) => {
+      mockFetch.mockImplementation(async (_url: string, options: unknown) => {
+        // @ts-ignore
         const body = JSON.parse(options.body);
         const userMsg = body.contents[0].parts[0].text;
         expect(userMsg).toContain('weekly');
@@ -460,13 +522,16 @@ describe('ChatbotService', () => {
         balance: 100000,
       });
 
-      mockFetch.mockImplementation(async (_url: string, options: any) => {
+      mockFetch.mockImplementation(async (_url: string, options: unknown) => {
+        // @ts-ignore
         const body = JSON.parse(options.body);
         const userMsg = body.contents[0].parts[0].text;
         expect(userMsg).toContain('monthly');
         expect(userMsg).toContain('Trader Ali');
         expect(userMsg).toContain('No trades this period');
-        return geminiOk('## Monthly Performance Review\n**Overall Grade: N/A**');
+        return geminiOk(
+          '## Monthly Performance Review\n**Overall Grade: N/A**',
+        );
       });
 
       const result = await service.generatePeriodicReview(1, 'monthly');

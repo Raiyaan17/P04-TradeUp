@@ -51,13 +51,18 @@ export class CorsExceptionFilter implements ExceptionFilter {
 
     // Set CORS headers for all responses, including error responses
     // Allow both development and production origins
-    const allowedOrigins = [
+    const ALLOWED_ORIGINS = [
       'http://localhost:3000',
+      'http://localhost:3001',
+      'http://localhost:3002',
       'https://p04-trade-up.vercel.app',
+      'https://p04-trade-up1.vercel.app',
+      'https://tradeup-syai.onrender.com/',
+      'http://136.119.205.38/',
     ];
     const requestOrigin = request.headers.origin;
 
-    if (requestOrigin && allowedOrigins.includes(requestOrigin)) {
+    if (requestOrigin && ALLOWED_ORIGINS.includes(requestOrigin)) {
       response.header('Access-Control-Allow-Origin', requestOrigin);
     } else {
       response.header(
@@ -75,6 +80,11 @@ export class CorsExceptionFilter implements ExceptionFilter {
       'Content-Type, Authorization, Accept, X-Requested-With',
     );
     response.header('Access-Control-Allow-Credentials', 'true');
+
+    if (request.method === 'OPTIONS') {
+      response.status(204).send();
+      return;
+    }
 
     const status =
       exception instanceof HttpException

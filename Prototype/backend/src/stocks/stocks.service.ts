@@ -1,6 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import axios from 'axios';
-import { FEATURED_SYMBOLS, PSX_API_BASE, SYMBOL_NAME_MAP } from '../common/constants';
+import {
+  FEATURED_SYMBOLS,
+  PSX_API_BASE,
+  SYMBOL_NAME_MAP,
+} from '../common/constants';
 import { PrismaService } from '../prisma/prisma.service';
 
 interface PsxApiResponse<T> {
@@ -36,23 +40,25 @@ export class StocksService {
   private readonly missingQueue = new Set<string>();
   private isProcessingQueue = false;
   private lastWorkerHeartbeat = 0;
-  private insightsCache: any = null;
+  private insightsCache: unknown = null;
   private lastInsightsFetch = 0;
   private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
-  updateTickCache(symbol: string, tick: any) {
-    // Normalize data: PSX Terminal uses changePercent/chgPct, we expect percentChange
+  updateTickCache(symbol: string, tick: Record<string, unknown>) {
+    const rawPct =
+      (tick['changePercent'] ?? tick['pch'] ?? tick['pct'] ?? tick['percentChange'] ?? 0) as number;
+    const percentChange = Number(rawPct) * 100;
+
     const normalized: TickData = {
       ...tick,
-      price: Number(tick.price || tick.last || 0),
-      change: Number(tick.change ?? tick.chg ?? 0),
-      percentChange: Number(
-        tick.percentChange ?? tick.changePercent ?? tick.chgPct ?? tick.pct ?? 0,
-      ),
-      volume: Number(tick.volume ?? tick.vol ?? 0),
-      value: Number(tick.value ?? tick.turnover ?? 0),
+      symbol,
+      price: Number(tick['price'] || tick['last'] || 0),
+      change: Number(tick['change'] ?? tick['chg'] ?? 0),
+      percentChange,
+      volume: Number(tick['volume'] ?? tick['vol'] ?? 0),
+      value: Number(tick['value'] ?? tick['turnover'] ?? 0),
     };
 
     this.tickCache.set(symbol, normalized);
@@ -76,7 +82,7 @@ export class StocksService {
       });
       if (data?.success) {
         this.updateTickCache(symbol, data.data);
-        return data.data;
+        return this.tickCache.get(symbol) || null;
       }
       return null;
     } catch (error) {
@@ -102,7 +108,9 @@ export class StocksService {
 
     this.isProcessingQueue = true;
     this.lastWorkerHeartbeat = now;
-    console.log(`Drip-feed worker starting. Queue size: ${this.missingQueue.size}`);
+    console.log(
+      `Drip-feed worker starting. Queue size: ${this.missingQueue.size}`,
+    );
 
     try {
       while (this.missingQueue.size > 0) {
@@ -111,7 +119,7 @@ export class StocksService {
         if (!symbol) break;
 
         // Respect 100 req/min limit by sleeping for 1000ms between calls
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise((resolve) => setTimeout(resolve, 1000));
 
         // 1. Drip-feed Price Data (Tick)
         if (!this.tickCache.has(symbol)) {
@@ -121,11 +129,15 @@ export class StocksService {
 
         // 2. Sync Metadata (Company Name from manual map)
         try {
-          const manualName = SYMBOL_NAME_MAP[symbol as any];
+          const manualName = SYMBOL_NAME_MAP[symbol];
           if (manualName) {
-            const dbStock = await this.prisma.stock.findUnique({ where: { symbol } });
+            const dbStock = await this.prisma.stock.findUnique({
+              where: { symbol },
+            });
             if (dbStock && dbStock.name !== manualName) {
-              console.log(`Drip-feeding: Syncing manual name for ${symbol} -> ${manualName}`);
+              console.log(
+                `Drip-feeding: Syncing manual name for ${symbol} -> ${manualName}`,
+              );
               await this.prisma.stock.update({
                 where: { symbol },
                 data: { name: manualName },
@@ -133,7 +145,10 @@ export class StocksService {
             }
           }
         } catch (dbError) {
-          console.error(`Failed to sync manual name for ${symbol}:`, (dbError as Error).message);
+          console.error(
+            `Failed to sync manual name for ${symbol}:`,
+            (dbError as Error).message,
+          );
         }
 
         this.missingQueue.delete(symbol);
@@ -152,8 +167,8 @@ export class StocksService {
     const results = await Promise.all(
       symbols.map(async (s) => {
         const dbStock = await this.findOrCreateStock(s);
-        
-        let tick = this.tickCache.get(s);
+
+        const tick = this.tickCache.get(s);
         if (!tick) {
           // Cold Start / Missing Data: Queue it to be safely fetched
           this.missingQueue.add(s);
@@ -236,23 +251,26 @@ export class StocksService {
 
     if (!stock) {
       stock = await this.prisma.stock.create({
-        data: { 
+        data: {
           symbol,
-          name: SYMBOL_NAME_MAP[symbol as any] || null
+          name:
+            // @ts-ignore
+            SYMBOL_NAME_MAP[symbol as unknown as Record<string, unknown>] ||
+            null,
         },
       });
     }
 
-    // Notice: Aggressive runtime name fetching has been disabled 
+    // Notice: Aggressive runtime name fetching has been disabled
     // to protect upstream REST rate limits. Names should be seeded safely in the background.
-    
+
     return stock;
   }
 
-  async getCompanyProfile(symbol: string): Promise<any> {
+  async getCompanyProfile(symbol: string): Promise<unknown> {
     const url = `${this.base}/api/companies/${encodeURIComponent(symbol)}`;
     try {
-      const { data } = await axios.get<PsxApiResponse<any>>(url, {
+      const { data } = await axios.get<PsxApiResponse<unknown>>(url, {
         timeout: 5000,
       });
       if (data?.success) return data.data;
@@ -266,10 +284,10 @@ export class StocksService {
     }
   }
 
-  async getFundamentals(symbol: string): Promise<any> {
+  async getFundamentals(symbol: string): Promise<unknown> {
     const url = `${this.base}/api/fundamentals/${encodeURIComponent(symbol)}`;
     try {
-      const { data } = await axios.get<PsxApiResponse<any>>(url, {
+      const { data } = await axios.get<PsxApiResponse<unknown>>(url, {
         timeout: 5000,
       });
       if (data?.success) return data.data;
@@ -283,7 +301,7 @@ export class StocksService {
     }
   }
 
-  async getMarketInsights(): Promise<any> {
+  async getMarketInsights(): Promise<unknown> {
     const now = Date.now();
     if (this.insightsCache && now - this.lastInsightsFetch < this.CACHE_TTL) {
       return this.insightsCache;
@@ -294,7 +312,7 @@ export class StocksService {
       featuredSymbols.map(async (s) => {
         const tick = this.tickCache.get(s);
         if (!tick || tick.price === undefined) return null;
-        
+
         // We need the name for the UI
         const dbStock = await this.findOrCreateStock(s);
         return {
@@ -305,7 +323,9 @@ export class StocksService {
       }),
     );
 
-    const validStocks = allTracked.filter((s): s is NonNullable<typeof s> => s !== null);
+    const validStocks = allTracked.filter(
+      (s): s is NonNullable<typeof s> => s !== null,
+    );
 
     // 1. Gainers: Highest percentChange
     const gainers = [...validStocks]

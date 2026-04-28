@@ -27,7 +27,7 @@ export class CreatePostDto {
   @MaxLength(5000)
   content!: string;
 
-  @IsUrl()
+  @IsUrl({ require_tld: false })
   @IsOptional()
   imageUrl?: string;
 

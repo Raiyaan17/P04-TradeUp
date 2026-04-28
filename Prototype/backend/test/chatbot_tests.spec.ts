@@ -24,7 +24,7 @@ import { WatchlistService } from '../src/watchlist/watchlist.service';
 
 // ─── Mock global fetch (used by ChatbotService to call Gemini API) ──
 const mockFetch = jest.fn();
-global.fetch = mockFetch as any;
+global.fetch = mockFetch as unknown as typeof global.fetch;
 
 /** Simulate a successful Gemini API response */
 function geminiOk(text: string) {
@@ -51,7 +51,7 @@ function geminiFail(status = 500) {
 
 describe('ChatbotService', () => {
   let service: ChatbotService;
-  let prisma: Record<string, any>;
+  let prisma: Record<string, Record<string, jest.Mock>>;
   let tradesService: Partial<TradesService>;
   let watchlistService: Partial<WatchlistService>;
   let stocksService: Partial<StocksService>;
@@ -72,7 +72,10 @@ describe('ChatbotService', () => {
       },
       user: {
         findUnique: jest.fn().mockResolvedValue({
-          id: 1, name: 'Test User', username: 'testuser', balance: 100000,
+          id: 1,
+          name: 'Test User',
+          username: 'testuser',
+          balance: 100000,
         }),
       },
       tournament: {
@@ -82,11 +85,18 @@ describe('ChatbotService', () => {
 
     tradesService = {
       getPortfolio: jest.fn().mockResolvedValue({
-        balance: 100000, totalAccountValue: 100000, totalInvested: 0,
-        totalUnrealizedPnl: 0, totalPnlPercentage: 0, portfolio: [],
+        balance: 100000,
+        totalAccountValue: 100000,
+        totalInvested: 0,
+        totalUnrealizedPnl: 0,
+        totalPnlPercentage: 0,
+        portfolio: [],
       }),
       getTransactions: jest.fn().mockResolvedValue({
-        transactions: [], total: 0, limit: 20, offset: 0,
+        transactions: [],
+        total: 0,
+        limit: 20,
+        offset: 0,
       }),
     };
     watchlistService = { list: jest.fn().mockResolvedValue([]) };
@@ -101,7 +111,10 @@ describe('ChatbotService', () => {
         { provide: StocksService, useValue: stocksService },
         { provide: TradesService, useValue: tradesService },
         { provide: WatchlistService, useValue: watchlistService },
-        { provide: ConfigService, useValue: { get: jest.fn().mockReturnValue('fake-api-key') } },
+        {
+          provide: ConfigService,
+          useValue: { get: jest.fn().mockReturnValue('fake-api-key') },
+        },
       ],
     }).compile();
 
@@ -114,12 +127,19 @@ describe('ChatbotService', () => {
   it('TC-01: should reuse existing session or create a new one', async () => {
     // First call — no existing session → creates new
     prisma.chatSession.findFirst.mockResolvedValue(null);
-    const newSession = { id: 99, userId: 1, createdAt: new Date(), lastActiveAt: new Date() };
+    const newSession = {
+      id: 99,
+      userId: 1,
+      createdAt: new Date(),
+      lastActiveAt: new Date(),
+    };
     prisma.chatSession.create.mockResolvedValue(newSession);
 
     const created = await service.getOrCreateSession(1);
     expect(created).toEqual(newSession);
-    expect(prisma.chatSession.create).toHaveBeenCalledWith({ data: { userId: 1 } });
+    expect(prisma.chatSession.create).toHaveBeenCalledWith({
+      data: { userId: 1 },
+    });
 
     // Second call — existing session within 24h → reuses it
     jest.clearAllMocks();
@@ -132,7 +152,9 @@ describe('ChatbotService', () => {
 
   it('TC-02: should call Gemini, persist messages, and return the AI response', async () => {
     prisma.chatSession.findFirst.mockResolvedValue({ id: 1, userId: 1 });
-    mockFetch.mockResolvedValue(geminiOk('Great question! Here is my analysis...'));
+    mockFetch.mockResolvedValue(
+      geminiOk('Great question! Here is my analysis...'),
+    );
 
     const result = await service.getChatResponse(1, 1, 'analyze my portfolio');
 
@@ -141,7 +163,11 @@ describe('ChatbotService', () => {
     expect(prisma.chatMessage.createMany).toHaveBeenCalledWith({
       data: [
         { sessionId: 1, role: 'user', content: 'analyze my portfolio' },
-        { sessionId: 1, role: 'assistant', content: 'Great question! Here is my analysis...' },
+        {
+          sessionId: 1,
+          role: 'assistant',
+          content: 'Great question! Here is my analysis...',
+        },
       ],
     });
   });
@@ -155,14 +181,19 @@ describe('ChatbotService', () => {
     expect(greetingResult).toContain('TradeUp AI');
 
     mockFetch.mockResolvedValue(geminiFail(503));
-    const genericResult = await service.getChatResponse(1, 1, 'what is market cap?');
+    const genericResult = await service.getChatResponse(
+      1,
+      1,
+      'what is market cap?',
+    );
     expect(genericResult).toContain('connection issue');
   });
 
   it('TC-04: should detect new users and include NEW USER marker in context', async () => {
     prisma.chatSession.findFirst.mockResolvedValue({ id: 1, userId: 1 });
 
-    mockFetch.mockImplementation(async (_url: string, options: any) => {
+    mockFetch.mockImplementation(async (_url: string, options: unknown) => {
+      // @ts-ignore
       const body = JSON.parse(options.body);
       const systemText = body.system_instruction.parts[0].text;
       expect(systemText).toContain('NEW USER');
@@ -203,13 +234,25 @@ describe('ChatbotController', () => {
   it('TC-05: should allow ADMIN to train and block TRADER with ForbiddenException', async () => {
     // ADMIN → allowed
     chatbotService.trainBaselineModel.mockResolvedValue(undefined);
-    const adminReq = { user: { userId: 1, email: 'admin@test.com', role: 'ADMIN' } };
-    const result = await controller.train(adminReq as any);
+    const adminReq = {
+      user: { userId: 1, email: 'admin@test.com', role: 'ADMIN' },
+    };
+    const result = await controller.train(
+      // @ts-ignore
+      adminReq as unknown as Record<string, unknown>,
+    );
     expect(chatbotService.trainBaselineModel).toHaveBeenCalled();
-    expect(result).toEqual({ message: 'Market baseline refreshed successfully.' });
+    expect(result).toEqual({
+      message: 'Market baseline refreshed successfully.',
+    });
 
     // TRADER → blocked
-    const traderReq = { user: { userId: 2, email: 'trader@test.com', role: 'TRADER' } };
-    await expect(controller.train(traderReq as any)).rejects.toThrow(ForbiddenException);
+    const traderReq = {
+      user: { userId: 2, email: 'trader@test.com', role: 'TRADER' },
+    };
+    await expect(
+      // @ts-ignore
+      controller.train(traderReq as unknown as Record<string, unknown>),
+    ).rejects.toThrow(ForbiddenException);
   });
 });

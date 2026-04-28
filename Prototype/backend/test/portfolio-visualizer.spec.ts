@@ -51,7 +51,13 @@ function makePortfolioItem(
     quantity,
     avgPrice: new Decimal(avgPrice),
     createdAt: new Date(),
-    stock: { id: stockId, symbol, name: `${symbol} Inc`, marketType: 'REG', createdAt: new Date() },
+    stock: {
+      id: stockId,
+      symbol,
+      name: `${symbol} Inc`,
+      marketType: 'REG',
+      createdAt: new Date(),
+    },
   };
 }
 
@@ -59,7 +65,10 @@ function makePortfolioItem(
 
 describe('Feature B: Portfolio Visualizer — API Contract', () => {
   let service: TradesService;
-  let prisma: { user: { findUnique: jest.Mock }; portfolio: { findMany: jest.Mock } };
+  let prisma: {
+    user: { findUnique: jest.Mock };
+    portfolio: { findMany: jest.Mock };
+  };
   let stocks: { getTick: jest.Mock };
 
   beforeEach(async () => {
@@ -139,7 +148,7 @@ describe('Feature B: Portfolio Visualizer — API Contract', () => {
       prisma.user.findUnique.mockResolvedValue(makeUser(1000));
       prisma.portfolio.findMany.mockResolvedValue([
         makePortfolioItem('AAPL', 10, 100, 1), // bought at 100
-        makePortfolioItem('TSLA', 5, 200, 2),  // bought at 200
+        makePortfolioItem('TSLA', 5, 200, 2), // bought at 200
       ]);
       // AAPL now at 120, TSLA now at 180
       stocks.getTick
@@ -148,12 +157,18 @@ describe('Feature B: Portfolio Visualizer — API Contract', () => {
 
       const result = await service.getPortfolio(1);
 
-      const aapl = result.portfolio.find((p: { symbol: string }) => p.symbol === 'AAPL');
-      const tsla = result.portfolio.find((p: { symbol: string }) => p.symbol === 'TSLA');
+      const aapl = result.portfolio.find(
+        (p: { symbol: string }) => p.symbol === 'AAPL',
+      );
+      const tsla = result.portfolio.find(
+        (p: { symbol: string }) => p.symbol === 'TSLA',
+      );
 
       // AAPL: 10 * 120 = 1200
+      // @ts-ignore
       expect(aapl.currentValue.toNumber()).toBeCloseTo(1200, 2);
       // TSLA: 5 * 180 = 900
+      // @ts-ignore
       expect(tsla.currentValue.toNumber()).toBeCloseTo(900, 2);
     });
 
@@ -257,16 +272,28 @@ describe('Feature B: Portfolio Visualizer — API Contract', () => {
 
       expect(result.portfolio).toHaveLength(3);
 
-      const aapl = result.portfolio.find((p: { symbol: string }) => p.symbol === 'AAPL');
-      expect(aapl.invested.toNumber()).toBeCloseTo(1000, 2);   // 10 * 100
+      const aapl = result.portfolio.find(
+        (p: { symbol: string }) => p.symbol === 'AAPL',
+      );
+      // @ts-ignore
+      expect(aapl.invested.toNumber()).toBeCloseTo(1000, 2); // 10 * 100
+      // @ts-ignore
       expect(aapl.currentValue.toNumber()).toBeCloseTo(1100, 2); // 10 * 110
 
-      const goog = result.portfolio.find((p: { symbol: string }) => p.symbol === 'GOOG');
-      expect(goog.invested.toNumber()).toBeCloseTo(1000, 2);   // 5 * 200
+      const goog = result.portfolio.find(
+        (p: { symbol: string }) => p.symbol === 'GOOG',
+      );
+      // @ts-ignore
+      expect(goog.invested.toNumber()).toBeCloseTo(1000, 2); // 5 * 200
+      // @ts-ignore
       expect(goog.currentValue.toNumber()).toBeCloseTo(950, 2); // 5 * 190
 
-      const tsla = result.portfolio.find((p: { symbol: string }) => p.symbol === 'TSLA');
-      expect(tsla.invested.toNumber()).toBeCloseTo(900, 2);    // 3 * 300
+      const tsla = result.portfolio.find(
+        (p: { symbol: string }) => p.symbol === 'TSLA',
+      );
+      // @ts-ignore
+      expect(tsla.invested.toNumber()).toBeCloseTo(900, 2); // 3 * 300
+      // @ts-ignore
       expect(tsla.currentValue.toNumber()).toBeCloseTo(1050, 2); // 3 * 350
     });
   });
@@ -298,8 +325,8 @@ describe('Feature B: Portfolio Visualizer — API Contract', () => {
       expect(result.portfolio).toHaveLength(1);
       expect(result.portfolio[0].symbol).toBe('SOLO');
       expect(result.portfolio[0].currentValue.toNumber()).toBe(1250); // 50 * 25
-      expect(result.portfolio[0].invested.toNumber()).toBe(1000);     // 50 * 20
-      expect(result.totalAccountValue.toNumber()).toBe(1350);         // 100 + 1250
+      expect(result.portfolio[0].invested.toNumber()).toBe(1000); // 50 * 20
+      expect(result.totalAccountValue.toNumber()).toBe(1350); // 100 + 1250
     });
 
     it('should handle stock price at zero', async () => {

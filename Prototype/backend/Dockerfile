@@ -26,5 +26,5 @@ COPY --from=builder /app/prisma ./prisma
 
 EXPOSE 3001
 
-# Start production server
-CMD ["npm", "run", "start:prod"]
+# Run migrations then start production server
+CMD ["sh", "-c", "npx prisma migrate deploy && npm run start:prod"]

@@ -26,6 +26,7 @@
   "dependencies": {
     "@fastify/multipart": "^10.0.0",
     "@fastify/static": "^9.1.2",
+    "@google/genai": "^1.50.1",
     "@nestjs/axios": "^4.0.1",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.2",
@@ -83,10 +84,14 @@
     "supertest": "^7.0.0",
     "ts-jest": "^29.2.5",
     "ts-loader": "^9.5.2",
+    "ts-morph": "^28.0.0",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.20.0"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.js"
   },
   "jest": {
     "moduleFileExtensions": [
