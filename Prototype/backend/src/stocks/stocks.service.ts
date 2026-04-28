@@ -47,18 +47,14 @@ export class StocksService {
   constructor(private readonly prisma: PrismaService) {}
 
   updateTickCache(symbol: string, tick: any) {
-    // Normalize data: PSX Terminal uses changePercent/chgPct, we expect percentChange
+    const rawPct = tick.changePercent ?? tick.pch ?? tick.pct ?? tick.percentChange ?? 0;
+    const percentChange = Number(rawPct) * 100;
+
     const normalized: TickData = {
       ...tick,
       price: Number(tick.price || tick.last || 0),
       change: Number(tick.change ?? tick.chg ?? 0),
-      percentChange: Number(
-        tick.percentChange ??
-          tick.changePercent ??
-          tick.chgPct ??
-          tick.pct ??
-          0,
-      ),
+      percentChange,
       volume: Number(tick.volume ?? tick.vol ?? 0),
       value: Number(tick.value ?? tick.turnover ?? 0),
     };
@@ -84,7 +80,7 @@ export class StocksService {
       });
       if (data?.success) {
         this.updateTickCache(symbol, data.data);
-        return data.data;
+        return this.tickCache.get(symbol) || null;
       }
       return null;
     } catch (error) {

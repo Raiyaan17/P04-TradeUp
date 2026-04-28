@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { io, Socket } from "socket.io-client";
 import { toast } from "sonner";
 import { TrendingUp, TrendingDown, Minus, Plus, Search, Loader2 } from "lucide-react";
 import { AppShell } from "@/components/layout";
@@ -14,9 +15,15 @@ import { SellJournalInput, type SellReasonType } from "@/components/portfolio/Se
 import { SYMBOL_SECTOR_MAP, ACTIVE_SECTORS } from "@/lib/constants";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
+const isLocalhost = typeof window !== 'undefined' && window.location.hostname === 'localhost';
+const WS_URL = process.env.NEXT_PUBLIC_WS_URL || (isLocalhost ? 'http://localhost:3001' : 'https://tradeup-syai.onrender.com');
+
 interface Tick {
     price: number;
     change: number;
+    percentChange?: number;
+    volume?: number;
+    value?: number;
 }
 
 interface StockData {
@@ -28,6 +35,7 @@ interface StockData {
 
 export default function TradeTestPage() {
     const [stocks, setStocks] = useState<StockData[]>([]);
+    const [liveTicks, setLiveTicks] = useState<Record<string, Tick>>({});
     const [selectedStock, setSelectedStock] = useState<StockData | null>(null);
     const [quantity, setQuantity] = useState<number>(0);
     const [searchTerm, setSearchTerm] = useState<string>("");
@@ -39,14 +47,16 @@ export default function TradeTestPage() {
     const [sellReason, setSellReason] = useState<SellReasonType | null>(null);
     const [sellNote, setSellNote] = useState('');
     const [sellDialogOpen, setSellDialogOpen] = useState(false);
+    const socketRef = useRef<Socket | null>(null);
+    const stocksRef = useRef<StockData[]>([]);
 
     const fetchAllStocks = useCallback(async (): Promise<void> => {
         try {
             setLoading(true);
             setError(null);
             const data = await http.get<StockData[]>("/stocks/featured");
-
             setStocks(data);
+            stocksRef.current = data;
         } catch (err) {
             const message = err instanceof ApiException ? err.message : "Failed to load stocks";
             setError(message);
@@ -55,9 +65,56 @@ export default function TradeTestPage() {
         }
     }, []);
 
+    // Mount: fetch REST snapshot, then re-fetch after 3s to catch drip-feed warm-up,
+    // then connect WebSocket for continuous live updates.
     useEffect(() => {
         fetchAllStocks();
-    }, [fetchAllStocks]);
+
+        // Second fetch after drip-feed has had time to warm up the tick cache
+        const warmupTimer = setTimeout(() => fetchAllStocks(), 3000);
+
+        // Socket.IO live tick subscription
+        const socket = io(`${WS_URL}/ws`, {
+            withCredentials: true,
+            reconnectionAttempts: 10,
+            reconnectionDelay: 1000,
+        });
+        socketRef.current = socket;
+
+        socket.on('connect', () => {
+            // Subscribe all featured symbols
+            stocksRef.current.forEach(s => socket.emit('subscribeSymbol', s.symbol));
+        });
+
+        socket.on('tickUpdate', (msg: { symbol: string; [key: string]: unknown }) => {
+            if (!msg?.symbol) return;
+            const t = msg as unknown as Tick & { symbol: string };
+            setLiveTicks(prev => ({
+                ...prev,
+                [msg.symbol]: {
+                    price: Number(t.price || 0),
+                    change: Number(t.change ?? 0),
+                    percentChange: Number(t.percentChange ?? 0),
+                    volume: Number(t.volume ?? 0),
+                    value: Number((t as any).value ?? 0),
+                },
+            }));
+        });
+
+        return () => {
+            clearTimeout(warmupTimer);
+            socket.close();
+            socketRef.current = null;
+        };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // Re-subscribe whenever stocks list changes (after second fetch)
+    useEffect(() => {
+        if (socketRef.current?.connected && stocks.length > 0) {
+            stocks.forEach(s => socketRef.current!.emit('subscribeSymbol', s.symbol));
+        }
+    }, [stocks]);
 
     const handleStockSelect = (stock: StockData): void => {
         if (selectedStock?.symbol !== stock.symbol) {
@@ -115,7 +172,14 @@ export default function TradeTestPage() {
         );
     }
 
-    const currentPrice = selectedStock ? getPrice(selectedStock.tick) : 0;
+    // Merge REST snapshot with live WebSocket ticks — WS wins if available
+    const getEffectiveTick = (stock: StockData): Tick | undefined => {
+        const live = liveTicks[stock.symbol];
+        if (live && live.price > 0) return live;
+        return stock.tick;
+    };
+
+    const currentPrice = selectedStock ? getPrice(getEffectiveTick(selectedStock)) : 0;
     const totalValue = currentPrice * quantity;
 
     const filteredStocks = stocks.filter(stock => {
@@ -168,8 +232,9 @@ export default function TradeTestPage() {
                             ) : (
                                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                                     {filteredStocks.map((stock) => {
-                                        const price = getPrice(stock.tick);
-                                        const { change, changePercent } = getChange(stock.tick);
+                                        const effectiveTick = getEffectiveTick(stock);
+                                        const price = getPrice(effectiveTick);
+                                        const { change, changePercent } = getChange(effectiveTick);
                                         const isPositive = change >= 0;
                                         const isSelected = selectedStock?.symbol === stock.symbol;
 

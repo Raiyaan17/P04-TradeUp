@@ -34,6 +34,8 @@ interface Tick {
   chgPct?: number;
   changePct?: number;
   pct?: number;
+  percentChange?: number;
+  changePercent?: number;
   pc?: number;
   prev?: number;
   previous?: number;
@@ -677,7 +679,7 @@ function getChange(tick: Tick | null | undefined): { chg: number; pct: number } 
   if (!tick) return { chg: NaN, pct: NaN };
 
   const chg = num(tick.chg ?? tick.change);
-  let pct = num(tick.chgPct ?? tick.changePct ?? tick.pct);
+  let pct = num(tick.chgPct ?? tick.changePct ?? tick.pct ?? tick.percentChange ?? tick.changePercent);
 
   if (!isFinite(pct)) {
     const price = num(tick.c ?? tick.price ?? tick.p);

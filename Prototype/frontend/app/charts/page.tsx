@@ -79,6 +79,8 @@ interface PortfolioData {
 
 const isLocalhost = typeof window !== 'undefined' && window.location.hostname === 'localhost';
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || (isLocalhost ? 'http://localhost:3001/api' : 'https://tradeup-syai.onrender.com/api');
+// WS_URL must point to the socket server root (no /api prefix — Socket.IO namespaces are separate from REST routes)
+const WS_URL = process.env.NEXT_PUBLIC_WS_URL || (isLocalhost ? 'http://localhost:3001' : 'https://tradeup-syai.onrender.com');
 const CANDLE_INTERVAL = 1 * 60 * 1000;
 const MARKET_CLOSED_TIMEOUT = 5000;
 
@@ -474,7 +476,7 @@ export default function Charts() {
       socketRef.current.close();
     }
 
-    const socket: Socket = io(`${API_BASE_URL}/ws`, {
+    const socket: Socket = io(`${WS_URL}/ws`, {
       withCredentials: true,
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,

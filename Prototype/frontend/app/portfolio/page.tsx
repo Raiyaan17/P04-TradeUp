@@ -62,7 +62,8 @@ import { formatUSD, formatPercent, getPnLClass } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
 const isLocalhost = typeof window !== 'undefined' && window.location.hostname === 'localhost';
-const WS_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || (isLocalhost ? 'http://localhost:3001/api' : 'https://tradeup-syai.onrender.com/api');
+// WS_URL must be the server root (no /api) — Socket.IO namespaces are separate from REST routes
+const WS_URL = process.env.NEXT_PUBLIC_WS_URL || (isLocalhost ? 'http://localhost:3001' : 'https://tradeup-syai.onrender.com');
 
 interface LiveTick {
   c?: number;
@@ -160,7 +161,7 @@ export default function Portfolio() {
     fetchPortfolio();
 
     // WebSocket: Connect once on mount
-    const socket = io(`${WS_BASE_URL}/ws`, {
+    const socket = io(`${WS_URL}/ws`, {
       withCredentials: true,
       reconnectionAttempts: 5,
     });
