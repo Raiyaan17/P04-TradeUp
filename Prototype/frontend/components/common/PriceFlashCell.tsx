@@ -11,15 +11,14 @@ interface PriceFlashCellProps {
 
 export function PriceFlashCell({ value, displayValue, className }: PriceFlashCellProps) {
   const [flashColor, setFlashColor] = useState<"green" | "red" | "transparent">("transparent")
-  const prevValueRef = useRef(value)
+  const [prevValue, setPrevValue] = useState(value)
 
-  useEffect(() => {
-    const prev = prevValueRef.current
-    if (value !== prev && isFinite(value) && isFinite(prev)) {
-      setFlashColor(value > prev ? "green" : "red")
+  if (!Object.is(value, prevValue)) {
+    setPrevValue(value)
+    if (isFinite(value) && isFinite(prevValue)) {
+      setFlashColor(value > prevValue ? "green" : "red")
     }
-    prevValueRef.current = value
-  }, [value])
+  }
 
   useEffect(() => {
     if (flashColor !== "transparent") {

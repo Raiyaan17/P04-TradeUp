@@ -581,7 +581,11 @@ export class OracleService implements OnModuleDestroy {
 
         // Fire callback to alert the Gateway
         if (this.tickCallback) {
-          this.tickCallback(tick as unknown as TournamentDataPoint, tickNews, leaderboard);
+          this.tickCallback(
+            tick as unknown as TournamentDataPoint,
+            tickNews,
+            leaderboard,
+          );
         }
 
         this.currentTickIndex++;

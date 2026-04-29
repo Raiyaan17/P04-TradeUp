@@ -104,8 +104,7 @@ export default function DashboardPage() {
       setFeatured(Array.isArray(json) ? json : []);
       setLastUpdated(new Date());
     } catch (e) {
-      const message = e instanceof ApiException ? e.message : "Failed to load stocks";
-      // setError(message);
+      console.error(e instanceof ApiException ? e.message : "Failed to load stocks", e);
     } finally {
       setLoading(false);
     }
