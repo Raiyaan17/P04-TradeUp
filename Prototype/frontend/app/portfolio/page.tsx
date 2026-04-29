@@ -7,11 +7,7 @@ import { useRouter } from 'next/navigation';
 import {
   TrendingUp,
   TrendingDown,
-  Minus,
-  DollarSign,
   Briefcase,
-  PiggyBank,
-  Wallet,
   AlertTriangle,
   MoreHorizontal,
   ExternalLink,
@@ -22,8 +18,8 @@ import {
   FileText,
 } from 'lucide-react';
 import { AppShell } from '@/components/layout';
-import { PageHeader, EmptyState } from '@/components/common';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHeader, EmptyState, DataCard, PriceFlashCell } from '@/components/common';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -290,18 +286,10 @@ export default function Portfolio() {
     return livePortfolio.reduce((sum, item) => sum + parseFloat(item.currentValue), 0);
   }, [livePortfolio]);
 
-  const liveTotalInvested = useMemo(() => {
-    if (!livePortfolio) return 0;
-    return livePortfolio.reduce((sum, item) => sum + (parseFloat(item.avgPrice) * item.quantity), 0);
-  }, [livePortfolio]);
-
-  const liveTotalPnlPct = liveTotalInvested !== 0 ? (liveTotalPnl / liveTotalInvested) * 100 : 0;
   const liveTotalAccountValue = (parseFloat(portfolioData?.balance || '0') + liveTotalPortfolioValue).toFixed(2);
 
   const totalPnlValue = liveTotalPnl;
   const totalPnlIsPositive = totalPnlValue > 0;
-  const totalPnlIsNegative = totalPnlValue < 0;
-  const totalPnlIsZero = totalPnlValue === 0;
 
   // Build a set of symbols flagged by health signals for table annotation
   const healthSignals = portfolioData?.healthSignals ?? [];
@@ -360,93 +348,29 @@ export default function Portfolio() {
         }
       />
 
-      {/* Summary Stats — Monochrome with Accent */}
-      <Card className="mb-6">
-        <CardContent className="py-4">
-          {/* Hero: Total Account Value - Amber Border Accent */}
-          <div className="flex items-center gap-3 p-3 mb-4 rounded-lg border-2 border-amber-500/40 bg-amber-500/5 shadow-sm">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/20 shrink-0">
-              <DollarSign className="h-5 w-5 text-amber-500" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm text-amber-600 dark:text-amber-400">Total Account Value</p>
-              <p className="text-lg font-bold tabular-nums text-amber-600 dark:text-amber-400">
-                {formatUSD(liveTotalAccountValue)}
-              </p>
-            </div>
-          </div>
-
-          {/* Other Metrics - Clean Monochrome */}
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-            {/* Cash Balance */}
-            <div className="flex items-center gap-3 p-2.5 rounded-lg bg-muted/30">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted shrink-0">
-                <Wallet className="h-4 w-4 text-blue-500" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs text-muted-foreground">Cash Balance</p>
-                <p className="text-sm font-semibold tabular-nums">
-                  {formatUSD(portfolioData.balance)}
-                </p>
-              </div>
-            </div>
-
-            {/* Total Invested */}
-            <div className="flex items-center gap-3 p-2.5 rounded-lg bg-muted/30">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted shrink-0">
-                <PiggyBank className="h-4 w-4 text-purple-500" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs text-muted-foreground">Total Invested</p>
-                <p className="text-sm font-semibold tabular-nums">
-                  {formatUSD(portfolioData.totalInvested)}
-                </p>
-              </div>
-            </div>
-
-            {/* Portfolio Value */}
-            <div className="flex items-center gap-3 p-2.5 rounded-lg bg-muted/30 lg:col-span-1 col-span-2">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted shrink-0">
-                <Briefcase className="h-4 w-4 text-emerald-500" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs text-muted-foreground">Portfolio Value</p>
-                <p className="text-sm font-semibold tabular-nums">
-                  {formatUSD(liveTotalPortfolioValue > 0 ? liveTotalPortfolioValue.toFixed(2) : portfolioData.totalPortfolioValue)}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* P&L Row - Enhanced Badge Style */}
-          <div className={cn(
-            'flex items-center justify-between mt-4 pt-3 border-t border-border/50 rounded-lg px-3 py-2',
-            totalPnlIsPositive && 'bg-emerald-500/10 border-emerald-500/20',
-            totalPnlIsNegative && 'bg-rose-500/10 border-rose-500/20',
-            totalPnlIsZero && 'bg-muted/30'
-          )}>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-medium text-muted-foreground">Unrealized P&L</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              {totalPnlIsPositive && <TrendingUp className="h-4 w-4 text-emerald-500" />}
-              {totalPnlIsNegative && <TrendingDown className="h-4 w-4 text-rose-500" />}
-              {totalPnlIsZero && <Minus className="h-4 w-4 text-muted-foreground" />}
-              <p className={cn('text-base font-bold tabular-nums', getPnLClass(liveTotalPnl.toFixed(2)))}>
-                {formatUSD(liveTotalPnl.toFixed(2))}
-              </p>
-              <span className={cn(
-                'text-sm font-bold tabular-nums px-2 py-0.5 rounded-full',
-                totalPnlIsPositive && 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400',
-                totalPnlIsNegative && 'bg-rose-500/20 text-rose-600 dark:text-rose-400',
-                totalPnlIsZero && 'bg-muted text-muted-foreground'
-              )}>
-                {formatPercent(liveTotalPnlPct.toFixed(2))}
-              </span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Summary Stats — Neo-Bauhaus Electric */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
+        <DataCard
+          title="Account Value"
+          value={formatUSD(liveTotalAccountValue)}
+          delta={totalPnlValue !== 0 ? {
+            value: formatUSD(Math.abs(liveTotalPnl).toFixed(2)),
+            isPositive: totalPnlIsPositive
+          } : undefined}
+        />
+        <DataCard
+          title="Portfolio Value"
+          value={formatUSD(liveTotalPortfolioValue > 0 ? liveTotalPortfolioValue.toFixed(2) : portfolioData.totalPortfolioValue)}
+        />
+        <DataCard
+          title="Cash Balance"
+          value={formatUSD(portfolioData.balance)}
+        />
+        <DataCard
+          title="Total Invested"
+          value={formatUSD(portfolioData.totalInvested)}
+        />
+      </div>
 
       {/* Health Insights Sheet */}
       <Sheet open={healthSheetOpen} onOpenChange={setHealthSheetOpen}>
@@ -499,34 +423,29 @@ export default function Portfolio() {
           {activeTab === 'holdings' && portfolioData.portfolio.length > 0 && (
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>Symbol</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead className="text-right">Qty</TableHead>
-                  <TableHead className="text-right" title="Your breakeven cost basis">Avg. Price</TableHead>
-                  <TableHead className="text-right">Current Price</TableHead>
-                  <TableHead className="text-right" title="Unrealized Profit & Loss">P&L</TableHead>
-                  <TableHead className="text-right">P&L %</TableHead>
-                  <TableHead className="text-center w-[80px]">Actions</TableHead>
+                <TableRow className="border-b border-border hover:bg-transparent">
+                  <TableHead className="text-label-caps">SYMBOL</TableHead>
+                  <TableHead className="text-label-caps hidden sm:table-cell">NAME</TableHead>
+                  <TableHead className="text-right text-label-caps">QTY</TableHead>
+                  <TableHead className="text-right text-label-caps" title="Your breakeven cost basis">AVG. PRICE</TableHead>
+                  <TableHead className="text-right text-label-caps">CURRENT PRICE</TableHead>
+                  <TableHead className="text-right text-label-caps" title="Unrealized Profit & Loss">P&L</TableHead>
+                  <TableHead className="text-right text-label-caps">P&L %</TableHead>
+                  <TableHead className="text-center w-[80px] text-label-caps">ACTIONS</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {(livePortfolio || portfolioData.portfolio).map((item) => {
                   const isPositive = parseFloat(item.unrealizedPnl) > 0;
                   const isNegative = parseFloat(item.unrealizedPnl) < 0;
-                  const badgeClass = isPositive 
-                    ? 'bg-emerald-500/15 text-emerald-400' 
-                    : isNegative 
-                      ? 'bg-rose-500/15 text-rose-400' 
-                      : 'bg-muted text-muted-foreground';
 
                   return (
                     <TableRow 
                       key={item.symbol}
-                      className="cursor-pointer hover:bg-muted/50 transition-colors"
+                      className="cursor-pointer hover:bg-muted/50 transition-colors border-none"
                       onClick={() => router.push(`/charts?symbol=${item.symbol}`)}
                     >
-                      <TableCell className="font-semibold">
+                      <TableCell className="font-bold text-label-caps">
                         <span className="inline-flex items-center gap-1.5">
                           {item.symbol}
                           {flaggedSymbols.has(item.symbol) && (
@@ -537,16 +456,18 @@ export default function Portfolio() {
                         </span>
                       </TableCell>
                       <TableCell className="text-muted-foreground hidden sm:table-cell">{item.name || '-'}</TableCell>
-                      <TableCell className="text-right tabular-nums">{item.quantity}</TableCell>
+                      <TableCell className="text-right tabular-nums font-mono">{item.quantity}</TableCell>
                       <TableCell className="text-right tabular-nums">{formatUSD(item.avgPrice)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{formatUSD(item.currentPrice)}</TableCell>
+                      <TableCell className="text-right tabular-nums font-medium">
+                        <PriceFlashCell value={parseFloat(item.currentPrice)} displayValue={formatUSD(item.currentPrice)} />
+                      </TableCell>
                       <TableCell className={cn('text-right tabular-nums font-semibold', getPnLClass(item.unrealizedPnl))}>
                         {formatUSD(item.unrealizedPnl)}
                       </TableCell>
                       <TableCell className="text-right">
-                        <Badge variant="outline" className={cn('tabular-nums font-medium border-transparent shrink-0', badgeClass)}>
-                          {formatPercent(item.pnlPercentage)}
-                        </Badge>
+                        <span className={cn("font-mono font-bold", isPositive ? "text-[#6fcf97]" : isNegative ? "text-[#eb5757]" : "text-muted-foreground")}>
+                          {isPositive ? "+" : ""}{formatPercent(item.pnlPercentage)}
+                        </span>
                       </TableCell>
                       <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
                         <DropdownMenu>

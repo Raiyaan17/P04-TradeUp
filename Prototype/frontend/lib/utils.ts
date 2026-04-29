@@ -8,13 +8,13 @@ export function cn(...inputs: ClassValue[]) {
 /**
  * Debounce function to delay function execution
  */
-export function debounce<T extends (...args: any[]) => any>(
-  func: T,
+export function debounce<TArgs extends unknown[]>(
+  func: (...args: TArgs) => void,
   delay: number
-): (...args: Parameters<T>) => void {
-  let timeoutId: NodeJS.Timeout;
+): (...args: TArgs) => void {
+  let timeoutId: ReturnType<typeof setTimeout>;
 
-  return function (...args: Parameters<T>) {
+  return function (...args: TArgs) {
     clearTimeout(timeoutId);
     timeoutId = setTimeout(() => func(...args), delay);
   };

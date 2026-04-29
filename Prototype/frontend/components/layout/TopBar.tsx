@@ -1,6 +1,6 @@
 'use client'
 
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useUser } from "@/context/UserContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -13,41 +13,22 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { cn } from "@/lib/utils";
-import { LogOut, Settings, User, Menu, X, Sun, Moon, HelpCircle } from "lucide-react";
+import { LogOut, Settings, User, HelpCircle } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useTheme } from "next-themes";
 import { getFriendRequests } from "@/lib/friendsService";
-
-const NAV_LINKS = [
-  { href: "/portfolio", label: "Portfolio" },
-  { href: "/buy", label: "Trade" },
-  { href: "/oracle", label: "Game" },
-  { href: "/community", label: "Community" },
-  { href: "/news", label: "News" },
-];
 
 export function TopBar() {
   const { user, refreshUser } = useUser();
-  const { resolvedTheme, setTheme } = useTheme();
   const router = useRouter();
-  const pathname = usePathname();
   const [hasRequests, setHasRequests] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => { setMounted(true); }, []);
 
   const handleSignOut = async () => {
     if (typeof window !== "undefined") {
       localStorage.removeItem("access_token");
     }
-    // Clear user state in context so stale data doesn't persist
     try {
       await refreshUser();
-    } catch {
-      // Expected to fail (no token) - user state will be cleared
-    }
+    } catch {}
     router.push("/");
   };
 
@@ -61,83 +42,40 @@ export function TopBar() {
     return 'U';
   };
 
-  // Poll for friend requests
   useEffect(() => {
     const checkRequests = async () => {
       try {
         const requests = await getFriendRequests();
         setHasRequests(requests.length > 0);
-      } catch {
-        // Silently fail - user might not be authenticated yet
-      }
+      } catch {}
     };
 
     checkRequests();
-    const interval = setInterval(checkRequests, 30000); // Poll every 30s
-
+    const interval = setInterval(checkRequests, 30000);
     return () => clearInterval(interval);
   }, []);
 
   return (
-    <header className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="max-w-7xl mx-auto px-6">
-        <div className="flex h-16 items-center justify-between">
-          {/* Logo */}
-          <Link
-            href="/dashboard"
-            className="text-2xl font-semibold text-foreground hover:text-primary transition-colors"
-          >
-            Trade Up
+    <header className="border-b border-border bg-background h-16 sticky top-0 z-40">
+      <div className="h-full px-6 flex items-center justify-between md:justify-end">
+        {/* Mobile Logo */}
+        <div className="md:hidden">
+          <Link href="/dashboard" className="text-primary text-label-caps font-bold">
+            ↗ TRADEUP
           </Link>
+        </div>
 
-          {/* Navigation */}
-          <nav className="hidden md:flex items-center gap-1">
-            {NAV_LINKS.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={cn(
-                  "px-4 py-2 text-sm font-medium rounded-md transition-colors",
-                  "hover:bg-accent hover:text-accent-foreground",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                  pathname === link.href
-                    ? "bg-accent text-accent-foreground"
-                    : "text-muted-foreground"
-                )}
-              >
-                {link.label}
-              </Link>
-            ))}
-          </nav>
-
-          {/* Right side Actions */}
-          <div className="flex items-center gap-2">
-            {/* Theme Toggle */}
-            {mounted && (
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label="Toggle theme"
-                onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
-                className="h-9 w-9 rounded-full text-muted-foreground hover:text-foreground transition-colors"
-              >
-                {resolvedTheme === 'dark' ? (
-                  <Sun className="h-4 w-4" />
-                ) : (
-                  <Moon className="h-4 w-4" />
-                )}
-              </Button>
-            )}
-
-            {/* User Menu */}
-            <DropdownMenu>
+        {/* Right side Actions */}
+        <div className="flex items-center gap-4">
+          {/* User Menu */}
+          <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                 <Avatar className="h-10 w-10">
                   {user?.profileImageUrl ? (
                     <AvatarImage src={user.profileImageUrl} alt={user.name || "User"} />
                   ) : null}
-                  <AvatarFallback className="bg-secondary text-secondary-foreground">
+                  <AvatarFallback className="bg-secondary text-secondary-foreground text-label-caps">
                     {getInitials(user?.name, user?.email)}
                   </AvatarFallback>
                 </Avatar>
@@ -159,19 +97,19 @@ export function TopBar() {
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
-                <Link href="/profile" className="cursor-pointer">
+                <Link href="/profile" className="cursor-pointer text-label-caps">
                   <User className="mr-2 h-4 w-4" />
                   <span>Profile</span>
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
-                <Link href="/settings/account" className="cursor-pointer">
+                <Link href="/settings/account" className="cursor-pointer text-label-caps">
                   <Settings className="mr-2 h-4 w-4" />
                   <span>Settings</span>
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
-                <Link href="/help" className="cursor-pointer">
+                <Link href="/help" className="cursor-pointer text-label-caps">
                   <HelpCircle className="mr-2 h-4 w-4" />
                   <span>Help</span>
                 </Link>
@@ -179,49 +117,15 @@ export function TopBar() {
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={handleSignOut}
-                className="cursor-pointer text-destructive focus:text-destructive"
+                className="cursor-pointer text-destructive focus:text-destructive text-label-caps"
               >
                 <LogOut className="mr-2 h-4 w-4" />
                 <span>Sign out</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-
-          {/* Mobile Menu Button */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="md:hidden"
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            aria-label="Toggle Menu"
-          >
-            {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-          </Button>
-        </div>
         </div>
       </div>
-
-      {/* Mobile Navigation */}
-      {isMobileMenuOpen && (
-        <div className="md:hidden border-t border-border bg-background px-4 py-4 shadow-lg flex flex-col gap-2">
-          {NAV_LINKS.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              onClick={() => setIsMobileMenuOpen(false)}
-              className={cn(
-                "px-4 py-3 text-base font-medium rounded-md transition-colors",
-                "hover:bg-accent hover:text-accent-foreground",
-                pathname === link.href
-                  ? "bg-accent text-accent-foreground"
-                  : "text-muted-foreground"
-              )}
-            >
-              {link.label}
-            </Link>
-          ))}
-        </div>
-      )}
     </header>
   );
 }

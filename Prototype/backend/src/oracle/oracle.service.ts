@@ -235,8 +235,13 @@ export class OracleService implements OnModuleDestroy {
         status: TournamentStatus.ACTIVE,
         startingCash,
         startedAt: new Date(),
-        trajectoryJson: generatedData.trajectory as any,
-        newsJson: generatedData.news as any,
+        // @ts-ignore
+        trajectoryJson: generatedData.trajectory as unknown as Record<
+          string,
+          unknown
+        >,
+        // @ts-ignore
+        newsJson: generatedData.news as unknown as Record<string, unknown>,
       },
     });
 
@@ -530,18 +535,22 @@ export class OracleService implements OnModuleDestroy {
 
         const rawTick = this.trajectoryPoints[this.currentTickIndex];
         // Enforce uppercase keys just in case Gemini returned lowercase JSON
-        const tick: any = {};
+        const tick: Record<string, unknown> = {};
         if (rawTick) {
           Object.keys(rawTick).forEach((key) => {
-            tick[key.toUpperCase()] = (rawTick as any)[key];
+            tick[key.toUpperCase()] = (
+              rawTick as unknown as Record<string, unknown>
+            )[key];
           });
-          tick.day = rawTick.day;
+          tick['day'] = rawTick.day;
         }
         // Save the cleaned tick back so getCurrentStockPrice finds uppercase keys safely
         this.trajectoryPoints[this.currentTickIndex] =
-          tick as TournamentDataPoint;
+          tick as unknown as TournamentDataPoint;
 
-        const tickNews = this.newsItems.filter((n) => n.day === tick.day);
+        const tickNews = this.newsItems.filter(
+          (n) => n.day === (tick['day'] as number),
+        );
 
         // Recalculate everyone's score
         const participants = await this.prisma.tournamentParticipant.findMany({
@@ -572,7 +581,11 @@ export class OracleService implements OnModuleDestroy {
 
         // Fire callback to alert the Gateway
         if (this.tickCallback) {
-          this.tickCallback(tick, tickNews, leaderboard);
+          this.tickCallback(
+            tick as unknown as TournamentDataPoint,
+            tickNews,
+            leaderboard,
+          );
         }
 
         this.currentTickIndex++;

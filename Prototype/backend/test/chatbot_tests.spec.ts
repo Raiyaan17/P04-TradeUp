@@ -24,7 +24,7 @@ import { WatchlistService } from '../src/watchlist/watchlist.service';
 
 // ─── Mock global fetch (used by ChatbotService to call Gemini API) ──
 const mockFetch = jest.fn();
-global.fetch = mockFetch as any;
+global.fetch = mockFetch as unknown as typeof global.fetch;
 
 /** Simulate a successful Gemini API response */
 function geminiOk(text: string) {
@@ -51,7 +51,7 @@ function geminiFail(status = 500) {
 
 describe('ChatbotService', () => {
   let service: ChatbotService;
-  let prisma: Record<string, any>;
+  let prisma: Record<string, Record<string, jest.Mock>>;
   let tradesService: Partial<TradesService>;
   let watchlistService: Partial<WatchlistService>;
   let stocksService: Partial<StocksService>;
@@ -192,7 +192,8 @@ describe('ChatbotService', () => {
   it('TC-04: should detect new users and include NEW USER marker in context', async () => {
     prisma.chatSession.findFirst.mockResolvedValue({ id: 1, userId: 1 });
 
-    mockFetch.mockImplementation(async (_url: string, options: any) => {
+    mockFetch.mockImplementation(async (_url: string, options: unknown) => {
+      // @ts-ignore
       const body = JSON.parse(options.body);
       const systemText = body.system_instruction.parts[0].text;
       expect(systemText).toContain('NEW USER');
@@ -236,7 +237,10 @@ describe('ChatbotController', () => {
     const adminReq = {
       user: { userId: 1, email: 'admin@test.com', role: 'ADMIN' },
     };
-    const result = await controller.train(adminReq as any);
+    const result = await controller.train(
+      // @ts-ignore
+      adminReq as unknown as Record<string, unknown>,
+    );
     expect(chatbotService.trainBaselineModel).toHaveBeenCalled();
     expect(result).toEqual({
       message: 'Market baseline refreshed successfully.',
@@ -246,8 +250,9 @@ describe('ChatbotController', () => {
     const traderReq = {
       user: { userId: 2, email: 'trader@test.com', role: 'TRADER' },
     };
-    await expect(controller.train(traderReq as any)).rejects.toThrow(
-      ForbiddenException,
-    );
+    await expect(
+      // @ts-ignore
+      controller.train(traderReq as unknown as Record<string, unknown>),
+    ).rejects.toThrow(ForbiddenException);
   });
 });

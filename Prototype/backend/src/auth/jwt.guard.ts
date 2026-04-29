@@ -12,7 +12,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
   handleRequest<TUser = JwtUser>(
     err: Error | null,
     user: TUser,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
     _info: Error | null,
   ): TUser {
     if (err || !user) {

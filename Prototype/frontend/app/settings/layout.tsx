@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AppShell } from "@/components/layout";
 import { PageHeader } from "@/components/common";
-import { Card, CardContent } from "@/components/ui/card";
+
 import { cn } from "@/lib/utils";
 import { User, Monitor } from "lucide-react";
 
@@ -23,30 +23,28 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
       <div className="flex flex-col lg:flex-row gap-6">
         {/* Sidebar */}
         <div className="lg:w-64 shrink-0">
-          <Card>
-            <CardContent className="p-2">
-              <nav className="space-y-1">
-                {SETTINGS_SECTIONS.map((section) => {
-                  const Icon = section.icon;
-                  return (
-                    <Link
-                      key={section.href}
-                      href={section.href}
-                      className={cn(
-                        "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors",
-                        pathname === section.href
-                          ? "bg-primary text-primary-foreground"
-                          : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                      )}
-                    >
-                      <Icon className="h-4 w-4" />
-                      {section.label}
-                    </Link>
-                  );
-                })}
-              </nav>
-            </CardContent>
-          </Card>
+          <div className="bg-card rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.2)] p-4 border border-transparent">
+            <nav className="space-y-2">
+              {SETTINGS_SECTIONS.map((section) => {
+                const Icon = section.icon;
+                return (
+                  <Link
+                    key={section.href}
+                    href={section.href}
+                    className={cn(
+                      "flex items-center gap-3 px-4 py-3 rounded-xl text-label-caps transition-colors",
+                      pathname === section.href
+                        ? "bg-primary text-primary-foreground shadow-md"
+                        : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                    )}
+                  >
+                    <Icon className="h-5 w-5" />
+                    {section.label}
+                  </Link>
+                );
+              })}
+            </nav>
+          </div>
         </div>
 
         {/* Content pane */}

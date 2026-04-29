@@ -76,7 +76,12 @@ export class ChatbotService implements OnModuleInit {
 
   async getChatResponse(userId: number, sessionId: number, message: string) {
     // 1. Verify session belongs to this user
-    let session: any;
+    let session: {
+      id: number;
+      userId: number;
+      lastActiveAt: Date;
+      createdAt: Date;
+    } | null = null;
     try {
       session = await this.prisma.chatSession.findFirst({
         where: { id: sessionId, userId },
@@ -89,7 +94,13 @@ export class ChatbotService implements OnModuleInit {
     }
 
     // 2. Load conversation history (non-critical — continue with empty if fails)
-    let history: any[] = [];
+    let history: {
+      id: number;
+      sessionId: number;
+      role: string;
+      content: string;
+      createdAt: Date;
+    }[] = [];
     try {
       history = await this.prisma.chatMessage.findMany({
         where: { sessionId },
@@ -195,21 +206,22 @@ export class ChatbotService implements OnModuleInit {
     const portfolioData = await this.tradesService.getPortfolio(userId);
 
     // Helper to safely convert Decimal/number/string to a displayable number
-    const safeNum = (val: any, decimals = 2): string => {
+    const safeNum = (val: unknown, decimals = 2): string => {
       if (val === null || val === undefined) return '0';
       const n =
+        // @ts-ignore
         typeof val === 'object' && val.toNumber ? val.toNumber() : Number(val);
       return isNaN(n) ? '0' : n.toFixed(decimals);
     };
 
-    // Filter transactions within the period
     const periodTransactions = allTransactions.transactions.filter(
-      (t: any) => new Date(t.createdAt) >= since,
+      (t: Record<string, unknown>) =>
+        new Date(t.createdAt as string | number | Date) >= since,
     );
 
     const tradeLines = periodTransactions.map(
-      (t: any) =>
-        `• ${t.type} ${t.symbol} x${t.quantity} @ ${safeNum(t.price)} PKR on ${new Date(t.createdAt).toLocaleDateString('en-PK')}`,
+      (t: Record<string, unknown>) =>
+        `• ${String(t.type)} ${String(t.symbol)} x${Number(t.quantity)} @ ${safeNum(t.price)} PKR on ${new Date(t.createdAt as string | number | Date).toLocaleDateString('en-PK')}`,
     );
 
     const reviewPrompt = `
@@ -270,10 +282,12 @@ export class ChatbotService implements OnModuleInit {
 
       const summaries = tournaments
         .map((s) => {
-          const trajectory = s.trajectoryJson as any[];
+          const trajectory = s.trajectoryJson as Record<string, unknown>[];
           if (!trajectory || trajectory.length === 0) return '';
-          const startPSX = trajectory[0]?.PSX || 62000;
-          const endPSX = trajectory[trajectory.length - 1]?.PSX || 62000;
+          const startPSX = Number(trajectory[0]?.PSX || 62000);
+          const endPSX = Number(
+            trajectory[trajectory.length - 1]?.PSX || 62000,
+          );
           const change = ((endPSX - startPSX) / startPSX) * 100;
           return `• PSX Tournament trend: ${startPSX.toFixed(2)} → ${endPSX.toFixed(2)} (${change.toFixed(2)}%)`;
         })
@@ -293,7 +307,13 @@ export class ChatbotService implements OnModuleInit {
 
   private async buildUserContext(userId: number): Promise<string> {
     // Fetch user info — this is critical, but handle gracefully
-    let user: any = null;
+    let user: {
+      id: number;
+      name: string | null;
+      username: string;
+      email: string;
+      balance: unknown;
+    } | null = null;
     try {
       user = await this.prisma.user.findUnique({ where: { id: userId } });
     } catch (err) {
@@ -301,7 +321,7 @@ export class ChatbotService implements OnModuleInit {
     }
 
     // Fetch portfolio — safe default for new users with no trades
-    let portfolioData: any = {
+    let portfolioData: Record<string, unknown> = {
       balance: user?.balance ?? 0,
       totalAccountValue: user?.balance ?? 0,
       totalInvested: 0,
@@ -316,7 +336,7 @@ export class ChatbotService implements OnModuleInit {
     }
 
     // Fetch transactions — safe default: empty list
-    let transactions: any[] = [];
+    let transactions: Record<string, unknown>[] = [];
     try {
       const transactionData = await this.tradesService.getTransactions(
         userId,
@@ -328,7 +348,7 @@ export class ChatbotService implements OnModuleInit {
     }
 
     // Fetch watchlist — safe default: empty list
-    let watchlistItems: any[] = [];
+    let watchlistItems: Record<string, unknown>[] = [];
     try {
       watchlistItems = await this.watchlistService.list(userId);
     } catch (err) {
@@ -336,7 +356,7 @@ export class ChatbotService implements OnModuleInit {
     }
 
     // Fetch featured/live stocks — safe default: empty list
-    let featuredStocks: any[] = [];
+    let featuredStocks: Record<string, unknown>[] = [];
     try {
       featuredStocks = await this.stocksService.listFeaturedWithTicks();
     } catch (err) {
@@ -345,41 +365,56 @@ export class ChatbotService implements OnModuleInit {
 
     // Detect new user state
     const isNewUser =
+      // @ts-ignore
       (portfolioData.portfolio || []).length === 0 && transactions.length === 0;
 
     // Helper to safely convert Decimal/number/string to a displayable number
-    const safeNum = (val: any, decimals = 2): string => {
+    const safeNum = (val: unknown, decimals = 2): string => {
       if (val === null || val === undefined) return '0';
       const n =
+        // @ts-ignore
         typeof val === 'object' && val.toNumber ? val.toNumber() : Number(val);
       return isNaN(n) ? '0' : n.toFixed(decimals);
     };
 
     // Format holdings as readable bullet points
-    const holdingLines = (portfolioData.portfolio || []).map((h: any) => {
+    const holdingLines = (
+      (portfolioData.portfolio as Record<string, unknown>[]) || []
+    ).map((h: Record<string, unknown>) => {
       const pnl =
-        typeof h.unrealizedPnl === 'object' && h.unrealizedPnl?.toNumber
-          ? h.unrealizedPnl.toNumber()
+        typeof h.unrealizedPnl === 'object' &&
+        h.unrealizedPnl &&
+        typeof (h.unrealizedPnl as unknown as Record<string, unknown>)
+          .toNumber === 'function'
+          ? // @ts-ignore
+            (h.unrealizedPnl as unknown as Record<string, unknown>).toNumber()
           : Number(h.unrealizedPnl || 0);
       const pnlSign = pnl >= 0 ? '+' : '';
-      return `  • ${h.symbol} (${h.quantity} shares) — Avg: ${safeNum(h.avgPrice)} | Now: ${safeNum(h.currentPrice)} | P&L: ${pnlSign}${safeNum(h.pnlPercentage, 1)}%`;
+      return `  • ${String(h.symbol)} (${Number(h.quantity)} shares) — Avg: ${safeNum(h.avgPrice)} | Now: ${safeNum(h.currentPrice)} | P&L: ${pnlSign}${safeNum(h.pnlPercentage, 1)}%`;
     });
 
     // Format recent trades as readable bullet points
-    const tradeLines = transactions.map((t: any) => {
-      const date = new Date(t.createdAt).toLocaleDateString('en-PK');
-      return `  • ${t.type} ${t.symbol} x${t.quantity} @ ${safeNum(t.price)} PKR on ${date}`;
+    const tradeLines = transactions.map((t: Record<string, unknown>) => {
+      const date = new Date(
+        t.createdAt as string | number | Date,
+      ).toLocaleDateString('en-PK');
+      return `  • ${String(t.type)} ${String(t.symbol)} x${Number(t.quantity)} @ ${safeNum(t.price)} PKR on ${date}`;
     });
 
     // Format watchlist
-    const watchlistLines = watchlistItems.map((w: any) => `  • ${w.symbol}`);
+    const watchlistLines = watchlistItems.map(
+      (w: Record<string, unknown>) => `  • ${String(w.symbol)}`,
+    );
 
     // Format live featured stocks
-    const stockLines = (featuredStocks || []).map((s: any) => {
-      const change =
-        s.tick?.percentChange != null ? safeNum(s.tick.percentChange) : 'N/A';
-      return `  • ${s.symbol}: ${s.tick?.price != null ? safeNum(s.tick.price) : 'N/A'} PKR (${change}%)`;
-    });
+    const stockLines = (featuredStocks || []).map(
+      (s: Record<string, unknown>) => {
+        const tick = s.tick as Record<string, unknown> | undefined;
+        const change =
+          tick?.percentChange != null ? safeNum(tick.percentChange) : 'N/A';
+        return `  • ${String(s.symbol)}: ${tick?.price != null ? safeNum(tick.price) : 'N/A'} PKR (${change}%)`;
+      },
+    );
 
     const contextString = `
 USER: ${user?.name || user?.username || 'Unknown'} (ID: ${userId})
@@ -405,7 +440,7 @@ ${this.marketBaseline}
     `.trim();
 
     this.logger.debug(
-      `Built user context for user ${userId} (isNewUser=${isNewUser}, holdings=${(portfolioData.portfolio || []).length}, trades=${transactions.length}, watchlist=${watchlistItems.length})`,
+      `Built user context for user ${userId} (isNewUser=${isNewUser}, holdings=${((portfolioData.portfolio as unknown[]) || []).length}, trades=${transactions.length}, watchlist=${watchlistItems.length})`,
     );
     return contextString;
   }
@@ -462,7 +497,7 @@ ${contextSnapshot}
     conversationHistory: { role: string; parts: { text: string }[] }[],
     newMessage: string,
   ): Promise<string> {
-    const contents: any[] = [
+    const contents: Record<string, unknown>[] = [
       ...conversationHistory.map((h) => ({ role: h.role, parts: h.parts })),
       { role: 'user', parts: [{ text: newMessage }] },
     ];

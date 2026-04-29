@@ -2,7 +2,7 @@
 
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { Sun, Moon, Monitor } from "lucide-react";
@@ -27,43 +27,43 @@ export default function DisplaySettingsPage() {
   if (!mounted) {
     return (
       <div className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Theme</CardTitle>
-            <CardDescription>
+        <div className="bg-card rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.2)] border border-transparent overflow-hidden">
+          <div className="p-6 border-b border-border/50">
+            <h2 className="text-2xl font-bold tracking-tight">Theme</h2>
+            <p className="text-sm text-muted-foreground mt-2">
               Choose how TradeUp looks to you. Select a theme preference.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            </p>
+          </div>
+          <div className="p-6">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
               {THEME_OPTIONS.map((option) => (
                 <div
                   key={option.value}
-                  className="flex flex-col items-center gap-3 p-4 rounded-lg border border-border bg-card animate-pulse"
+                  className="flex flex-col items-center gap-4 p-6 rounded-2xl border-2 border-border bg-card animate-pulse"
                 >
-                  <div className="h-10 w-10 rounded-full bg-muted" />
-                  <div className="h-4 w-16 rounded bg-muted" />
+                  <div className="h-12 w-12 rounded-full bg-muted" />
+                  <div className="h-4 w-20 rounded bg-muted" />
                 </div>
               ))}
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Theme</CardTitle>
-          <CardDescription>
+      <div className="bg-card rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.2)] border border-transparent hover:border-primary/20 transition-colors overflow-hidden">
+        <div className="p-6 border-b border-border/50">
+          <h2 className="text-2xl font-bold tracking-tight">Theme</h2>
+          <p className="text-sm text-muted-foreground mt-2">
             Choose how TradeUp looks to you. Select a theme preference.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
+          </p>
+        </div>
+        <div className="p-6 space-y-6">
           {/* Theme selection grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
             {THEME_OPTIONS.map((option) => {
               const Icon = option.icon;
               const isSelected = theme === option.value;
@@ -73,32 +73,32 @@ export default function DisplaySettingsPage() {
                   key={option.value}
                   onClick={() => setTheme(option.value)}
                   className={cn(
-                    "flex flex-col items-center gap-3 p-4 rounded-lg border-2 transition-all cursor-pointer",
-                    "hover:bg-accent hover:border-accent-foreground/20",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    "flex flex-col items-center gap-4 p-6 rounded-2xl border-2 transition-all cursor-pointer",
+                    "hover:bg-muted/50 hover:border-border",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
                     isSelected
-                      ? "border-primary bg-primary/5"
+                      ? "border-primary bg-primary/5 shadow-[0_0_15px_rgba(74,142,255,0.15)]"
                       : "border-border bg-card"
                   )}
                 >
                   <div
                     className={cn(
-                      "flex items-center justify-center h-12 w-12 rounded-full transition-colors",
+                      "flex items-center justify-center h-14 w-14 rounded-full transition-colors",
                       isSelected
-                        ? "bg-primary text-primary-foreground"
+                        ? "bg-primary text-primary-foreground shadow-lg"
                         : "bg-muted text-muted-foreground"
                     )}
                   >
-                    <Icon className="h-6 w-6" />
+                    <Icon className="h-7 w-7" />
                   </div>
                   <div className="text-center">
                     <Label className={cn(
-                      "font-medium pointer-events-none",
-                      isSelected && "text-primary"
+                      "text-label-caps pointer-events-none block mb-2",
+                      isSelected ? "text-primary" : "text-muted-foreground"
                     )}>
                       {option.label}
                     </Label>
-                    <p className="text-xs text-muted-foreground mt-1">
+                    <p className="text-xs font-mono text-muted-foreground leading-relaxed">
                       {option.description}
                     </p>
                   </div>
@@ -106,9 +106,8 @@ export default function DisplaySettingsPage() {
               );
             })}
           </div>
-
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

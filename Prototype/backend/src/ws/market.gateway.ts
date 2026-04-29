@@ -7,8 +7,7 @@ import {
   ConnectedSocket,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { WebSocket } from 'ws';
-import { FEATURED_SYMBOLS, PSX_WS_URL } from '../common/constants';
+import { FEATURED_SYMBOLS } from '../common/constants';
 import { StocksService } from '../stocks/stocks.service';
 
 interface TickUpdateMessage {
@@ -35,12 +34,10 @@ export class MarketGateway implements OnModuleInit {
   @WebSocketServer()
   server!: Server;
 
-  private upstream?: WebSocket;
-
   constructor(private readonly stocksService: StocksService) {}
 
   onModuleInit() {
-    this.connectUpstream();
+    this.startPollingFallback();
   }
 
   @SubscribeMessage('subscribeSymbol')
@@ -55,68 +52,76 @@ export class MarketGateway implements OnModuleInit {
     socket.emit('subscribed', { symbol });
   }
 
-  private connectUpstream() {
-    const ws = new WebSocket(PSX_WS_URL);
-    this.upstream = ws;
+  private getActiveSubscribedSymbols(): string[] {
+    if (!this.server?.sockets?.adapter?.rooms) return [];
+    const activeSymbols: string[] = [];
+    const rooms = this.server.sockets.adapter.rooms;
 
-    ws.on('open', () => {
-      // Single global subscription to the entire REG market
-      const msg = {
-        type: 'subscribe',
-        subscriptionType: 'marketData',
-        params: { marketType: 'REG' },
-        requestId: 'sub-market-all',
-      };
-      ws.send(JSON.stringify(msg));
-    });
+    for (const [roomName, clients] of rooms.entries()) {
+      if (
+        typeof roomName === 'string' &&
+        roomName.startsWith('symbol:') &&
+        clients.size > 0
+      ) {
+        const symbol = roomName.replace('symbol:', '');
+        if ((FEATURED_SYMBOLS as readonly string[]).includes(symbol)) {
+          activeSymbols.push(symbol);
+        }
+      }
+    }
+    return activeSymbols;
+  }
 
-    ws.on('message', (data: unknown) => {
+  private startPollingFallback() {
+    console.log(
+      '[MarketGateway] Upstream WebSocket disabled. Starting REST API polling fallback...',
+    );
+
+    setInterval(async () => {
       try {
-        let rawMessage: string;
+        const symbolsToPoll = this.getActiveSubscribedSymbols();
+        if (symbolsToPoll.length === 0) return;
 
-        if (Buffer.isBuffer(data)) {
-          rawMessage = data.toString();
-        } else if (Array.isArray(data)) {
-          rawMessage = Buffer.concat(data as Buffer[]).toString();
-        } else if (data instanceof ArrayBuffer) {
-          rawMessage = Buffer.from(data).toString();
-        } else {
-          rawMessage = String(data);
-        }
+        // Fetch updates in small batches to respect rate limits
+        const batchSize = 5;
+        for (let i = 0; i < symbolsToPoll.length; i += batchSize) {
+          const batch = symbolsToPoll.slice(i, i + batchSize);
 
-        const msg = JSON.parse(rawMessage);
+          await Promise.all(
+            batch.map(async (symbol) => {
+              try {
+                // Pass forceFetch=true to bypass the local cache and hit the REST API
+                const tick = await this.stocksService.getTick(
+                  symbol,
+                  'REG',
+                  true,
+                );
+                if (tick) {
+                  // Emit the updated tick to all clients in the room
+                  const msg: TickUpdateMessage = {
+                    type: 'tickUpdate',
+                    symbol,
+                    tick,
+                  };
+                  this.server.to(`symbol:${symbol}`).emit('tickUpdate', msg);
+                }
+              } catch (err) {
+                // Ignore individual fetch errors so polling continues
+              }
+            }),
+          );
 
-        // Handle PSX Heartbeat Requirements
-        if (msg?.type === 'ping') {
-          ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
-          return;
-        }
-
-        if (msg?.type === 'tickUpdate' && msg?.symbol) {
-          // Gatekeeper: Only process allowed KSE-100 symbols
-          if ((FEATURED_SYMBOLS as readonly string[]).includes(msg.symbol)) {
-            // Update in-memory cache directly into the service layer
-            this.stocksService.updateTickCache(msg.symbol, msg.tick || msg);
-            // Broadcast to connected frontend clients
-            this.server.to(`symbol:${msg.symbol}`).emit('tickUpdate', msg);
+          // Delay between batches to respect upstream rate limits
+          if (i + batchSize < symbolsToPoll.length) {
+            await new Promise((resolve) => setTimeout(resolve, 1000));
           }
         }
-      } catch (error) {
-        console.error('Failed to parse WebSocket message:', error);
+      } catch (err) {
+        console.error(
+          '[MarketGateway] Error in polling fallback:',
+          (err as Error).message,
+        );
       }
-    });
-
-    ws.on('close', () => {
-      setTimeout(() => this.connectUpstream(), 2000);
-    });
-
-    ws.on('error', (error) => {
-      console.error('WebSocket error:', error);
-      try {
-        ws.close();
-      } catch (closeError) {
-        console.error('Failed to close WebSocket:', closeError);
-      }
-    });
+    }, 10000); // Poll active subscriptions every 10 seconds
   }
 }

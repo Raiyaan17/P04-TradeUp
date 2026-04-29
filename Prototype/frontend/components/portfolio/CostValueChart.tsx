@@ -67,6 +67,8 @@ function CustomTooltip({
 }
 
 export function CostValueChart({ portfolio }: CostValueChartProps) {
+  const { resolvedTheme } = useTheme();
+
   const data: CostValueDatum[] = portfolio
     .map((item) => ({
       symbol: item.symbol,
@@ -84,8 +86,6 @@ export function CostValueChart({ portfolio }: CostValueChartProps) {
   }
 
   const chartHeight = Math.max(200, data.length * 48);
-
-  const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
   const axisColor = isDark ? '#9ca3af' : '#4b5563';
   const labelColor = isDark ? '#e5e7eb' : '#1f2937';

@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, type GenerateContentConfig } from '@google/genai';
 
 export interface TournamentDataPoint {
   day: number;
@@ -131,7 +131,7 @@ No extra text, no markdown block syntax, just raw JSON.`;
     prompt: string,
     isJson: boolean = true,
   ): Promise<string> {
-    const config: any = {
+    const config: GenerateContentConfig = {
       temperature: 0.7,
       maxOutputTokens: 8192,
     };
@@ -166,7 +166,14 @@ No extra text, no markdown block syntax, just raw JSON.`;
     return parsed.news || [];
   }
 
-  async generateTournamentAnalysis(stats: any): Promise<string> {
+  async generateTournamentAnalysis(stats: {
+    startingCash: number;
+    pnl: number;
+    rank: number;
+    totalPlayers: number;
+    totalTrades: number;
+    topStock: string;
+  }): Promise<string> {
     const prompt = `You are a strict, senior hedge fund manager acting as a mentor. Analyze this trader's 60-minute quick tournament performance:
     
 Starting Balance: ${stats.startingCash} PKR

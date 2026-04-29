@@ -165,8 +165,10 @@ describe('Feature B: Portfolio Visualizer — API Contract', () => {
       );
 
       // AAPL: 10 * 120 = 1200
+      // @ts-ignore
       expect(aapl.currentValue.toNumber()).toBeCloseTo(1200, 2);
       // TSLA: 5 * 180 = 900
+      // @ts-ignore
       expect(tsla.currentValue.toNumber()).toBeCloseTo(900, 2);
     });
 
@@ -273,19 +275,25 @@ describe('Feature B: Portfolio Visualizer — API Contract', () => {
       const aapl = result.portfolio.find(
         (p: { symbol: string }) => p.symbol === 'AAPL',
       );
+      // @ts-ignore
       expect(aapl.invested.toNumber()).toBeCloseTo(1000, 2); // 10 * 100
+      // @ts-ignore
       expect(aapl.currentValue.toNumber()).toBeCloseTo(1100, 2); // 10 * 110
 
       const goog = result.portfolio.find(
         (p: { symbol: string }) => p.symbol === 'GOOG',
       );
+      // @ts-ignore
       expect(goog.invested.toNumber()).toBeCloseTo(1000, 2); // 5 * 200
+      // @ts-ignore
       expect(goog.currentValue.toNumber()).toBeCloseTo(950, 2); // 5 * 190
 
       const tsla = result.portfolio.find(
         (p: { symbol: string }) => p.symbol === 'TSLA',
       );
+      // @ts-ignore
       expect(tsla.invested.toNumber()).toBeCloseTo(900, 2); // 3 * 300
+      // @ts-ignore
       expect(tsla.currentValue.toNumber()).toBeCloseTo(1050, 2); // 3 * 350
     });
   });
