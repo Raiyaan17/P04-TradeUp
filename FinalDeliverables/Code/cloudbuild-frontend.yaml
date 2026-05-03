@@ -1,0 +1,30 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    dir: 'Prototype/frontend'
+    args: 
+      - 'build'
+      - '--build-arg'
+      - 'NEXT_PUBLIC_API_URL=http://136.119.205.38'
+      - '--build-arg'
+      - 'NEXT_PUBLIC_WS_URL=http://136.119.205.38'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/project-8ca874ae-688d-414c-91b/tradeup/frontend:$SHORT_SHA'
+      - '-t' 
+      - 'us-central1-docker.pkg.dev/project-8ca874ae-688d-414c-91b/tradeup/frontend:latest'
+      - '.'
+
+  - name: 'gcr.io/cloud-builders/kubectl'
+    args:
+      - 'set'
+      - 'image'
+      - 'deployment/tradeup-frontend' 
+      - 'frontend-sha256-1=us-central1-docker.pkg.dev/project-8ca874ae-688d-414c-91b/tradeup/frontend:$SHORT_SHA' 
+    env:
+      - 'CLOUDSDK_COMPUTE_REGION=us-central1' 
+      - 'CLOUDSDK_CONTAINER_CLUSTER=autopilot-cluster-1'
+
+images:
+  - 'us-central1-docker.pkg.dev/project-8ca874ae-688d-414c-91b/tradeup/frontend:$SHORT_SHA'
+  - 'us-central1-docker.pkg.dev/project-8ca874ae-688d-414c-91b/tradeup/frontend:latest'
+options:
+  logging: CLOUD_LOGGING_ONLY

@@ -1,0 +1,19 @@
+name: Build
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types: [opened, synchronize, reopened]
+jobs:
+  sonarqube:
+    name: SonarQube
+    runs-on: macos-latest # or windows-latest
+    steps:
+      - uses: actions/checkout@b4ffde65f69b029ed5d11d302e7a470a5bf63239  # v4
+        with:
+          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@2e6582eff76fb392ce5399c1c8cc6b31652e58c7  # v6
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

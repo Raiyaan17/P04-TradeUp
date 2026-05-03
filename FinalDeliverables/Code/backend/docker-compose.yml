@@ -1,0 +1,44 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: tradeup-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-tradeup}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-tradeup}
+    ports:
+      - "5432:5432"
+    volumes:
+      - tradeup_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  backend:
+    container_name: tradeup-backend
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      PORT: ${PORT:-3001}
+      DATABASE_URL: ${DATABASE_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      PSX_API_BASE: ${PSX_API_BASE:-https://psxterminal.com}
+      # Supabase (for profile image storage)
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      # News APIs
+      NEWS_API_KEY: ${NEWS_API_KEY}
+      STOCK_API_KEY: ${STOCK_API_KEY}
+      # Gemini AI
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+    ports:
+      - "3001:3001"
+    depends_on:
+      db:
+        condition: service_healthy
+    # Removed development volume mount to allow the production build dist/ folder to serve correctly
+volumes:
+  tradeup_db:

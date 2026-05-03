@@ -1,0 +1,8 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    dir: 'Prototype/backend'
+    args: ['build', '-t', 'us-central1-docker.pkg.dev/project-8ca874ae-688d-414c-91b/tradeup/backend:latest', '.']
+images:
+  - 'us-central1-docker.pkg.dev/project-8ca874ae-688d-414c-91b/tradeup/backend:latest'
+options:
+  logging: CLOUD_LOGGING_ONLY
