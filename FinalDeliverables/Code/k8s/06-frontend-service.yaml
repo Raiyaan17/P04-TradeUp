@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: tradeup-frontend-svc
+  namespace: tradeup
+spec:
+  type: NodePort # Required for GKE Ingress HTTP Load Balancer
+  selector:
+    app: tradeup-frontend
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 3000

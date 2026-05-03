@@ -1,0 +1,44 @@
+import { Module } from '@nestjs/common';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
+import { PrismaModule } from './prisma/prisma.module';
+import { UsersModule } from './users/users.module';
+import { AuthModule } from './auth/auth.module';
+import { StocksModule } from './stocks/stocks.module';
+import { WatchlistModule } from './watchlist/watchlist.module';
+import { WsModule } from './ws/ws.module';
+import { NewsModule } from './news/news.module';
+import { TradesModule } from './trades/trades.module';
+import { FriendsModule } from './friends/friends.module';
+import { OracleModule } from './oracle/oracle.module';
+import { CommunityModule } from './community/community.module';
+import { ChatbotModule } from './chatbot/chatbot.module';
+
+@Module({
+  imports: [
+    ThrottlerModule.forRoot({
+      throttlers: [
+        {
+          limit: 10,
+          ttl: 60,
+        },
+      ],
+    }),
+    PrismaModule,
+    UsersModule,
+    AuthModule,
+    StocksModule,
+    WatchlistModule,
+    WsModule,
+    NewsModule,
+    TradesModule,
+    FriendsModule,
+    OracleModule,
+    CommunityModule,
+    ChatbotModule,
+  ],
+  controllers: [AppController],
+  providers: [AppService],
+})
+export class AppModule {}

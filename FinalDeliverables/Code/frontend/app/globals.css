@@ -1,0 +1,116 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+html, body {
+  margin: 0;
+  padding: 0;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-space-grotesk);
+  --font-mono: var(--font-space-grotesk);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  /* Default to dark theme for Neo-Bauhaus Electric */
+  --background: #131313;
+  --foreground: #e5e2e1;
+  --card: #1c1b1b;
+  --card-foreground: #e5e2e1;
+  --popover: #2a2a2a;
+  --popover-foreground: #e5e2e1;
+  --primary: #4a8eff;
+  --primary-foreground: #00285b;
+  --secondary: #2a2a2a;
+  --secondary-foreground: #c1c6d7;
+  --muted: #201f1f;
+  --muted-foreground: #8b90a0;
+  --accent: #005bc0;
+  --accent-foreground: #e5e2e1;
+  --destructive: #93000a;
+  --destructive-foreground: #ffdad6;
+  --border: #414754;
+  --input: #201f1f;
+  --ring: #4a8eff;
+  --radius: 0.5rem;
+}
+
+.dark {
+  --background: #131313;
+  --foreground: #e5e2e1;
+  --card: #1c1b1b;
+  --card-foreground: #e5e2e1;
+  --popover: #2a2a2a;
+  --popover-foreground: #e5e2e1;
+  --primary: #4a8eff;
+  --primary-foreground: #00285b;
+  --secondary: #2a2a2a;
+  --secondary-foreground: #c1c6d7;
+  --muted: #201f1f;
+  --muted-foreground: #8b90a0;
+  --accent: #005bc0;
+  --accent-foreground: #e5e2e1;
+  --destructive: #93000a;
+  --destructive-foreground: #ffdad6;
+  --border: #414754;
+  --input: #201f1f;
+  --ring: #4a8eff;
+  --radius: 0.5rem;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground font-sans;
+  }
+  h1 {
+    @apply text-[4.5rem] font-bold leading-[1.1] tracking-[-0.04em];
+  }
+  h2 {
+    @apply text-3xl font-semibold leading-[1.2] tracking-[-0.02em];
+  }
+  h3 {
+    @apply text-2xl font-semibold leading-[1.2] tracking-[-0.01em];
+  }
+}
+
+@layer utilities {
+  .text-label-caps {
+    @apply text-xs font-bold leading-none tracking-[0.1em] uppercase;
+  }
+  .text-body-lg {
+    @apply text-xl font-normal leading-[1.6] tracking-normal;
+  }
+  .text-body-md {
+    @apply text-base font-normal leading-[1.6] tracking-normal;
+  }
+}

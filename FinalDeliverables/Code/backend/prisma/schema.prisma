@@ -1,0 +1,298 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                     Int                     @id @default(autoincrement())
+  email                  String                  @unique
+  passwordHash           String
+  role                   Role                    @default(TRADER)
+  createdAt              DateTime                @default(now())
+  name                   String?
+  profileImageUrl        String?
+  balance                Decimal                 @default(-1)
+  tournamentScore        Int                     @default(0)
+  gender                 Gender?
+  username               String                  @unique
+  chatSessions           ChatSession[]
+  comments               Comment[]
+  receivedFriendships    Friendship[]            @relation("ReceivedFriendships")
+  sentFriendships        Friendship[]            @relation("SentFriendships")
+  portfolio              Portfolio[]
+  posts                  Post[]
+  reactions              Reaction[]
+  savedPosts             SavedPost[]
+  tournamentParticipants TournamentParticipant[]
+  transactions           Transaction[]
+  blockedByUsers         UserBlock[]             @relation("BlockedUser")
+  blockedUsers           UserBlock[]             @relation("BlockedByUser")
+  watchlist              WatchlistItem[]
+}
+
+model Friendship {
+  id         Int              @id @default(autoincrement())
+  senderId   Int
+  receiverId Int
+  status     FriendshipStatus @default(PENDING)
+  createdAt  DateTime         @default(now())
+  receiver   User             @relation("ReceivedFriendships", fields: [receiverId], references: [id])
+  sender     User             @relation("SentFriendships", fields: [senderId], references: [id])
+
+  @@unique([senderId, receiverId])
+}
+
+model Stock {
+  id           Int             @id @default(autoincrement())
+  symbol       String          @unique
+  name         String?
+  marketType   String          @default("REG")
+  createdAt    DateTime        @default(now())
+  portfolio    Portfolio[]
+  transactions Transaction[]
+  watchers     WatchlistItem[]
+}
+
+model WatchlistItem {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  stockId   Int
+  createdAt DateTime @default(now())
+  stock     Stock    @relation(fields: [stockId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, stockId])
+}
+
+model Portfolio {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  stockId   Int
+  quantity  Int
+  avgPrice  Decimal
+  createdAt DateTime @default(now())
+  stock     Stock    @relation(fields: [stockId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, stockId])
+}
+
+model Transaction {
+  id        Int             @id @default(autoincrement())
+  userId    Int
+  stockId   Int
+  type      TransactionType
+  quantity  Int
+  price     Decimal
+  total     Decimal
+  createdAt  DateTime        @default(now())
+  sellReason SellReason?
+  sellNote   String?
+  stock      Stock           @relation(fields: [stockId], references: [id])
+  user       User            @relation(fields: [userId], references: [id])
+}
+
+model Tournament {
+  id             String                  @id @default(uuid())
+  status         TournamentStatus        @default(PENDING)
+  startingCash   Decimal
+  createdAt      DateTime                @default(now())
+  startedAt      DateTime?
+  endedAt        DateTime?
+  trajectoryJson Json
+  newsJson       Json
+  participants   TournamentParticipant[]
+
+  @@index([status])
+}
+
+model TournamentParticipant {
+  id             Int                     @id @default(autoincrement())
+  tournamentId   String
+  userId         Int
+  currentBalance Decimal
+  currentScore   Decimal                 @default(0)
+  joinedAt       DateTime                @default(now())
+  tournament     Tournament              @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  user           User                    @relation(fields: [userId], references: [id])
+  portfolio      TournamentPortfolio[]
+  transactions   TournamentTransaction[]
+
+  @@unique([tournamentId, userId])
+}
+
+model TournamentPortfolio {
+  id            Int                   @id @default(autoincrement())
+  participantId Int
+  stockSymbol   String
+  quantity      Int                   @default(0)
+  avgPrice      Decimal               @default(0)
+  participant   TournamentParticipant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@unique([participantId, stockSymbol])
+}
+
+model TournamentTransaction {
+  id            Int                   @id @default(autoincrement())
+  participantId Int
+  stockSymbol   String
+  type          TransactionType
+  quantity      Int
+  price         Decimal
+  total         Decimal
+  createdAt     DateTime              @default(now())
+  participant   TournamentParticipant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@index([participantId])
+}
+
+model Post {
+  id        Int         @id @default(autoincrement())
+  authorId  Int
+  title     String
+  content   String
+  tag       PostTag     @default(GENERAL)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  imageUrl  String?
+  comments  Comment[]
+  author    User        @relation(fields: [authorId], references: [id])
+  reactions Reaction[]
+  savedBy   SavedPost[]
+
+  @@index([authorId])
+  @@index([createdAt])
+}
+
+model Comment {
+  id        Int       @id @default(autoincrement())
+  postId    Int
+  authorId  Int
+  parentId  Int?
+  content   String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  imageUrl  String?
+  author    User      @relation(fields: [authorId], references: [id])
+  parent    Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   Comment[] @relation("CommentReplies")
+  post      Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@index([authorId])
+  @@index([parentId])
+}
+
+model Reaction {
+  id        Int          @id @default(autoincrement())
+  postId    Int
+  userId    Int
+  type      ReactionType
+  createdAt DateTime     @default(now())
+  post      Post         @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User         @relation(fields: [userId], references: [id])
+
+  @@unique([postId, userId])
+  @@index([postId])
+}
+
+model UserBlock {
+  id        Int      @id @default(autoincrement())
+  blockerId Int
+  blockedId Int
+  createdAt DateTime @default(now())
+  blocked   User     @relation("BlockedUser", fields: [blockedId], references: [id])
+  blocker   User     @relation("BlockedByUser", fields: [blockerId], references: [id])
+
+  @@unique([blockerId, blockedId])
+  @@index([blockerId])
+}
+
+model SavedPost {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  postId    Int
+  createdAt DateTime @default(now())
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+  @@index([userId])
+  @@index([postId])
+}
+
+model ChatSession {
+  id           Int           @id @default(autoincrement())
+  userId       Int
+  createdAt    DateTime      @default(now())
+  lastActiveAt DateTime      @default(now())
+  messages     ChatMessage[]
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model ChatMessage {
+  id        Int         @id @default(autoincrement())
+  sessionId Int
+  role      String
+  content   String
+  createdAt DateTime    @default(now())
+  session   ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+}
+
+enum Role {
+  TRADER
+  ADMIN
+}
+
+enum Gender {
+  MALE
+  FEMALE
+}
+
+enum TransactionType {
+  BUY
+  SELL
+}
+
+enum FriendshipStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+}
+
+enum TournamentStatus {
+  PENDING
+  ACTIVE
+  COMPLETED
+}
+
+enum PostTag {
+  GENERAL
+  STOCKS
+  CRYPTO
+  NEWS
+  ANALYSIS
+  QUESTION
+}
+
+enum ReactionType {
+  LIKE
+  LOVE
+  FIRE
+  BEARISH
+  BULLISH
+}
+
+enum SellReason {
+  TARGET_HIT
+  PANIC_EMOTION
+  NEEDED_CASH
+}

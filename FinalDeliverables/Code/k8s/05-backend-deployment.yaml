@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tradeup-backend
+  namespace: tradeup
+spec:
+  replicas: 1 # Scale later when Redis adapter is added
+  selector:
+    matchLabels:
+      app: tradeup-backend
+  template:
+    metadata:
+      labels:
+        app: tradeup-backend
+    spec:
+      containers:
+        - name: backend
+          image: us-central1-docker.pkg.dev/project-8ca874ae-688d-414c-91b/tradeup/backend:latest
+          ports:
+            - containerPort: 3001
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: tradeup-secrets
+                  key: DATABASE_URL
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: tradeup-secrets
+                  key: JWT_SECRET
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: tradeup-secrets
+                  key: POSTGRES_PASSWORD
+            - name: SUPABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: tradeup-secrets
+                  key: SUPABASE_URL
+            - name: SUPABASE_SERVICE_ROLE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: tradeup-secrets
+                  key: SUPABASE_SERVICE_ROLE_KEY
+            - name: NEWS_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: tradeup-secrets
+                  key: NEWS_API_KEY
+            - name: STOCK_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: tradeup-secrets
+                  key: STOCK_API_KEY
+            - name: GEMINI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: tradeup-secrets
+                  key: GEMINI_API_KEY
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
