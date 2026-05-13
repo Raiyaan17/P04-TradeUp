@@ -33,12 +33,16 @@ export class OracleService implements OnModuleDestroy {
 
   // Ideally, use an EventEmitter or emit via a dedicated Gateway.
   // We'll expose getters for WebSockets to pull, or a callback mechanism.
+<<<<<<< HEAD
   private tickCallback?: (
     tickData: TournamentDataPoint,
     news: TournamentNewsItem[],
     leaderboard: LeaderboardEntry[],
   ) => void;
   private endCallback?: (leaderboard: LeaderboardEntry[]) => void;
+=======
+  private tickCallback?: (tickData: TournamentDataPoint, news: TournamentNewsItem[], leaderboard: LeaderboardEntry[]) => void;
+>>>>>>> parent of c00d657 ( final working game)
 
   constructor(
     private readonly prisma: PrismaService,
@@ -60,10 +64,6 @@ export class OracleService implements OnModuleDestroy {
     this.tickCallback = cb;
   }
 
-  setEndCallback(cb: (leaderboard: LeaderboardEntry[]) => void) {
-    this.endCallback = cb;
-  }
-
   async getActiveTournament() {
     return this.prisma.tournament.findFirst({
       where: { status: TournamentStatus.ACTIVE },
@@ -76,6 +76,7 @@ export class OracleService implements OnModuleDestroy {
     });
   }
 
+<<<<<<< HEAD
   async getActiveTournaments() {
     return this.prisma.tournament.findMany({
       where: { status: TournamentStatus.ACTIVE },
@@ -190,6 +191,9 @@ export class OracleService implements OnModuleDestroy {
     startingCash: number,
     speed: 'normal' | 'fast' = 'normal',
   ) {
+=======
+  async startTournament(userId: number, startingCash: number) {
+>>>>>>> parent of c00d657 ( final working game)
     const active = await this.getActiveTournament();
     if (active)
       throw new BadRequestException('A tournament is already active.');
@@ -252,7 +256,7 @@ export class OracleService implements OnModuleDestroy {
     // Join the first player
     await this.joinTournament(userId, tournament.id);
 
-    this.startTickEngine(tournament.id, speed);
+    this.startTickEngine(tournament.id);
 
     return tournament;
   }
@@ -291,14 +295,14 @@ export class OracleService implements OnModuleDestroy {
     });
     if (existing) return existing;
 
-    const newParticipant = await this.prisma.tournamentParticipant.create({
+    return this.prisma.tournamentParticipant.create({
       data: {
         tournamentId,
         userId,
         currentBalance: tournament.startingCash,
-        currentScore: 0,
       },
     });
+<<<<<<< HEAD
 
     // Optionally broadcast immediate leaderboard update to all clients
     // so players instantly see newly arrived competitors
@@ -312,6 +316,8 @@ export class OracleService implements OnModuleDestroy {
     }
 
     return newParticipant;
+=======
+>>>>>>> parent of c00d657 ( final working game)
   }
 
   async buyStock(
@@ -479,6 +485,7 @@ export class OracleService implements OnModuleDestroy {
     });
   }
 
+<<<<<<< HEAD
   private startTickEngine(
     tournamentId: string,
     speed: 'normal' | 'fast' = 'normal',
@@ -594,18 +601,56 @@ export class OracleService implements OnModuleDestroy {
           `Tick Engine Error at minute ${this.currentTickIndex}:`,
           err,
         );
-        this.stopTickEngine();
-      }
-    };
+=======
+  private startTickEngine(tournamentId: string) {
+    this.stopTickEngine();
 
-    // Wait 2.5s to allow clients to establish WebSocket connection before first tick
-    setTimeout(() => {
-      // Check if we didn't stop it in the meantime
-      if (this.currentTickIndex === 0) {
-        tickFn();
-        this.tickInterval = setInterval(tickFn, intervalMs);
+    // Broadcast a new tick every 5 seconds
+    this.tickInterval = setInterval(async () => {
+      if (this.currentTickIndex >= this.trajectoryPoints.length) {
+>>>>>>> parent of c00d657 ( final working game)
+        this.stopTickEngine();
+        await this.prisma.tournament.update({
+          where: { id: tournamentId },
+          data: { status: TournamentStatus.COMPLETED, endedAt: new Date() },
+        });
+        return;
       }
-    }, 2500);
+
+      const tick = this.trajectoryPoints[this.currentTickIndex];
+      const tickNews = this.newsItems.filter(n => n.minute === tick.minute);
+
+      // Recalculate everyone's score
+      const participants = await this.prisma.tournamentParticipant.findMany({
+        where: { tournamentId },
+        include: { user: true },
+      });
+
+      for (const p of participants) {
+        await this.recalculateScore(p.id);
+      }
+
+      // Build leaderboard
+      const updatedParticipants = await this.prisma.tournamentParticipant.findMany({
+        where: { tournamentId },
+        include: { user: true },
+        orderBy: { currentScore: 'desc' },
+      });
+
+      const leaderboard: LeaderboardEntry[] = updatedParticipants.map((p, index) => ({
+        userId: p.userId,
+        username: p.user.username,
+        pnl: Number(p.currentScore),
+        rank: index + 1,
+      }));
+
+      // Fire callback to alert the Gateway
+      if (this.tickCallback) {
+        this.tickCallback(tick, tickNews, leaderboard);
+      }
+
+      this.currentTickIndex++;
+    }, 5000);
   }
 
   private stopTickEngine() {

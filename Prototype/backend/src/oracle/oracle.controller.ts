@@ -22,6 +22,7 @@ export class OracleController {
     return this.oracleService.getActiveTournament();
   }
 
+<<<<<<< HEAD
   @Get('list')
   async getActiveTournaments() {
     return this.oracleService.getActiveTournaments();
@@ -47,6 +48,8 @@ export class OracleController {
     );
   }
 
+=======
+>>>>>>> parent of c00d657 ( final working game)
   @Post('start')
   @UseGuards(RolesGuard)
   @Roles('ADMIN')
@@ -54,13 +57,16 @@ export class OracleController {
     // @ts-ignore
     @Req() req: import('../types/request.type').AuthenticatedRequest,
     @Body('startingCash') startingCash: number,
-    @Body('speed') speed?: 'normal' | 'fast',
   ) {
+<<<<<<< HEAD
     return this.oracleService.startTournament(
       req.user.userId,
       startingCash,
       speed || 'normal',
     );
+=======
+    return this.oracleService.startTournament(req.user.userId, startingCash);
+>>>>>>> parent of c00d657 ( final working game)
   }
 
   @Post('join')
