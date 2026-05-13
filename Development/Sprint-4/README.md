@@ -4,3 +4,5 @@ Sprint 4 rundown:
 -Umar - First Prototype of PX=SX AI Simulated Game mode
 -Shahmir - Final ChatBot Version
 -Raiyaan - Added tool tips,refined stock information,added useful information for the users
+
+Walkthrough : https://drive.google.com/file/d/1416fdKvb0lMjLf-4PP9evyJolClEu2W3/view?usp=drive_link
